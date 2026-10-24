@@ -44,11 +44,9 @@ export function foldStage(href, size, state) {
   const ghosts = [...el.querySelectorAll('.fold-ghost')];
   const sky = $('.j-sky');
   const lid = $('.j-lid');
-  const ridges = $('.j-ridges');
   const shine = $('.j-shine');
   const ripple = $('.j-ripple');
   const glow = $('.j-glow');
-  const ridgeStep = +ridges.dataset.step;
   const shineTravel = +shine.dataset.travel;
 
   // The last triangle's centre sits at (1/6, 1/3) of the card; that point flies to the jar's mouth.
@@ -85,8 +83,8 @@ export function foldStage(href, size, state) {
     ripple.animate([{ opacity: 0.9, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(1.35, 1.8)' }], { duration: 420, easing: 'cubic-bezier(.2,.7,.3,1)' });
     glow.animate([{ opacity: 0 }, { opacity: 0.35, offset: 0.25 }, { opacity: 0 }], { duration: 420, easing: 'ease-out' });
   };
+  // The lid is a photo, so a twist reads as a sweep of light across the brass and a small tilt.
   const twist = (dir) => {
-    ridges.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${dir * ridgeStep * 4}px)` }], { duration: 180, easing: 'cubic-bezier(.3,0,.2,1)' });
     shine.animate([{ opacity: 1, transform: `translateX(${dir > 0 ? 0 : shineTravel}px)` }, { opacity: 1, transform: `translateX(${dir > 0 ? shineTravel : 0}px)` }], { duration: 180 });
     return run(lid, [{ transform: 'rotate(0)' }, { transform: `rotate(${dir * 1.5}deg)`, offset: 0.6 }, { transform: 'rotate(0)' }], { duration: 180 });
   };
@@ -118,7 +116,7 @@ export function foldStage(href, size, state) {
     await run(sky, [{ opacity: 0, transform: 'scale(.7)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 220, easing: 'cubic-bezier(.2,.8,.3,1)' });
     // Lid settles, then one twist and a click.
     lid.style.opacity = 1;
-    await run(lid, [{ transform: 'translateY(-30px) rotate(-6deg)', opacity: 0 }, { transform: 'translateY(0) rotate(0)', opacity: 1 }], { duration: 200, easing: 'cubic-bezier(.3,0,.2,1)' });
+    await run(lid, [{ transform: 'translateY(-220px) rotate(-6deg)', opacity: 0 }, { transform: 'translateY(0) rotate(0)', opacity: 1 }], { duration: 200, easing: 'cubic-bezier(.3,0,.2,1)' });
     await twist(-1);
     click();
     show('kept');
@@ -130,7 +128,7 @@ export function foldStage(href, size, state) {
     // One twist and a click, then the lid lifts off.
     click();
     await twist(1);
-    await run(lid, [{ transform: 'translateY(0) rotate(0)', opacity: 1 }, { transform: 'translateY(-34px) rotate(-6deg)', opacity: 0 }], { duration: 220, easing: 'cubic-bezier(.2,.7,.3,1)' });
+    await run(lid, [{ transform: 'translateY(0) rotate(0)', opacity: 1 }, { transform: 'translateY(-260px) rotate(-6deg)', opacity: 0 }], { duration: 220, easing: 'cubic-bezier(.2,.7,.3,1)' });
     energy();
     await run(sky, [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(.7)' }], { duration: 170 });
     const flight = [{ transform: inJar }, { transform: midAir, offset: 0.55 }, { transform: 'none' }];

@@ -1,6 +1,6 @@
 import { store, newId } from './store.js';
 import { prepareImage, makeSampleSky, hexToRgb, luminance, dominant, hex, mix } from './sky.js';
-import { jarShape, jarSvg, lidSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
+import { BOX, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
 import { foldStage } from './fold.js';
 import { sunTimes } from './sun.js';
 import { makeStory, shareImage, saveImage } from './story.js';
@@ -60,12 +60,8 @@ function toLocalInput(ms) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-/** Canvas jars can't read CSS, so hand them the theme's colors. */
-function themeInk() {
-  const cs = getComputedStyle(document.documentElement);
-  const v = (name) => cs.getPropertyValue(name).trim();
-  return { ink: v('--ink'), paper: v('--paper'), glass: v('--glass') };
-}
+/** Canvas jars can't read CSS, so tell them which glass layer suits the theme. */
+const isDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
 
 let toastTimer;
 function toast(msg) {
@@ -304,13 +300,13 @@ function renderMonths() {
   $('#nextYear').addEventListener('click', () => { state.year++; renderMonths(); });
 
   state.redraw = () => {
-    const theme = themeInk();
+    const dark = isDark();
     view.querySelectorAll('.month-slot').forEach((el) => {
       const m = +el.dataset.month;
       const w = Math.min(el.clientWidth, 96);
       const h = Math.round(w * JAR_RATIO);
       const ctx = setupCanvas(el.querySelector('canvas'), w, h);
-      drawJar(ctx, { x: 0, y: 0, w, h, skies: skiesIn(y, m), capacity: daysIn(y, m), ghost: el.disabled, ...theme });
+      drawJar(ctx, { x: 0, y: 0, w, skies: skiesIn(y, m), capacity: daysIn(y, m), ghost: el.disabled, dark });
     });
   };
   state.redraw();
@@ -361,7 +357,7 @@ function renderMonth(year, month) {
     const w = Math.min(view.clientWidth * 0.55, 200);
     const h = Math.round(w * JAR_RATIO);
     const ctx = setupCanvas(cv, w, h);
-    layers = drawJar(ctx, { x: 0, y: 0, w, h, skies: list, capacity: days, ...themeInk() });
+    layers = drawJar(ctx, { x: 0, y: 0, w, skies: list, capacity: days, dark: isDark() });
   };
   state.redraw();
   cv.addEventListener('click', (e) => {
@@ -399,16 +395,13 @@ function layoutCameraFrame() {
   const jh = Math.min(H * 0.58, Math.min(W * 0.78, 340) * JAR_RATIO);
   const jw = jh / JAR_RATIO;
   const x = (W - jw) / 2, y = (H - jh) / 2 - H * 0.02;
-  const g = jarShape(jw, jh, 1.5);
+  // Place the photo's coordinate space so its jar box lands at x,y, jw wide.
+  const place = `translate(${x} ${y}) scale(${jw / BOX.w}) translate(${-BOX.x} ${-BOX.y})`;
   $('#camFrame').setAttribute('viewBox', `0 0 ${W} ${H}`);
   $('#camFrame').innerHTML = `
-    <defs><mask id="camMask"><rect width="${W}" height="${H}" fill="white"/><path d="${g.body}" transform="translate(${x} ${y})" fill="black"/></mask></defs>
+    <defs><mask id="camMask"><rect width="${W}" height="${H}" fill="white"/><path d="${INTERIOR}" transform="${place}" fill="black"/></mask></defs>
     <rect class="cam-scrim" width="${W}" height="${H}" mask="url(#camMask)"/>
-    <g transform="translate(${x} ${y})">
-      <path class="cam-line" d="${g.body}"/>
-      ${g.threads.map((ty) => `<line class="cam-line" x1="${g.mx}" x2="${jw - g.mx}" y1="${ty}" y2="${ty}"/>`).join('')}
-      ${lidSvg(g)}
-    </g>`;
+    <g transform="${place}">${jarSvg({ lidded: true }).replace(/^<svg[^>]*>|<\/svg>\s*$/g, '')}</g>`;
 }
 
 async function openCapture() {
@@ -827,6 +820,8 @@ async function init() {
   try {
     await document.fonts.load('30px "Cormorant Garamond"');
   } catch { /* fonts are optional */ }
+  // Every jar on screen is drawn from these layers; without them jars fall back to a plain outline.
+  try { await loadJar(); } catch { /* outline jars */ }
   state.skies = await store.all();
   if (!(await store.persistent())) toast(t.notPersistent);
 

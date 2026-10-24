@@ -1,7 +1,7 @@
 // 1080×1920 images sized for an Instagram story, printed on paper under a Kepfa quote:
 // one jarred sky with its handwritten note, one month's jar, or the whole year's shelf.
 
-import { drawJar, jarShape, JAR_RATIO } from './jar.js';
+import { drawJar, jarPoint, JAR_RATIO } from './jar.js';
 import { dominant, loadImage } from './sky.js';
 import { t, fmt, MONTHS, MONTHS_SHORT } from './strings.js';
 
@@ -13,7 +13,6 @@ const TAG = '#FBF9F5';
 const INK = '#1E1C19';
 const SOFT = '#6B645B';
 const RULE = '#CFC7BB';
-const GLASS = 'rgba(255,255,255,.45)';
 
 const SERIF = '"Cormorant Garamond", "IBM Plex Sans Thai", Georgia, serif';
 const HAND = '"Reenie Beanie", "IBM Plex Sans Thai", sans-serif';
@@ -154,12 +153,14 @@ async function storySingle(sky, showPlace, quote) {
   const [c, ctx] = page();
   const top = masthead(ctx, quote);
 
-  const bw = 620, bh = Math.round(620 * JAR_RATIO), bx = (W - bw) / 2, by = top + 50;
+  const bw = 580, bh = Math.round(580 * JAR_RATIO), bx = (W - bw) / 2, by = top + 50;
   const { img, release } = await loadImage(sky.photo);
-  drawJar(ctx, { x: bx, y: by, w: bw, h: bh, image: img, ink: INK, paper: PAPER, glass: GLASS });
+  drawJar(ctx, { x: bx, y: by, w: bw, image: img });
   release();
-  const g = jarShape(bw, bh);
-  if (showPlace && sky.place) tag(ctx, bx + bw - g.mx, by + g.threads[1], sky.place);
+  if (showPlace && sky.place) {
+    const [nx, ny] = jarPoint(860, 360, bw);
+    tag(ctx, bx + nx, by + ny, sky.place);
+  }
 
   let y = by + bh + 110;
   if (sky.note) {
@@ -184,7 +185,7 @@ async function storyJar({ year, month, skies, quote }) {
   text(ctx, t.storyKept(year, skies.length), W / 2, top + 195, { font: `36px ${SANS}`, color: SOFT });
 
   const bw = 540, bh = Math.round(540 * JAR_RATIO), bx = (W - bw) / 2, by = top + 250;
-  drawJar(ctx, { x: bx, y: by, w: bw, h: bh, skies, capacity: new Date(year, month + 1, 0).getDate(), ink: INK, paper: PAPER, glass: GLASS });
+  drawJar(ctx, { x: bx, y: by, w: bw, skies, capacity: new Date(year, month + 1, 0).getDate() });
 
   // One square per sky: the month as a row of colors.
   const size = 34, gap = 10, perRow = 16;
@@ -206,7 +207,7 @@ async function storyYear({ year, skies, quote }) {
   text(ctx, String(year), W / 2, top + 140, { font: `500 140px ${SERIF}` });
   text(ctx, `${skies.length} ${t.kept(skies.length)}`, W / 2, top + 205, { font: `36px ${SANS}`, color: SOFT });
 
-  const bw = 176, bh = Math.round(176 * JAR_RATIO), gapX = 52, rowH = bh + 100, firstRow = top + 260;
+  const bw = 160, bh = Math.round(160 * JAR_RATIO), gapX = 70, rowH = bh + 90, firstRow = top + 260;
   const left = (W - (4 * bw + 3 * gapX)) / 2;
   const now = new Date();
   for (let m = 0; m < 12; m++) {
@@ -215,8 +216,8 @@ async function storyYear({ year, skies, quote }) {
     const y = firstRow + r * rowH;
     const future = year > now.getFullYear() || (year === now.getFullYear() && m > now.getMonth());
     drawJar(ctx, {
-      x, y, w: bw, h: bh, skies: skies.filter((s) => new Date(s.takenAt).getMonth() === m),
-      capacity: new Date(year, m + 1, 0).getDate(), ghost: future, ink: INK, paper: PAPER, glass: GLASS,
+      x, y, w: bw, skies: skies.filter((s) => new Date(s.takenAt).getMonth() === m),
+      capacity: new Date(year, m + 1, 0).getDate(), ghost: future,
     });
     if (col === 0) {
       ctx.fillStyle = INK;

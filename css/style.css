@@ -196,12 +196,15 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .jar { display: block; width: 100%; height: auto; stroke: none; overflow: visible; }
 .j-glass { fill: var(--glass); }
 .j-glare { fill: var(--glare); }
-.j-line { fill: none; stroke: var(--ink); stroke-opacity: .45; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.j-thread { stroke: var(--ink); stroke-opacity: .3; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.j-lid-cap { fill: var(--ink); }
-.j-ridges line { stroke: var(--paper); stroke-opacity: .22; stroke-width: 1; vector-effect: non-scaling-stroke; }
+/* The glass layer matching the theme: dark ink on light paper, light ink on dark paper. */
+.j-body-light { display: none; }
+@media (prefers-color-scheme: dark) {
+  .j-body-ink { display: none; }
+  .j-body-light { display: inline; }
+}
+.j-outline { fill: none; stroke: var(--ink); stroke-opacity: .45; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .j-sky, .j-lid, .j-ripple { transform-box: fill-box; transform-origin: 50% 50%; }
-.j-shine { fill: var(--flash); fill-opacity: .22; opacity: 0; }
+.j-shine { fill: var(--flash); fill-opacity: .35; opacity: 0; }
 .j-glow { fill: var(--flash); opacity: 0; }
 .j-ripple { fill: none; stroke: var(--flash); stroke-width: 2; vector-effect: non-scaling-stroke; opacity: 0; }
 
@@ -348,9 +351,8 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .cam-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; stroke: none; }
 .cam.no-camera .cam-frame, .cam.no-camera .cam-bottom { display: none; }
 .cam-scrim { fill: var(--camera); fill-opacity: .74; }
-.cam-line { fill: none; stroke: var(--camera-ink); stroke-opacity: .85; stroke-width: 1.5; }
-.cam-frame .j-lid-cap { fill: var(--camera-ink); }
-.cam-frame .j-ridges line { stroke: var(--camera); }
+.cam-frame .j-glass, .cam-frame .j-body-ink { display: none; }
+.cam-frame .j-body-light { display: inline; }
 .cam-top, .cam-bottom {
   position: absolute;
   left: 0; right: 0;
@@ -386,10 +388,9 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .cam-fallback .cam-fallback-title { font-family: var(--f-display); font-size: var(--t-xl); opacity: 1; }
 .cam-fallback .btn { min-width: 220px; }
 .fallback-jar { width: 90px; margin-bottom: var(--s-3); }
-.fallback-jar .j-line, .fallback-jar .j-thread { stroke: var(--camera-ink); }
 .fallback-jar .j-glass { fill: rgba(255, 255, 255, .06); }
-.fallback-jar .j-lid-cap { fill: var(--camera-ink); }
-.fallback-jar .j-ridges line { stroke: var(--camera); }
+.fallback-jar .j-body-ink { display: none; }
+.fallback-jar .j-body-light { display: inline; }
 
 .review { overflow-y: auto; background: var(--paper); color: var(--ink); }
 .review-inner {
