@@ -1,18 +1,5 @@
-// Everything about a single sky photo: palette extraction, sky-type guess, resizing,
+// Everything about a single sky photo: palette extraction, resizing,
 // and procedurally drawn sample skies for the first-run demo shelf.
-
-export const SKY_TYPES = {
-  sunrise:  { th: 'ฟ้ายามเช้า', en: 'Sunrise',      grad: ['#7d97cf', '#f4b6a6', '#ffe1a8'] },
-  clear:    { th: 'ฟ้าใส',      en: 'Clear blue',   grad: ['#3f7fd8', '#8fc1f0', '#dcefff'] },
-  cloudy:   { th: 'ฟ้าเมฆ',     en: 'Cloudy',       grad: ['#8d9cb0', '#c3ccd7', '#eceff3'] },
-  pink:     { th: 'ฟ้าสีชมพู',  en: 'Cotton candy', grad: ['#8a7fd6', '#e8a6cc', '#ffd5bd'] },
-  sunset:   { th: 'ฟ้ายามเย็น', en: 'Sunset',       grad: ['#3b3f78', '#ef7f7a', '#ffbf6b'] },
-  bluehour: { th: 'บลูอาวร์',   en: 'Blue hour',    grad: ['#16245a', '#36559e', '#8b98cc'] },
-  storm:    { th: 'ฟ้าครึ้ม',   en: 'Stormy',       grad: ['#353b45', '#5d6570', '#8f959e'] },
-  night:    { th: 'ฟ้ากลางคืน', en: 'Night',        grad: ['#070b1f', '#18224d', '#363b6b'] },
-  rainbow:  { th: 'ฟ้ามีรุ้ง',  en: 'Rainbow',      grad: ['#7fb2e8', '#f3a9c4', '#ffe08a'] },
-};
-export const TYPE_ORDER = Object.keys(SKY_TYPES);
 
 // ---------- color helpers ----------
 
@@ -23,20 +10,6 @@ export function hex([r, g, b]) {
 export function hexToRgb(h) {
   const n = parseInt(h.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
-export function rgbToHsl(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) return [0, 0, l];
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  let h;
-  if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
-  else if (max === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
-  return [h * 60, s, l];
 }
 
 /** Relative luminance 0..1, good enough to pick dark or light text. */
@@ -127,29 +100,6 @@ export function dominant(palette) {
   return palette.reduce((a, b) => (b.weight > a.weight ? b : a), palette[0]);
 }
 
-/** Best guess at the sky type from palette + time of day. The user can always change it. */
-export function classify(palette, date = new Date()) {
-  const hour = date.getHours() + date.getMinutes() / 60;
-  let L = 0, S = 0, warm = 0, pink = 0, blue = 0;
-  for (const c of palette) {
-    const [h, s, l] = rgbToHsl(...c.rgb);
-    L += l * c.weight;
-    S += s * c.weight;
-    if (s > 0.28 && l > 0.25 && l < 0.92) {
-      if (h < 55 || h >= 345) warm += c.weight;
-      else if (h >= 275) pink += c.weight;
-      else if (h >= 185 && h < 255) blue += c.weight;
-    }
-  }
-  if (L < 0.17) return 'night';
-  if (S < 0.2 && L < 0.42) return 'storm';
-  if (warm > 0.22) return hour >= 4 && hour < 11 ? 'sunrise' : 'sunset';
-  if (pink > 0.25) return 'pink';
-  if (blue > 0.3 && L < 0.38) return 'bluehour';
-  if (S < 0.18) return 'cloudy';
-  return 'clear';
-}
-
 // ---------- image prep ----------
 
 export async function loadImage(blob) {
@@ -191,6 +141,16 @@ export async function prepareImage(blob) {
 
 // ---------- sample skies ----------
 
+const SAMPLE_GRADS = {
+  sunrise: ['#7d97cf', '#f4b6a6', '#ffe1a8'],
+  clear: ['#3f7fd8', '#8fc1f0', '#dcefff'],
+  cloudy: ['#8d9cb0', '#c3ccd7', '#eceff3'],
+  pink: ['#8a7fd6', '#e8a6cc', '#ffd5bd'],
+  sunset: ['#3b3f78', '#ef7f7a', '#ffbf6b'],
+  bluehour: ['#16245a', '#36559e', '#8b98cc'],
+  night: ['#070b1f', '#18224d', '#363b6b'],
+};
+
 function rng(seed) {
   return () => {
     seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
@@ -222,7 +182,7 @@ export function makeSampleSky(kind, seed) {
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const ctx = c.getContext('2d');
-  const [a, b, d] = SKY_TYPES[kind].grad;
+  const [a, b, d] = SAMPLE_GRADS[kind];
 
   const g = ctx.createLinearGradient(0, 0, 0, H * 0.9);
   g.addColorStop(0, a);
@@ -261,22 +221,8 @@ export function makeSampleSky(kind, seed) {
     ctx.fillRect(0, 0, W, H);
   }
 
-  if (kind === 'rainbow') {
-    const cols = ['#ff6b6b', '#ffa94d', '#ffe066', '#69db7c', '#4dabf7', '#9775fa'];
-    ctx.globalAlpha = 0.32;
-    ctx.lineWidth = 16;
-    cols.forEach((col, i) => {
-      ctx.strokeStyle = col;
-      ctx.beginPath();
-      ctx.arc(W * 0.55, H * 0.95, 520 - i * 16, Math.PI * 1.08, Math.PI * 1.92);
-      ctx.stroke();
-    });
-    ctx.globalAlpha = 1;
-  }
-
-  const cloudCount = { cloudy: 16, storm: 18, clear: 4, sunset: 6, sunrise: 5, pink: 7, bluehour: 3, night: 2, rainbow: 6 }[kind];
+  const cloudCount = { cloudy: 16, clear: 4, sunset: 6, sunrise: 5, pink: 7, bluehour: 3, night: 2 }[kind];
   const cloudColor = {
-    storm: 'rgba(70,76,86,.75)',
     cloudy: 'rgba(250,251,253,.8)',
     sunset: 'rgba(255,190,170,.6)',
     sunrise: 'rgba(255,225,215,.6)',

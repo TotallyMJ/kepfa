@@ -1,36 +1,13 @@
 import { store, newId } from './store.js';
-import { SKY_TYPES, TYPE_ORDER, prepareImage, classify, makeSampleSky, hexToRgb, luminance } from './sky.js';
-import { drawJar, lidColor, setupCanvas } from './jar.js';
-import { makeStory, shareImage, saveImage, thaiDate, thaiTime } from './story.js';
-
-const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-const TH_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-const PROMPTS = ['ฟ้าวันนี้ทำให้นึกถึงอะไร?', 'ตอนนั้นกำลังทำอะไรอยู่?', 'ใครอยู่ด้วยตอนนั้น?',
-  'อยากบอกอะไรกับฟ้าวันนี้', 'ฟ้าแบบนี้เหมือนเพลงอะไร?'];
-const DEX_HINTS = {
-  sunrise: 'ตื่นก่อน 7 โมง แล้วมองไปทางทิศตะวันออก',
-  clear: 'วันแดดดี ฟ้าโล่งไม่มีเมฆ',
-  cloudy: 'วันที่เมฆลอยเต็มฟ้า',
-  pink: 'ไม่กี่นาทีหลังพระอาทิตย์ตก',
-  sunset: 'ราว 17:45–18:30 น.',
-  bluehour: 'ฟ้าเริ่มมืด หลังตะวันตกราว 20 นาที',
-  storm: 'ช่วงก่อนฝนตกหนัก',
-  night: 'คืนที่ฟ้าเปิด เห็นดาวหรือพระจันทร์',
-  rainbow: 'หลังฝนหยุด ยืนหันหลังให้พระอาทิตย์',
-};
+import { prepareImage, makeSampleSky, hexToRgb, luminance, dominant, hex, mix } from './sky.js';
+import { bottleShape, bottleSvg, corkSvg, drawBottle, setupCanvas } from './jar.js';
+import { makeStory, shareImage, saveImage } from './story.js';
+import { t, fmt, MONTHS, MONTHS_SHORT } from './strings.js';
 
 const ICON = {
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4l4 4"/><path d="M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"/></svg>',
-  back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6l6 6-6 6"/></svg>',
-  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12"/></svg>',
-  shake: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="5" width="8" height="15" rx="3"/><path d="M9 3h6M4 9v6M20 9v6"/></svg>',
-  camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>',
-  jar: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7.5" y="2.5" width="9" height="3" rx="1"/><path d="M8 5.5v1.5A4 4 0 0 0 5 11v7a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-7a4 4 0 0 0-3-4V5.5"/><path d="M5 14c2.5-1.5 4.5 1 7 0s4.5-1.5 7 0"/></svg>',
-  download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>',
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -44,7 +21,6 @@ const state = { skies: [], year: new Date().getFullYear(), redraw: null, lastRou
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad2 = (n) => String(n).padStart(2, '0');
 const daysIn = (y, m) => new Date(y, m + 1, 0).getDate();
-const gradCss = (colors) => `linear-gradient(180deg, ${colors.join(', ')})`;
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function skiesIn(year, month) {
@@ -56,6 +32,12 @@ function skiesIn(year, month) {
 
 function sortSkies() {
   state.skies.sort((a, b) => a.takenAt - b.takenAt);
+}
+
+function chunk(list, n) {
+  const out = [];
+  for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n));
+  return out;
 }
 
 const urls = new Map();
@@ -76,40 +58,22 @@ function toLocalInput(ms) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-function countBy(list, fn) {
-  const out = {};
-  for (const s of list) { const k = fn(s); out[k] = (out[k] || 0) + 1; }
-  return out;
-}
-
-function topKey(counts) {
-  const e = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-  return e ? e[0] : null;
-}
-
-function partOfDay(ms) {
-  const h = new Date(ms).getHours();
-  if (h >= 5 && h < 11) return 'ตอนเช้า';
-  if (h >= 11 && h < 16) return 'กลางวัน';
-  if (h >= 16 && h < 19) return 'ตอนเย็น';
-  return 'ตอนค่ำ';
-}
-
-function setPhase() {
-  const h = new Date().getHours();
-  document.documentElement.dataset.phase = h >= 5 && h < 9 ? 'dawn' : h >= 9 && h < 17 ? 'day' : h >= 17 && h < 20 ? 'dusk' : 'night';
+/** Canvas bottles can't read CSS, so hand them the theme's ink and glass. */
+function themeInk() {
+  const cs = getComputedStyle(document.documentElement);
+  return { ink: cs.getPropertyValue('--ink').trim(), glass: cs.getPropertyValue('--glass').trim() };
 }
 
 let toastTimer;
 function toast(msg) {
-  const t = $('#toast');
-  t.textContent = msg;
-  t.hidden = false;
-  t.style.animation = 'none';
-  void t.offsetWidth;
-  t.style.animation = '';
+  const el = $('#toast');
+  el.textContent = msg;
+  el.hidden = false;
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = '';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.hidden = true; }, 2200);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
 }
 
 let actx;
@@ -119,67 +83,48 @@ function chime(freqs = [1318, 1976], gap = 0.07) {
     actx ||= new (window.AudioContext || window.webkitAudioContext)();
     const t0 = actx.currentTime;
     freqs.forEach((f, i) => {
-      const t = t0 + i * gap;
+      const at = t0 + i * gap;
       const o = actx.createOscillator();
       const g = actx.createGain();
       o.type = 'sine';
-      o.frequency.setValueAtTime(f, t);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.18, t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      o.frequency.setValueAtTime(f, at);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(0.18, at + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.6);
       o.connect(g).connect(actx.destination);
-      o.start(t);
-      o.stop(t + 0.65);
+      o.start(at);
+      o.stop(at + 0.65);
     });
   } catch { /* sound is optional */ }
 }
 
-function tween(ms, fn) {
-  return new Promise((resolve) => {
-    if (reduceMotion()) { fn(1); return resolve(); }
-    const start = performance.now();
-    const step = (now) => {
-      const t = Math.min(1, (now - start) / ms);
-      fn(t);
-      if (t < 1) requestAnimationFrame(step); else resolve();
-    };
-    requestAnimationFrame(step);
-  });
-}
-const easeOutBack = (t) => 1 + 2.2 * (t - 1) ** 3 + 1.2 * (t - 1) ** 2;
-
 function paletteHtml(palette) {
   return palette.map((p) => {
-    const fg = luminance(hexToRgb(p.hex)) > 0.55 ? '#1f2444' : '#ffffff';
-    return `<button type="button" data-hex="${p.hex}" style="background:${p.hex};color:${fg}" aria-label="คัดลอกสี ${p.hex}">${p.hex.slice(1).toUpperCase()}</button>`;
+    const fg = luminance(hexToRgb(p.hex)) > 0.55 ? '#2A2723' : '#FBF9F5';
+    return `<button type="button" data-hex="${p.hex}" style="background:${p.hex};color:${fg}" aria-label="Copy ${p.hex}">${p.hex.slice(1).toUpperCase()}</button>`;
   }).join('');
-}
-
-function chipHtml(type, pressed) {
-  const t = SKY_TYPES[type];
-  return `<button type="button" class="chip" data-type="${type}" aria-pressed="${pressed}"><i style="background:${gradCss(t.grad)}"></i>${t.th}</button>`;
 }
 
 // ---------- routing ----------
 
 function parseRoute() {
   const [a, b] = location.hash.replace(/^#\/?/, '').split('/');
-  if (a === 'jar' && /^\d{4}-\d{2}$/.test(b || '')) {
+  if (a === 'month' && /^\d{4}-\d{2}$/.test(b || '')) {
     const [y, m] = b.split('-').map(Number);
-    return { name: 'jar', year: y, month: m - 1 };
+    return { name: 'month', year: y, month: m - 1 };
   }
-  if (a === 'dex') return { name: 'dex' };
+  if (a === 'months') return { name: 'months' };
   return { name: 'shelf' };
 }
 
 function render() {
   const route = parseRoute();
-  document.querySelectorAll('.tab').forEach((t) => {
-    const on = (route.name === 'dex' && t.dataset.tab === 'dex') || (route.name !== 'dex' && t.dataset.tab === 'shelf');
-    if (on) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
+  const tab = route.name === 'shelf' ? 'shelf' : 'months';
+  document.querySelectorAll('.tab').forEach((el) => {
+    if (el.dataset.tab === tab) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
   });
-  if (route.name === 'jar') renderJar(route.year, route.month);
-  else if (route.name === 'dex') renderDex();
+  if (route.name === 'month') renderMonth(route.year, route.month);
+  else if (route.name === 'months') renderMonths();
   else renderShelf();
   if (location.hash !== state.lastRoute) { window.scrollTo(0, 0); state.lastRoute = location.hash; }
 }
@@ -188,78 +133,56 @@ function go(hash) {
   if (location.hash === hash) render(); else location.hash = hash;
 }
 
-// ---------- shelf ----------
+// ---------- shelf (home): one bottle per sky ----------
 
 function bannerHtml() {
   if (!state.skies.some((s) => s.sample)) return '';
-  return `<div class="banner"><p>นี่คือฟ้าตัวอย่าง กดเล่นได้เลย พร้อมเก็บฟ้าของตัวเองเมื่อไหร่ค่อยล้างออก</p>
-    <button type="button" class="pill" id="clearSamples">ล้างตัวอย่าง</button></div>`;
+  return `<div class="banner"><p>${t.sampleBanner}</p><button type="button" class="btn-text" id="clearSamples">${t.clearSamples}</button></div>`;
+}
+
+function shelfRowsHtml(list) {
+  return chunk(list, 3).map((row) => `
+    <div class="shelf-row">
+      <div class="shelf-bottles">${row.map((s) => `<button type="button" class="bottle-slot" data-id="${s.id}" aria-label="${t.openSky(fmt.long(s.takenAt))}">${bottleSvg({ href: photoUrl(s) })}</button>`).join('')}</div>
+      <div class="shelf-labels">${row.map((s) => { const [day, time] = fmt.shelf(s.takenAt); return `<p><span>${day}</span><span>${time}</span></p>`; }).join('')}</div>
+    </div>`).join('');
 }
 
 function renderShelf() {
-  const y = state.year;
   const now = new Date();
-  const all = skiesIn(y);
-  const types = new Set(all.map((s) => s.type)).size;
-  const years = state.skies.map((s) => new Date(s.takenAt).getFullYear());
-  const minYear = Math.min(now.getFullYear(), ...years);
+  const groups = [];
+  for (const s of state.skies.slice().reverse()) {
+    const d = new Date(s.takenAt);
+    const last = groups[groups.length - 1];
+    if (last && last.y === d.getFullYear() && last.m === d.getMonth()) last.items.push(s);
+    else groups.push({ y: d.getFullYear(), m: d.getMonth(), items: [s] });
+  }
 
-  const slot = (m) => {
-    const future = y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth());
-    const isNow = y === now.getFullYear() && m === now.getMonth();
-    const n = skiesIn(y, m).length;
-    return `<button type="button" class="jar-slot${isNow ? ' is-now' : ''}" data-month="${m}" ${future ? 'disabled' : ''}
-      aria-label="โหลเดือน${TH_MONTHS[m]} ${n} ท้องฟ้า">
-      <span class="jar-wrap"><canvas></canvas></span>
-      <span class="jar-name">${TH_MONTHS_SHORT[m]}</span>
-      <span class="jar-count">${future ? '–' : `${n} ฟ้า`}</span></button>`;
-  };
-
-  // Newest shelf on top so the jars you're filling now are the first thing you see.
   view.innerHTML = `
-    <header class="top">
-      <div class="top-title"><h1 class="wordmark">Kepfa<small>เก็บฟ้าใส่โหล</small></h1></div>
-      <button type="button" class="icon-btn" id="shareYear" aria-label="แชร์ชั้นวางปี ${y} ลงสตอรี่" ${all.length ? '' : 'disabled'}>${ICON.share}</button>
+    <header class="masthead">
+      <div class="masthead-row"><h1 class="wordmark">Kepfa</h1><span class="eyebrow">${t.vol(now.getFullYear())}</span></div>
+      <p class="tagline">${t.tagline}</p>
     </header>
     ${bannerHtml()}
-    <div class="year-head">
-      <div>
-        <p class="eyebrow">ชั้นฟ้าปี ${y}</p>
-        <p class="big-count">${all.length}<span>ท้องฟ้า</span></p>
-        <p class="sub">เจอแล้ว ${types} จาก ${TYPE_ORDER.length} แบบใน Sky dex</p>
-      </div>
-      <div class="year-switch">
-        <button type="button" id="prevYear" aria-label="ปีก่อน" ${y <= minYear ? 'disabled' : ''}>${ICON.left}</button>
-        <strong>${y}</strong>
-        <button type="button" id="nextYear" aria-label="ปีถัดไป" ${y >= now.getFullYear() ? 'disabled' : ''}>${ICON.right}</button>
-      </div>
-    </div>
-    <div class="shelf">
-      ${[3, 2, 1, 0].map((r) => `<div class="shelf-row">${[0, 1, 2].map((c) => slot(r * 3 + c)).join('')}</div>`).join('')}
-    </div>`;
+    <p class="kept"><span class="kept-n">${state.skies.length}</span> ${t.kept(state.skies.length)}</p>
+    ${groups.length
+      ? groups.map((g) => `<section class="shelf-group"><h2 class="group-title">${MONTHS[g.m]} <span>${g.y}</span></h2>${shelfRowsHtml(g.items)}</section>`).join('')
+      : `<div class="empty">
+           <div class="empty-bottle">${bottleSvg()}</div>
+           <h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>
+           <button type="button" class="btn primary" id="firstSky">${t.keepFirst}</button>
+         </div>`}`;
 
-  view.querySelectorAll('.jar-slot').forEach((el) => {
-    el.addEventListener('click', () => go(`#/jar/${y}-${pad2(+el.dataset.month + 1)}`));
-  });
-  $('#prevYear').addEventListener('click', () => { state.year--; renderShelf(); });
-  $('#nextYear').addEventListener('click', () => { state.year++; renderShelf(); });
-  $('#shareYear').addEventListener('click', () => openStory('year', { year: y, skies: all }));
+  bindBottleSlots(view);
   $('#clearSamples')?.addEventListener('click', clearSamples);
+  $('#firstSky')?.addEventListener('click', openCapture);
+  state.redraw = null;
+}
 
-  state.redraw = () => {
-    view.querySelectorAll('.jar-slot').forEach((el) => {
-      const m = +el.dataset.month;
-      const wrap = el.querySelector('.jar-wrap');
-      const w = wrap.clientWidth;
-      const h = Math.round(w * 4 / 3);
-      const ctx = setupCanvas(el.querySelector('canvas'), w, h);
-      drawJar(ctx, {
-        x: w * 0.08, y: h * 0.02, w: w * 0.84, h: h * 0.98,
-        skies: skiesIn(y, m), capacity: daysIn(y, m), lid: lidColor(m), ghost: el.disabled,
-      });
-    });
-  };
-  state.redraw();
+function bindBottleSlots(root) {
+  root.querySelectorAll('.bottle-slot').forEach((el) => {
+    el.addEventListener('click', () => openDetail(state.skies.find((s) => s.id === el.dataset.id)));
+  });
 }
 
 async function clearSamples() {
@@ -267,72 +190,115 @@ async function clearSamples() {
   for (const s of samples) { await store.remove(s.id); forgetUrls(s.id); }
   state.skies = state.skies.filter((s) => !s.sample);
   render();
-  toast('ล้างฟ้าตัวอย่างแล้ว ออกไปเก็บฟ้าแรกกัน');
+  toast(t.samplesCleared);
 }
 
-// ---------- one month's jar ----------
+// ---------- months: one layered bottle per month ----------
 
-function renderJar(year, month) {
-  const list = skiesIn(year, month);
-  const days = daysIn(year, month);
-  const topType = topKey(countBy(list, (s) => s.type));
-  const topTime = topKey(countBy(list, (s) => partOfDay(s.takenAt)));
+function renderMonths() {
+  const y = state.year;
+  const now = new Date();
+  const all = skiesIn(y);
+  const minYear = Math.min(now.getFullYear(), ...state.skies.map((s) => new Date(s.takenAt).getFullYear()));
+  const isFuture = (m) => y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth());
 
+  // Newest shelf on top so the bottles you're filling now are the first thing you see.
   view.innerHTML = `
-    <header class="top">
-      <a class="icon-btn" href="#/" aria-label="กลับไปชั้นวาง">${ICON.back}</a>
-      <div class="top-title"><p class="eyebrow">โหลเดือน · ${year}</p><h1>${TH_MONTHS[month]}</h1></div>
-      <button type="button" class="icon-btn" id="shareJar" aria-label="แชร์โหลนี้ลงสตอรี่" ${list.length ? '' : 'disabled'}>${ICON.share}</button>
-    </header>
-    <div class="jar-stage" id="jarStage"><canvas id="bigJar" aria-label="โหลเดือน${TH_MONTHS[month]} มี ${list.length} ชั้นสี"></canvas></div>
-    ${list.length
-      ? '<p class="tap-hint">แตะชั้นสีในโหลเพื่อดูฟ้าวันนั้น</p>'
-      : '<p class="empty-note"><strong>โหลนี้ยังว่าง</strong>ฟ้าแรกของเดือนรออยู่ข้างนอก ออกไปเก็บกัน</p>'}
-    <div class="actions">
-      ${list.length
-        ? `<button type="button" class="pill" id="shake">${ICON.shake} เขย่าโหล</button>
-           <button type="button" class="pill primary" id="shareJar2">${ICON.share} แชร์ลงสตอรี่</button>`
-        : `<button type="button" class="pill primary" id="firstSky">${ICON.camera} เก็บฟ้าแรก</button>`}
-    </div>
-    ${list.length ? `
-      <div class="stats">
-        <div class="stat"><b>${list.length}/${days}</b><span>วันที่มีฟ้าในโหล</span></div>
-        <div class="stat"><b>${SKY_TYPES[topType].th}</b><span>ฟ้าที่เจอบ่อยสุด</span></div>
-        <div class="stat"><b>${topTime}</b><span>ช่วงที่ชอบมองฟ้า</span></div>
+    <header class="masthead">
+      <div class="masthead-row"><h1 class="wordmark">${t.months}</h1>
+        <div class="year-switch">
+          <button type="button" id="prevYear" aria-label="${t.prevYear}" ${y <= minYear ? 'disabled' : ''}>${ICON.left}</button>
+          <span>${y}</span>
+          <button type="button" id="nextYear" aria-label="${t.nextYear}" ${y >= now.getFullYear() ? 'disabled' : ''}>${ICON.right}</button>
+        </div>
       </div>
-      <h2 class="section-title">ฟ้าเดือนนี้</h2>
-      <div class="thumbs">
-        ${list.slice().reverse().map((s) => `<button type="button" class="thumb" data-id="${s.id}">
-          <img src="${photoUrl(s)}" alt="ฟ้า${SKY_TYPES[s.type].th} ${thaiDate(s.takenAt)}" loading="lazy"><span>${new Date(s.takenAt).getDate()} ${TH_MONTHS_SHORT[month]}</span></button>`).join('')}
-      </div>` : ''}`;
+    </header>
+    <div class="kept-row">
+      <p class="kept"><span class="kept-n">${all.length}</span> ${t.kept(all.length)}</p>
+      ${all.length ? `<button type="button" class="btn-text" id="shareYear">${t.shareStory}</button>` : ''}
+    </div>
+    ${[3, 2, 1, 0].map((r) => {
+      const ms = [0, 1, 2].map((c) => r * 3 + c);
+      return `<div class="shelf-row">
+        <div class="shelf-bottles">${ms.map((m) => `<button type="button" class="month-slot" data-month="${m}" ${isFuture(m) ? 'disabled' : ''}
+          aria-label="${t.monthBottle(MONTHS[m], skiesIn(y, m).length)}"><canvas></canvas></button>`).join('')}</div>
+        <div class="shelf-labels">${ms.map((m) => `<p><span>${MONTHS_SHORT[m]}</span><span>${isFuture(m) ? '–' : skiesIn(y, m).length}</span></p>`).join('')}</div>
+      </div>`;
+    }).join('')}`;
 
-  const share = () => openStory('jar', { year, month, skies: list });
-  $('#shareJar').addEventListener('click', share);
-  $('#shareJar2')?.addEventListener('click', share);
-  $('#firstSky')?.addEventListener('click', openCapture);
-  $('#shake')?.addEventListener('click', () => shakeJar(list));
-  view.querySelectorAll('.thumb').forEach((el) => {
-    el.addEventListener('click', () => openDetail(state.skies.find((s) => s.id === el.dataset.id)));
+  view.querySelectorAll('.month-slot').forEach((el) => {
+    el.addEventListener('click', () => go(`#/month/${y}-${pad2(+el.dataset.month + 1)}`));
   });
+  $('#shareYear')?.addEventListener('click', () => openStory('year', { year: y, skies: all }));
+  $('#prevYear').addEventListener('click', () => { state.year--; renderMonths(); });
+  $('#nextYear').addEventListener('click', () => { state.year++; renderMonths(); });
 
-  let layers = [];
-  const cv = $('#bigJar');
-  const jarBox = { x: 0, w: 0 };
   state.redraw = () => {
-    const w = Math.min(view.clientWidth, 290);
-    const h = Math.round(w * 1.38);
-    const ctx = setupCanvas(cv, w, h);
-    jarBox.x = w * 0.04; jarBox.w = w * 0.92;
-    layers = drawJar(ctx, {
-      x: jarBox.x, y: h * 0.01, w: jarBox.w, h: h * 0.98,
-      skies: list, capacity: days, lid: lidColor(month), label: `${TH_MONTHS_SHORT[month]} ${year}`,
+    const theme = themeInk();
+    view.querySelectorAll('.month-slot').forEach((el) => {
+      const m = +el.dataset.month;
+      const w = Math.min(el.clientWidth, 92);
+      const h = Math.round(w * 1.9);
+      const ctx = setupCanvas(el.querySelector('canvas'), w, h);
+      drawBottle(ctx, { x: 0, y: 0, w, h, skies: skiesIn(y, m), capacity: daysIn(y, m), ghost: el.disabled, ...theme });
     });
   };
   state.redraw();
+}
+
+// ---------- one month's bottle ----------
+
+function renderMonth(year, month) {
+  const list = skiesIn(year, month);
+  const days = daysIn(year, month);
+  const minutes = list.map((s) => { const d = new Date(s.takenAt); return d.getHours() * 60 + d.getMinutes(); }).sort((a, b) => a - b);
+  const favorite = minutes.length ? fmt.minutes(minutes[Math.floor(minutes.length / 2)]) : '';
+  const monthColor = list.length
+    ? hex(list.map((s) => hexToRgb(dominant(s.palette).hex)).reduce((acc, c, i) => mix(acc, c, 1 / (i + 1))))
+    : '';
+
+  view.innerHTML = `
+    <header class="page-head">
+      <a class="eyebrow back" href="#/months">‹ ${t.backToMonths}</a>
+      <span class="eyebrow">${t.issue(month + 1)}</span>
+    </header>
+    <h1 class="title">${MONTHS[month]}</h1>
+    <p class="subtitle">${year}</p>
+    <div class="jar-stage" id="jarStage"><canvas id="bigJar" aria-label="${t.monthBottle(MONTHS[month], list.length)}"></canvas></div>
+    ${list.length
+      ? `<p class="hint">${t.tapLayer}</p>
+         <div class="actions">
+           <button type="button" class="btn" id="shake">${t.shake}</button>
+           <button type="button" class="btn primary" id="shareJar">${t.shareStory}</button>
+         </div>
+         <div class="stats">
+           <div class="stat"><b class="num">${list.length}</b><span>${t.daysOf(days)}</span></div>
+           <div class="stat"><b class="mono">${favorite}</b><span>${t.favoriteTime}</span></div>
+           <div class="stat"><b class="mono"><i class="swatch" style="background:${monthColor}"></i>${monthColor.slice(1).toUpperCase()}</b><span>${t.monthColor}</span></div>
+         </div>
+         <h2 class="section-title">${t.thisMonth}</h2>
+         <div class="mini-grid">${list.slice().reverse().map((s) => { const [day, time] = fmt.shelf(s.takenAt); return `<div class="mini">
+           <button type="button" class="bottle-slot" data-id="${s.id}" aria-label="${t.openSky(fmt.long(s.takenAt))}">${bottleSvg({ href: photoUrl(s) })}</button>
+           <p><span>${day}</span><span>${time}</span></p></div>`; }).join('')}</div>`
+      : `<div class="empty"><h2>${t.emptyMonthTitle}</h2><p>${t.emptyMonthBody}</p>
+         <button type="button" class="btn primary" id="firstSky">${t.keepFirst}</button></div>`}`;
+
+  $('#shareJar')?.addEventListener('click', () => openStory('jar', { year, month, skies: list }));
+  $('#shake')?.addEventListener('click', () => shakeJar(list));
+  $('#firstSky')?.addEventListener('click', openCapture);
+  bindBottleSlots(view);
+
+  let layers = [];
+  const cv = $('#bigJar');
+  state.redraw = () => {
+    const w = Math.min(view.clientWidth * 0.5, 160);
+    const h = Math.round(w * 1.9);
+    const ctx = setupCanvas(cv, w, h);
+    layers = drawBottle(ctx, { x: 0, y: 0, w, h, skies: list, capacity: days, ...themeInk() });
+  };
+  state.redraw();
   cv.addEventListener('click', (e) => {
-    const r = cv.getBoundingClientRect();
-    const px = e.clientX - r.left, py = e.clientY - r.top;
-    if (px < jarBox.x || px > jarBox.x + jarBox.w) return;
+    const py = e.clientY - cv.getBoundingClientRect().top;
     const hit = layers.find((l) => py >= l.top - 2 && py <= l.bottom + 2);
     if (hit) openDetail(list[hit.index]);
   });
@@ -351,46 +317,6 @@ function shakeJar(list) {
   }, reduceMotion() ? 0 : 750);
 }
 
-// ---------- sky dex ----------
-
-function renderDex() {
-  const byType = {};
-  for (const s of state.skies) (byType[s.type] ||= []).push(s);
-  const found = TYPE_ORDER.filter((t) => byType[t]).length;
-
-  view.innerHTML = `
-    <header class="top">
-      <div class="top-title"><p class="eyebrow">สะสมให้ครบทุกแบบ</p><h1>Sky dex</h1></div>
-    </header>
-    <div class="dex-progress">
-      <p class="sub">เจอแล้ว <b>${found}</b> จาก ${TYPE_ORDER.length} แบบ</p>
-      <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="${TYPE_ORDER.length}" aria-valuenow="${found}"><i style="width:${(found / TYPE_ORDER.length) * 100}%"></i></div>
-    </div>
-    <div class="dex-grid">
-      ${TYPE_ORDER.map((t) => {
-        const info = SKY_TYPES[t];
-        const list = byType[t];
-        if (!list) {
-          return `<div class="dex-card locked">
-            <div class="tile" style="background:${gradCss(info.grad)}"></div>
-            <b>${info.th}</b><small>${DEX_HINTS[t]}</small></div>`;
-        }
-        const latest = list[list.length - 1];
-        return `<button type="button" class="dex-card" data-type="${t}">
-          <div class="tile"><img src="${photoUrl(latest)}" alt="" loading="lazy"><span class="count">${list.length}</span></div>
-          <b>${info.th}</b><small>เจอครั้งแรก ${thaiDate(list[0].takenAt)}</small></button>`;
-      }).join('')}
-    </div>`;
-
-  view.querySelectorAll('.dex-card[data-type]').forEach((el) => {
-    el.addEventListener('click', () => {
-      const list = byType[el.dataset.type];
-      openDetail(list[list.length - 1]);
-    });
-  });
-  state.redraw = null;
-}
-
 // ---------- capture ----------
 
 let stream = null;
@@ -398,6 +324,25 @@ let draft = null;
 
 function showStep(name) {
   cap.querySelectorAll('.cap-step').forEach((s) => { s.hidden = s.dataset.step !== name; });
+}
+
+/** Dim the viewfinder outside a bottle-shaped window, so what you frame is what gets corked. */
+function layoutCameraFrame() {
+  const W = innerWidth, H = innerHeight;
+  const bh = Math.min(H * 0.6, Math.min(W * 0.7, 300) * 1.9);
+  const bw = bh / 1.9;
+  const x = (W - bw) / 2, y = (H - bh) / 2 - H * 0.02;
+  const g = bottleShape(bw, bh, 1.5);
+  const { lip } = g;
+  $('#camFrame').setAttribute('viewBox', `0 0 ${W} ${H}`);
+  $('#camFrame').innerHTML = `
+    <defs><mask id="camMask"><rect width="${W}" height="${H}" fill="#fff"/><path d="${g.body}" transform="translate(${x} ${y})" fill="black"/></mask></defs>
+    <rect class="cam-scrim" width="${W}" height="${H}" mask="url(#camMask)"/>
+    <g transform="translate(${x} ${y})">
+      <path class="cam-line" d="${g.body}"/>
+      <rect class="cam-line" x="${lip.x}" y="${lip.y}" width="${lip.w}" height="${lip.h}" rx="${lip.r}"/>
+      ${corkSvg(g)}
+    </g>`;
 }
 
 async function openCapture() {
@@ -409,6 +354,7 @@ async function openCapture() {
   camStep.classList.remove('no-camera');
   $('#shutter').hidden = false;
   cap.querySelector('.cam-hint').hidden = false;
+  layoutCameraFrame();
 
   if (!navigator.mediaDevices?.getUserMedia) return showFallback();
   try {
@@ -416,7 +362,7 @@ async function openCapture() {
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } },
       audio: false,
     });
-    if (cap.hidden || cap.querySelector('.cam').hidden) { s.getTracks().forEach((t) => t.stop()); return; }
+    if (cap.hidden || camStep.hidden) { s.getTracks().forEach((tr) => tr.stop()); return; }
     stream = s;
     const v = $('#camVideo');
     v.srcObject = stream;
@@ -428,13 +374,14 @@ async function openCapture() {
 
 function showFallback() {
   $('#camFallback').hidden = false;
+  $('#fallbackBottle').innerHTML = bottleSvg();
   cap.querySelector('.cam').classList.add('no-camera');
   $('#shutter').hidden = true;
   cap.querySelector('.cam-hint').hidden = true;
 }
 
 function stopCamera() {
-  stream?.getTracks().forEach((t) => t.stop());
+  stream?.getTracks().forEach((tr) => tr.stop());
   stream = null;
   $('#camVideo').srcObject = null;
 }
@@ -472,73 +419,60 @@ function picked(e) {
 async function review(blob, takenAt) {
   showStep('review');
   const el = cap.querySelector('.review');
-  el.innerHTML = '<div class="loading"><div class="spinner"></div><p>กำลังดึงสีจากฟ้า…</p></div>';
+  el.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t.reading}</p></div>`;
   try {
-    const prep = await prepareImage(blob);
-    draft = { ...prep, takenAt, type: classify(prep.palette, new Date(takenAt)), typeTouched: false };
+    draft = { ...(await prepareImage(blob)), takenAt };
   } catch {
-    el.innerHTML = `<div class="loading"><p>เปิดรูปนี้ไม่ได้ ลองรูปอื่นดูนะ</p>
-      <button type="button" class="pill primary" id="tryAgain">เลือกรูปใหม่</button></div>`;
+    el.innerHTML = `<div class="loading"><p>${t.cantOpen}</p>
+      <button type="button" class="btn primary" id="tryAgain">${t.chooseAnother}</button></div>`;
     $('#tryAgain').addEventListener('click', openCapture);
     return;
   }
   draft.url = URL.createObjectURL(draft.photo);
-  const prompt = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+  const prompt = t.notePrompts[Math.floor(Math.random() * t.notePrompts.length)];
 
   el.innerHTML = `
     <div class="review-inner">
-      <div class="top">
-        <button type="button" class="icon-btn" data-close-capture aria-label="ยกเลิก">${ICON.close}</button>
-        <div class="top-title"><p class="eyebrow">ฟ้าใหม่</p><h1>หย่อนลงโหลเลยไหม</h1></div>
+      <div class="page-head">
+        <button type="button" class="eyebrow back" data-close-capture>${t.cancel}</button>
+        <span class="eyebrow">${t.newSky}</span>
       </div>
-      <div class="review-photo"><img src="${draft.url}" alt="ภาพฟ้าที่เพิ่งเก็บ"></div>
-      <div><p class="field-label">สีของฟ้านี้ · แตะเพื่อคัดลอก</p><div class="palette">${paletteHtml(draft.palette)}</div></div>
-      <div><p class="field-label">ฟ้าแบบไหน</p><div class="chips" id="typeChips">${TYPE_ORDER.map((t) => chipHtml(t, t === draft.type)).join('')}</div></div>
+      <div class="review-bottle">${bottleSvg({ href: draft.url, corked: false })}</div>
+      <div><p class="field-label">${t.colors}</p><div class="palette">${paletteHtml(draft.palette)}</div></div>
       <div>
-        <label class="field-label" for="noteInput">บันทึกสั้น ๆ</label>
-        <textarea id="noteInput" class="note" maxlength="120" rows="3" placeholder="${prompt}"></textarea>
-        <div class="note-meta"><span>ข้อความนี้จะไปอยู่ใต้รูปตอนแชร์</span><span id="noteCount">0/120</span></div>
+        <label class="field-label" for="noteInput">${t.note} <span>${t.optional}</span></label>
+        <input id="noteInput" class="field note" maxlength="80" placeholder="${prompt}" autocomplete="off">
       </div>
       <div>
-        <label class="field-label" for="whenInput">ถ่ายเมื่อ</label>
-        <input id="whenInput" class="when" type="datetime-local" value="${toLocalInput(takenAt)}" max="${toLocalInput(Date.now())}">
+        <label class="field-label" for="placeInput">${t.place} <span>${t.optional}</span></label>
+        <input id="placeInput" class="field" maxlength="24" placeholder="${t.placeHint}" autocomplete="off">
+      </div>
+      <div>
+        <label class="field-label" for="whenInput">${t.taken}</label>
+        <input id="whenInput" class="field mono" type="datetime-local" value="${toLocalInput(takenAt)}" max="${toLocalInput(Date.now())}">
       </div>
       <div class="review-actions">
-        <button type="button" class="pill" id="retake">ถ่ายใหม่</button>
-        <button type="button" class="pill primary" id="dropIt">${ICON.jar} หย่อนลงโหล</button>
+        <button type="button" class="btn" id="retake">${t.retake}</button>
+        <button type="button" class="btn primary" id="corkIt">${t.corkIt}</button>
       </div>
     </div>`;
 
-  const chips = $('#typeChips');
-  const setType = (t) => {
-    draft.type = t;
-    chips.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.type === t)));
-  };
-  chips.addEventListener('click', (e) => {
-    const c = e.target.closest('.chip');
-    if (!c) return;
-    draft.typeTouched = true;
-    setType(c.dataset.type);
-  });
-  $('#noteInput').addEventListener('input', (e) => { $('#noteCount').textContent = `${e.target.value.length}/120`; });
   $('#whenInput').addEventListener('change', (e) => {
     const ms = new Date(e.target.value).getTime();
-    if (!Number.isFinite(ms)) return;
-    draft.takenAt = Math.min(ms, Date.now());
-    if (!draft.typeTouched) setType(classify(draft.palette, new Date(draft.takenAt)));
+    if (Number.isFinite(ms)) draft.takenAt = Math.min(ms, Date.now());
   });
   $('#retake').addEventListener('click', () => { URL.revokeObjectURL(draft.url); draft = null; openCapture(); });
-  $('#dropIt').addEventListener('click', saveDraft);
+  $('#corkIt').addEventListener('click', saveDraft);
 }
 
 async function saveDraft() {
-  const btn = $('#dropIt');
+  const btn = $('#corkIt');
   btn.disabled = true;
   const sky = {
     id: newId(),
     takenAt: draft.takenAt,
-    type: draft.type,
     note: $('#noteInput').value.trim(),
+    place: $('#placeInput').value.trim(),
     palette: draft.palette,
     photo: draft.photo,
     thumb: draft.thumb,
@@ -549,71 +483,44 @@ async function saveDraft() {
     await store.put(sky);
   } catch {
     btn.disabled = false;
-    toast('บันทึกไม่สำเร็จ ลองอีกครั้งนะ');
+    toast(t.saveFailed);
     return;
   }
   URL.revokeObjectURL(draft.url);
   draft = null;
   state.skies.push(sky);
   sortSkies();
-  await playDrop(sky);
+  await playCork(sky);
 }
 
-async function playDrop(sky) {
+/** The cork drops into the bottle's neck, the glass tinks, and the sky is kept. */
+async function playCork(sky) {
   showStep('drop');
   const el = cap.querySelector('.drop');
-  const d = new Date(sky.takenAt);
-  const y = d.getFullYear(), m = d.getMonth();
-  const list = skiesIn(y, m);
   el.innerHTML = `
-    <div class="drop-stage"><canvas id="dropJar"></canvas><div class="drop-ball" id="dropBall"></div></div>
+    <div class="drop-stage">${bottleSvg({ href: photoUrl(sky) })}</div>
     <div class="drop-msg" id="dropMsg">
-      <h2>เก็บฟ้าแล้ว</h2>
-      <p>โหลเดือน${TH_MONTHS[m]}มี ${list.length} ท้องฟ้า</p>
+      <h2>${t.corked}</h2>
+      <p>${fmt.long(sky.takenAt)}</p>
       <div class="actions">
-        <button type="button" class="pill" id="dropShare">${ICON.share} แชร์ลงสตอรี่</button>
-        <button type="button" class="pill primary" id="dropOpen">ดูโหล</button>
+        <button type="button" class="btn" id="dropShare">${t.shareStory}</button>
+        <button type="button" class="btn primary" id="dropOpen">${t.seeShelf}</button>
       </div>
     </div>`;
 
-  const w = Math.round(Math.min(240, innerWidth * 0.62));
-  const h = Math.round(w * 1.4);
-  const ctx = setupCanvas($('#dropJar'), w, h);
-  const opts = { x: 0, y: 0, w, h, capacity: daysIn(y, m), lid: lidColor(m) };
-  const before = list.filter((s) => s !== sky);
-  drawJar(ctx, { ...opts, skies: before });
-
-  const ball = $('#dropBall');
-  ball.style.backgroundImage = `url("${photoUrl(sky)}")`;
+  const cork = el.querySelector('.b-cork');
   if (!reduceMotion()) {
-    await ball.animate([
-      { transform: 'translateY(-70vh) rotate(-10deg) scale(1)', borderRadius: '18px' },
-      { transform: `translateY(${h * 0.02}px) rotate(6deg) scale(.85)`, borderRadius: '24px', offset: 0.55 },
-      { transform: `translateY(${h * 0.22}px) rotate(0deg) scale(.22)`, borderRadius: '50%', opacity: 1, offset: 0.82 },
-      { transform: `translateY(${h * 0.5}px) scale(.06)`, borderRadius: '50%', opacity: 0 },
-    ], { duration: 1300, easing: 'cubic-bezier(.45,0,.55,1)', fill: 'forwards' }).finished;
+    await cork.animate([
+      { transform: 'translateY(-70px)', opacity: 0 },
+      { transform: 'translateY(4px)', opacity: 1, offset: 0.8 },
+      { transform: 'translateY(0)', opacity: 1 },
+    ], { duration: 700, easing: 'cubic-bezier(.5,0,.6,1)' }).finished;
   }
-  ball.remove();
   chime();
   navigator.vibrate?.(18);
-
-  // Pour the new sky in on top, then settle into date order.
-  const poured = [...before, sky];
-  await tween(800, (t) => {
-    ctx.clearRect(0, 0, w, h);
-    drawJar(ctx, { ...opts, skies: poured, grow: easeOutBack(t) });
-  });
-  if (list[list.length - 1] !== sky) {
-    ctx.clearRect(0, 0, w, h);
-    drawJar(ctx, { ...opts, skies: list });
-  }
   $('#dropMsg').classList.add('show');
-  $('#dropShare').addEventListener('click', () => openStory('single', sky));
-  $('#dropOpen').addEventListener('click', () => {
-    closeCapture();
-    state.year = y;
-    go(`#/jar/${y}-${pad2(m + 1)}`);
-  });
+  $('#dropShare').addEventListener('click', () => openStory('single', { sky }));
+  $('#dropOpen').addEventListener('click', () => { closeCapture(); go('#/'); });
 }
 
 // ---------- detail sheet ----------
@@ -622,31 +529,27 @@ function openDetail(sky, { pop = false } = {}) {
   if (!sky) return;
   const wrap = $('#sheet');
   const art = wrap.querySelector('.sheet');
-  const t = SKY_TYPES[sky.type];
   art.className = `sheet${pop ? ' pop' : ''}`;
   art.innerHTML = `
     <div class="grabber"></div>
-    <div class="detail-photo"><img src="${photoUrl(sky, 'photo')}" alt="ฟ้า${t.th} ${thaiDate(sky.takenAt)}"></div>
-    <div class="detail-meta">
-      <span class="chip"><i style="background:${gradCss(t.grad)}"></i>${t.th}</span>
-      <time datetime="${new Date(sky.takenAt).toISOString()}">${thaiDate(sky.takenAt)} · ${thaiTime(sky.takenAt)}</time>
-    </div>
-    ${sky.note ? `<p class="detail-note">${esc(sky.note)}</p>` : '<p class="detail-note muted">ไม่มีบันทึก</p>'}
-    <div class="palette detail-palette">${paletteHtml(sky.palette)}</div>
+    <div class="detail-bottle">${bottleSvg({ href: photoUrl(sky, 'photo'), label: t.openSky(fmt.long(sky.takenAt)) })}</div>
+    ${sky.note ? `<p class="detail-note">${esc(sky.note)}</p>` : ''}
+    <p class="detail-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.long(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>
+    <div class="palette">${paletteHtml(sky.palette)}</div>
     <div class="sheet-actions">
-      <button type="button" class="pill primary" id="shareOne">${ICON.share} แชร์ลงสตอรี่</button>
-      <button type="button" class="pill danger" id="askDelete" aria-label="ลบฟ้านี้">${ICON.trash}</button>
+      <button type="button" class="btn primary" id="shareOne">${t.shareStory}</button>
+      <button type="button" class="btn-text danger" id="askDelete">${t.deleteSky}</button>
     </div>
     <div id="confirmBox"></div>`;
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
 
-  $('#shareOne').addEventListener('click', () => openStory('single', sky));
+  $('#shareOne').addEventListener('click', () => openStory('single', { sky }));
   $('#askDelete').addEventListener('click', () => {
     $('#confirmBox').innerHTML = `<div class="confirm">
-      <p>ลบฟ้านี้ออกจากโหล? ลบแล้วกู้คืนไม่ได้</p>
-      <div class="row"><button type="button" class="pill" id="noDelete">ยกเลิก</button>
-      <button type="button" class="pill primary" id="yesDelete">ลบ</button></div></div>`;
+      <p>${t.deleteConfirm}</p>
+      <div class="actions"><button type="button" class="btn" id="noDelete">${t.keepIt}</button>
+      <button type="button" class="btn danger" id="yesDelete">${t.deleteSky}</button></div></div>`;
     $('#noDelete').addEventListener('click', () => { $('#confirmBox').innerHTML = ''; });
     $('#yesDelete').addEventListener('click', async () => {
       await store.remove(sky.id);
@@ -654,7 +557,7 @@ function openDetail(sky, { pop = false } = {}) {
       closeSheet();
       forgetUrls(sky.id);
       render();
-      toast('ลบฟ้าออกจากโหลแล้ว');
+      toast(t.deleted);
     });
   });
 }
@@ -671,40 +574,52 @@ let storyUrl = null;
 async function openStory(kind, payload) {
   const wrap = $('#storyModal');
   const art = wrap.querySelector('.sheet');
-  const title = kind === 'single' ? 'แชร์ฟ้านี้' : kind === 'jar' ? `แชร์โหลเดือน${TH_MONTHS[payload.month]}` : `แชร์ชั้นฟ้าปี ${payload.year}`;
+  const title = kind === 'single' ? t.shareTitle.single : kind === 'jar' ? t.shareTitle.jar(MONTHS[payload.month]) : t.shareTitle.year(payload.year);
+  const canShowPlace = kind === 'single' && payload.sky.place;
   art.innerHTML = `
     <div class="grabber"></div>
     <h2>${title}</h2>
     <div class="story-preview" id="storyPreview"><div class="spinner"></div></div>
-    <p class="story-tip">บนมือถือ กด "แชร์" แล้วเลือก Instagram → Stories ถ้าไม่มีให้เลือก บันทึกรูปแล้วอัปจากคลังภาพได้เลย</p>
+    ${canShowPlace ? `<label class="switch"><span>${t.showPlace}</span><input type="checkbox" id="showPlace"></label>
+      <p class="hint left">${t.showPlaceHint}</p>` : ''}
+    <p class="hint left">${t.storyTip}</p>
     <div class="sheet-actions">
-      <button type="button" class="pill" id="saveStory" disabled>${ICON.download} บันทึกรูป</button>
-      <button type="button" class="pill primary" id="shareStory" disabled>${ICON.share} แชร์</button>
+      <button type="button" class="btn" id="saveStory" disabled>${t.saveImage}</button>
+      <button type="button" class="btn primary" id="shareStory" disabled>${t.share}</button>
     </div>`;
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
 
-  let blob;
-  try {
-    blob = await makeStory(kind, payload);
-  } catch {
-    $('#storyPreview').innerHTML = '<p class="story-tip">สร้างรูปไม่สำเร็จ ปิดแล้วลองใหม่อีกครั้งนะ</p>';
-    return;
-  }
-  if (wrap.hidden) return;
-  if (storyUrl) URL.revokeObjectURL(storyUrl);
-  storyUrl = URL.createObjectURL(blob);
-  $('#storyPreview').innerHTML = `<img src="${storyUrl}" alt="ภาพสตอรี่ขนาด 1080×1920">`;
-  const stamp = new Date().toISOString().slice(0, 10);
-  const filename = `kepfa-${kind}-${stamp}.jpg`;
-  const saveBtn = $('#saveStory'), shareBtn = $('#shareStory');
-  saveBtn.disabled = false;
-  shareBtn.disabled = false;
-  saveBtn.addEventListener('click', () => { saveImage(blob, filename); toast('บันทึกรูปแล้ว'); });
-  shareBtn.addEventListener('click', async () => {
-    const res = await shareImage(blob, filename);
-    if (res === 'saved') toast('อุปกรณ์นี้แชร์ตรงไม่ได้ เลยบันทึกรูปให้แทน');
+  const filename = `kepfa-${kind}-${new Date().toISOString().slice(0, 10)}.jpg`;
+  let blob = null;
+  let build = 0;
+  const make = async (showPlace) => {
+    const mine = ++build;
+    $('#saveStory').disabled = true;
+    $('#shareStory').disabled = true;
+    let out;
+    try {
+      out = await makeStory(kind, { ...payload, showPlace });
+    } catch {
+      $('#storyPreview').innerHTML = `<p class="hint">${t.storyFailed}</p>`;
+      return;
+    }
+    if (mine !== build || wrap.hidden) return;
+    blob = out;
+    if (storyUrl) URL.revokeObjectURL(storyUrl);
+    storyUrl = URL.createObjectURL(blob);
+    $('#storyPreview').innerHTML = `<img src="${storyUrl}" alt="">`;
+    $('#saveStory').disabled = false;
+    $('#shareStory').disabled = false;
+  };
+
+  $('#saveStory').addEventListener('click', () => { saveImage(blob, filename); toast(t.saved); });
+  $('#shareStory').addEventListener('click', async () => {
+    if ((await shareImage(blob, filename)) === 'saved') toast(t.sharedFallback);
   });
+  // Place stays off every time the sheet opens, so it never leaves the phone by accident.
+  $('#showPlace')?.addEventListener('change', (e) => make(e.target.checked));
+  make(false);
 }
 
 function closeStory() {
@@ -716,19 +631,21 @@ function closeStory() {
 // ---------- sample shelf ----------
 
 const SAMPLE_RECIPES = [
-  ['sunset', 18, 12, 'ฟ้าหลังเลิกงาน สวยจนต้องหยุดเดิน'],
-  ['clear', 11, 5, 'ชาไทยกับฟ้าใส ๆ'],
-  ['pink', 18, 34, 'ฟ้าสีชมพูเหมือนสายไหม'],
-  ['cloudy', 14, 20, 'เมฆเยอะแต่ลมเย็นดี'],
-  ['cloudy', 16, 2, 'ลมแรง เมฆวิ่งเร็วมาก'],
-  ['night', 21, 40, 'ดาวเต็มฟ้าที่บ้านยาย'],
-  ['sunrise', 6, 18, 'เช้าวันเสาร์ ไม่ต้องรีบไปไหน'],
-  ['bluehour', 18, 55, 'บลูอาวร์บนสะพานพระราม 8'],
-  ['sunset', 17, 58, 'ซันเซ็ตริมเจ้าพระยากับแก๊งเพื่อน'],
-  ['clear', 9, 30, ''],
-  ['cloudy', 12, 45, 'ฟ้าครึ้มแต่ใจสดใส'],
-  ['pink', 18, 20, 'นั่งรถเมล์กลับบ้าน ฟ้าเป็นสีพีช'],
+  ['sunset', 18, 12, 'the one after work', 'Bangkok'],
+  ['clear', 11, 5, 'saturday blue', ''],
+  ['pink', 18, 34, 'peach bus ride', 'Bangkok'],
+  ['cloudy', 14, 20, 'all clouds', ''],
+  ['cloudy', 16, 2, '', ''],
+  ['night', 21, 40, 'grandma’s stars', 'Chiang Mai'],
+  ['sunrise', 6, 18, 'slow morning', ''],
+  ['bluehour', 18, 55, 'blue hour on the bridge', 'Bangkok'],
+  ['sunset', 17, 58, 'the river one', 'Bangkok'],
+  ['clear', 9, 30, '', ''],
+  ['cloudy', 12, 45, 'grey but fine', ''],
+  ['pink', 18, 20, 'the cotton candy one', 'Hua Hin'],
 ];
+const SEED_KEY = 'skyjar.seeded';
+const SEED_VERSION = '2';
 
 async function seedSamples(onProgress) {
   const now = new Date();
@@ -746,19 +663,18 @@ async function seedSamples(onProgress) {
     const last = mo.back === 0 ? now.getDate() : daysIn(y, m);
     for (let i = 0; i < mo.count; i++) {
       const day = Math.max(1, Math.round(((i + 0.5) * last) / mo.count));
-      const [kind, hh, mm, note] = SAMPLE_RECIPES[k % SAMPLE_RECIPES.length];
+      const [kind, hh, mm, note, place] = SAMPLE_RECIPES[k % SAMPLE_RECIPES.length];
       k++;
       const takenAt = new Date(y, m, day, hh, mm).getTime();
-      if (takenAt <= Date.now()) plan.push({ kind, takenAt, note, seed: k * 7919 });
+      if (takenAt <= Date.now()) plan.push({ kind, takenAt, note, place, seed: k * 7919 });
     }
   }
-  // Stormy and rainbow skies are left out on purpose so the Sky dex has something left to find.
 
   for (let i = 0; i < plan.length; i++) {
     const p = plan[i];
     const prep = await prepareImage(await makeSampleSky(p.kind, p.seed));
     const sky = {
-      id: newId(), takenAt: p.takenAt, type: p.kind, note: p.note,
+      id: newId(), takenAt: p.takenAt, note: p.note, place: p.place,
       palette: prep.palette, photo: prep.photo, thumb: prep.thumb, sample: true, createdAt: Date.now(),
     };
     await store.put(sky);
@@ -768,11 +684,11 @@ async function seedSamples(onProgress) {
   sortSkies();
 }
 
-function seededBefore() {
-  try { return localStorage.getItem('skyjar.seeded') === '1'; } catch { return false; }
+function seededVersion() {
+  try { return localStorage.getItem(SEED_KEY); } catch { return null; }
 }
 function markSeeded() {
-  try { localStorage.setItem('skyjar.seeded', '1'); } catch { /* ignore */ }
+  try { localStorage.setItem(SEED_KEY, SEED_VERSION); } catch { /* ignore */ }
 }
 
 // ---------- boot ----------
@@ -789,11 +705,12 @@ function bindGlobal() {
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('.palette button[data-hex]');
     if (!b) return;
+    const code = b.dataset.hex.toUpperCase();
     try {
-      await navigator.clipboard.writeText(b.dataset.hex.toUpperCase());
-      toast(`คัดลอก ${b.dataset.hex.toUpperCase()} แล้ว`);
+      await navigator.clipboard.writeText(code);
+      toast(t.copied(code));
     } catch {
-      toast(b.dataset.hex.toUpperCase());
+      toast(code);
     }
   });
 
@@ -807,26 +724,31 @@ function bindGlobal() {
   let resizeTimer;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => state.redraw?.(), 120);
+    resizeTimer = setTimeout(() => {
+      state.redraw?.();
+      if (!cap.hidden) layoutCameraFrame();
+    }, 120);
   });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => state.redraw?.());
   window.addEventListener('hashchange', render);
 }
 
 async function init() {
-  setPhase();
-  setInterval(setPhase, 5 * 60 * 1000);
   bindGlobal();
-  view.innerHTML = '<div class="loading"><div class="spinner"></div><p>กำลังเปิดชั้นวาง…</p></div>';
+  view.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t.opening}</p></div>`;
 
   try {
-    await document.fonts.load('30px Itim');
+    await document.fonts.load('30px "Cormorant Garamond"');
   } catch { /* fonts are optional */ }
   state.skies = await store.all();
-  if (!(await store.persistent())) toast('เบราว์เซอร์นี้ไม่เก็บข้อมูลถาวร ปิดแท็บแล้วฟ้าจะหายนะ');
+  if (!(await store.persistent())) toast(t.notPersistent);
 
-  if (!state.skies.length && !seededBefore()) {
-    view.innerHTML = '<div class="loading"><div class="spinner"></div><p id="seedMsg">กำลังจัดชั้นวางตัวอย่าง…</p></div>';
-    await seedSamples((i, n) => { const m = $('#seedMsg'); if (m) m.textContent = `กำลังจัดชั้นวางตัวอย่าง… ${i}/${n}`; });
+  // First visit, or a shelf that still only holds an older batch of samples: lay out a fresh sample shelf.
+  if (seededVersion() !== SEED_VERSION && state.skies.every((s) => s.sample)) {
+    for (const s of state.skies) await store.remove(s.id);
+    state.skies = [];
+    view.innerHTML = `<div class="loading"><div class="spinner"></div><p id="seedMsg">${t.preparing(0, '…')}</p></div>`;
+    await seedSamples((i, n) => { const m = $('#seedMsg'); if (m) m.textContent = t.preparing(i, n); });
     markSeeded();
   }
   render();

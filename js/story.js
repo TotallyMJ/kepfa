@@ -1,320 +1,284 @@
-// 1080×1920 images sized for an Instagram story: one sky, one month's jar, or the whole year's shelf.
+// 1080×1920 images sized for an Instagram story, printed on paper:
+// one corked sky with its postmark, one month's bottle, or the whole year's shelf.
 
-import { drawJar, lidColor } from './jar.js';
-import { SKY_TYPES, hexToRgb, luminance, mix, dominant, loadImage } from './sky.js';
+import { drawBottle, bottleShape } from './jar.js';
+import { dominant, loadImage } from './sky.js';
+import { t, fmt, MONTHS, MONTHS_SHORT } from './strings.js';
 
 const W = 1080, H = 1920;
-const INK = '#1f2444';
-const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-const TH_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const PAPER = '#F1EDE6';
+const TAG = '#FBF9F5';
+const INK = '#2A2723';
+const SOFT = '#6B645B';
+const RULE = '#CFC7BB';
+const STAMP = '#2C3D6B';
+const GLASS = 'rgba(255,255,255,.45)';
+
+const SERIF = '"Cormorant Garamond", "IBM Plex Sans Thai", Georgia, serif';
+const SANS = '"IBM Plex Sans", "IBM Plex Sans Thai", system-ui, sans-serif';
+const MONO = '"IBM Plex Mono", ui-monospace, monospace';
 
 async function fontsReady() {
   try {
     await Promise.all([
-      document.fonts.load('64px Itim'),
-      document.fonts.load('40px Anuphan'),
-      document.fonts.load('500 40px Anuphan'),
-      document.fonts.load('30px "DM Mono"'),
+      document.fonts.load('500 64px "Cormorant Garamond"'),
+      document.fonts.load('64px "Cormorant Garamond"'),
+      document.fonts.load('40px "IBM Plex Sans"'),
+      document.fonts.load('500 40px "IBM Plex Sans"'),
+      document.fonts.load('40px "IBM Plex Sans Thai"'),
+      document.fonts.load('40px "IBM Plex Mono"'),
     ]);
   } catch { /* fall back to system fonts */ }
 }
 
-function canvas() {
+function page() {
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
-  return [c, c.getContext('2d')];
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(0, 0, W, H);
+  // paper grain, and it stops IG's compression from banding flat areas
+  const img = ctx.getImageData(0, 0, W, H);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() - 0.5) * 7;
+    d[i] += n; d[i + 1] += n; d[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+  return [c, ctx];
 }
 
 function toBlob(c) {
   return new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.92));
 }
 
-function soften(hexColor, t) {
-  const [r, g, b] = mix(hexToRgb(hexColor), [255, 255, 255], t);
-  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+function text(ctx, str, x, y, { font, color = INK, align = 'center', spacing = 0 }) {
+  ctx.font = font;
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'alphabetic';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = `${spacing}px`;
+  ctx.fillText(str, x, y);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
-function backdrop(ctx, colors, soft) {
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  colors.forEach((c, i) => g.addColorStop(colors.length === 1 ? 0 : i / (colors.length - 1), soften(c, soft)));
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-  // grain so the gradient doesn't band on IG's compression
-  const img = ctx.getImageData(0, 0, W, H);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const n = (Math.random() - 0.5) * 6;
-    d[i] += n; d[i + 1] += n; d[i + 2] += n;
-  }
-  ctx.putImageData(img, 0, 0);
+function masthead(ctx) {
+  text(ctx, 'Kepfa', 90, 150, { font: `500 64px ${SERIF}`, align: 'left' });
+  text(ctx, t.skyCollection.toUpperCase(), W - 90, 146, { font: `26px ${SANS}`, color: SOFT, align: 'right', spacing: 5 });
+  ctx.fillStyle = RULE;
+  ctx.fillRect(90, 182, W - 180, 2);
 }
 
-function textColorFor(colors, soft) {
-  const avg = colors.map(hexToRgb).map((c) => mix(c, [255, 255, 255], soft)).reduce((a, c) => a + luminance(c), 0) / colors.length;
-  return avg > 0.55 ? INK : '#ffffff';
+function footer(ctx) {
+  text(ctx, t.footer, W / 2, 1840, { font: `28px ${SANS}`, color: SOFT });
 }
 
-function wrap(ctx, text, maxW, maxLines) {
-  // Thai has no spaces between words, so wrap by character when a line overflows.
+function rule(ctx, y, half = 140) {
+  ctx.fillStyle = RULE;
+  ctx.fillRect(W / 2 - half, y, half * 2, 2);
+}
+
+function wrap(ctx, str, maxW, maxLines) {
+  // Wrap by words, falling back to characters for scripts without spaces (Thai).
+  const tokens = str.includes(' ') ? str.split(/(\s+)/) : Array.from(str);
   const lines = [];
   let line = '';
-  for (const ch of Array.from(text)) {
-    const test = line + ch;
-    if (ctx.measureText(test).width > maxW && line) {
-      lines.push(line);
-      line = ch.trimStart();
+  for (const tok of tokens) {
+    const test = line + tok;
+    if (ctx.measureText(test).width > maxW && line.trim()) {
+      lines.push(line.trim());
+      line = tok.trimStart();
       if (lines.length === maxLines) break;
     } else {
       line = test;
     }
   }
-  if (lines.length < maxLines && line) lines.push(line);
-  if (lines.length === maxLines && lines.join('').length < Array.from(text).length) {
-    lines[maxLines - 1] = lines[maxLines - 1].slice(0, -1) + '…';
+  if (lines.length < maxLines && line.trim()) lines.push(line.trim());
+  if (lines.length === maxLines && lines.join(' ').length < str.trim().length - 1) {
+    lines[maxLines - 1] = lines[maxLines - 1].replace(/.$/, '…');
   }
   return lines;
 }
 
-function wordmark(ctx, color, y) {
-  ctx.fillStyle = color;
-  ctx.globalAlpha = 0.85;
-  ctx.font = '52px Itim, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText('kepfa', W / 2, y);
-  ctx.globalAlpha = 1;
-}
-
-function pill(ctx, text, cx, cy, fg, bg) {
-  ctx.font = '500 34px Anuphan, sans-serif';
-  const tw = ctx.measureText(text).width;
-  const pw = tw + 64, ph = 72;
-  ctx.fillStyle = bg;
-  ctx.beginPath();
-  ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
-  ctx.fill();
-  ctx.fillStyle = fg;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, cx, cy + 2);
-}
-
-export function thaiDate(ms) {
-  const d = new Date(ms);
-  return `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-export function thaiTime(ms) {
-  const d = new Date(ms);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-async function storySingle(sky) {
-  const [c, ctx] = canvas();
-  const colors = sky.palette.map((p) => p.hex);
-  backdrop(ctx, colors, 0.35);
-  const fg = textColorFor(colors, 0.35);
-
-  wordmark(ctx, fg, 140);
-  ctx.font = '30px "DM Mono", monospace';
-  ctx.fillStyle = fg;
-  ctx.globalAlpha = 0.75;
-  ctx.fillText(`${thaiDate(sky.takenAt)}  ·  ${thaiTime(sky.takenAt)}`, W / 2, 196);
-  ctx.globalAlpha = 1;
-
-  // Polaroid with the note written on the bottom strip.
-  const cardX = 130, cardY = 260, cardW = 820, pad = 38;
-  const photoW = cardW - pad * 2, photoH = Math.round(photoW * 4 / 3);
-  const cardH = pad + photoH + 190;
+/** Round postmark with the month and day, inked slightly off-square like a real stamp. */
+function postmark(ctx, cx, cy, top, bottom, scale = 1) {
   ctx.save();
-  ctx.translate(W / 2, cardY + cardH / 2);
-  ctx.rotate(-0.025);
-  ctx.translate(-W / 2, -(cardY + cardH / 2));
-  ctx.shadowColor = 'rgba(20,24,50,.28)';
-  ctx.shadowBlur = 50;
-  ctx.shadowOffsetY = 18;
-  ctx.fillStyle = '#fffdf8';
-  ctx.fillRect(cardX, cardY, cardW, cardH);
-  ctx.shadowColor = 'transparent';
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.12);
+  ctx.strokeStyle = STAMP;
+  ctx.globalAlpha = 0.82;
+  ctx.lineWidth = 5 * scale;
+  ctx.beginPath(); ctx.arc(0, 0, 108 * scale, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 3 * scale;
+  ctx.beginPath(); ctx.arc(0, 0, 80 * scale, 0, Math.PI * 2); ctx.stroke();
+  text(ctx, top, 0, -4 * scale, { font: `500 ${58 * scale}px ${SERIF}`, color: STAMP, spacing: 3 * scale });
+  text(ctx, bottom, 0, 44 * scale, { font: `${36 * scale}px ${MONO}`, color: STAMP });
+  ctx.restore();
+}
 
-  const { img, release } = await loadImage(sky.photo);
-  const s = Math.max(photoW / img.naturalWidth, photoH / img.naturalHeight);
-  const iw = img.naturalWidth * s, ih = img.naturalHeight * s;
+/** Wavy cancellation lines that run off the bottle's edge. */
+function cancellation(ctx, x, y) {
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(cardX + pad, cardY + pad, photoW, photoH);
-  ctx.clip();
-  ctx.drawImage(img, cardX + pad + (photoW - iw) / 2, cardY + pad + (photoH - ih) / 2, iw, ih);
-  ctx.restore();
-  release();
-
-  ctx.fillStyle = '#3b3654';
-  ctx.font = '46px Itim, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  const note = sky.note?.trim() || SKY_TYPES[sky.type].th;
-  wrap(ctx, note, photoW, 2).forEach((ln, i) => ctx.fillText(ln, cardX + pad + 4, cardY + pad + photoH + 82 + i * 60));
-  ctx.restore();
-
-  // Palette swatches with hex codes.
-  const sw = sky.palette.slice(0, 5);
-  const d = 118, gap = 36;
-  const rowW = sw.length * d + (sw.length - 1) * gap;
-  let sx = (W - rowW) / 2;
-  const sy = 1600;
-  sw.forEach((p) => {
-    ctx.fillStyle = p.hex;
+  ctx.strokeStyle = STAMP;
+  ctx.globalAlpha = 0.72;
+  ctx.lineWidth = 4;
+  for (let k = 0; k < 4; k++) {
     ctx.beginPath();
-    ctx.arc(sx + d / 2, sy, d / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = 'rgba(255,255,255,.85)';
+    for (let dx = 0; dx <= 300; dx += 6) {
+      const yy = y + k * 22 + Math.sin(dx / 18) * 7;
+      if (dx === 0) ctx.moveTo(x + dx, yy); else ctx.lineTo(x + dx, yy);
+    }
     ctx.stroke();
-    ctx.fillStyle = fg;
-    ctx.font = '24px "DM Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(p.hex.toUpperCase(), sx + d / 2, sy + d / 2 + 44);
-    sx += d + gap;
-  });
+  }
+  ctx.restore();
+}
 
-  const t = SKY_TYPES[sky.type];
-  pill(ctx, `${t.th} · ${t.en}`, W / 2, 1800, INK, 'rgba(255,255,255,.72)');
+/** Paper tag tied to the bottle's neck. */
+function tag(ctx, nx, ny, label) {
+  const tx = nx + 120, ty = ny - 30;
+  ctx.save();
+  ctx.strokeStyle = SOFT;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(nx, ny);
+  ctx.quadraticCurveTo(nx + 60, ny + 30, tx + 22, ty + 46);
+  ctx.stroke();
+  ctx.translate(tx, ty);
+  ctx.rotate(0.14);
+  let size = 34;
+  ctx.font = `500 ${size}px ${SANS}`;
+  const str = label.toUpperCase();
+  while (size > 22 && ctx.measureText(str).width + str.length * 2 > 260) { size -= 2; ctx.font = `500 ${size}px ${SANS}`; }
+  const tw = Math.max(200, ctx.measureText(str).width + str.length * 2 + 90);
+  ctx.fillStyle = TAG;
+  ctx.strokeStyle = RULE;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, tw, 92, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = SOFT;
+  ctx.beginPath(); ctx.arc(24, 46, 8, 0, Math.PI * 2); ctx.stroke();
+  text(ctx, str, 48 + (tw - 48) / 2, 58, { font: `500 ${size}px ${SANS}`, spacing: 2 });
+  ctx.restore();
+}
+
+function swatches(ctx, palette, y) {
+  const sw = palette.slice(0, 5);
+  const size = 72, gap = 22;
+  let x = (W - (sw.length * size + (sw.length - 1) * gap)) / 2;
+  for (const p of sw) {
+    ctx.fillStyle = p.hex;
+    ctx.fillRect(x, y, size, size);
+    text(ctx, p.hex.slice(1).toUpperCase(), x + size / 2, y + size + 40, { font: `22px ${MONO}`, color: SOFT });
+    x += size + gap;
+  }
+}
+
+async function storySingle(sky, showPlace) {
+  const [c, ctx] = page();
+  masthead(ctx);
+
+  const bw = 480, bh = 912, bx = (W - bw) / 2, by = 240;
+  const { img, release } = await loadImage(sky.photo);
+  drawBottle(ctx, { x: bx, y: by, w: bw, h: bh, image: img, ink: INK, glass: GLASS });
+  release();
+  const g = bottleShape(bw, bh);
+  if (showPlace && sky.place) tag(ctx, bx + g.cx + g.nw / 2, by + g.nt + 30, sky.place);
+  cancellation(ctx, bx + bw - 150, by + bh - 300);
+  const d = new Date(sky.takenAt);
+  postmark(ctx, bx - 10, by + bh - 240, MONTHS_SHORT[d.getMonth()].toUpperCase(), String(d.getDate()));
+
+  let y = by + bh + 110;
+  if (sky.note) {
+    ctx.font = `56px ${SERIF}`;
+    const lines = wrap(ctx, sky.note, W - 260, 2);
+    lines.forEach((ln, i) => text(ctx, ln, W / 2, y + i * 70, { font: `56px ${SERIF}` }));
+    y += lines.length * 70 - 20;
+  }
+  rule(ctx, y);
+  text(ctx, fmt.stamp(sky.takenAt), W / 2, y + 70, { font: `40px ${MONO}`, color: SOFT });
+  swatches(ctx, sky.palette, y + 150);
+  footer(ctx);
   return toBlob(c);
 }
 
 async function storyJar({ year, month, skies }) {
-  const [c, ctx] = canvas();
-  const colors = skies.length ? skies.slice().reverse().map((s) => dominant(s.palette).hex) : ['#c8d2f3', '#fcdccb'];
-  const bg = colors.length > 6 ? colors.filter((_, i) => i % Math.ceil(colors.length / 6) === 0) : colors;
-  backdrop(ctx, bg, 0.55);
-  const fg = textColorFor(bg, 0.55);
+  const [c, ctx] = page();
+  masthead(ctx);
+  text(ctx, MONTHS[month], W / 2, 340, { font: `500 128px ${SERIF}` });
+  text(ctx, t.storyKept(year, skies.length), W / 2, 410, { font: `36px ${SANS}`, color: SOFT });
 
-  ctx.fillStyle = fg;
-  ctx.textAlign = 'center';
-  ctx.font = '96px Itim, sans-serif';
-  ctx.fillText(`ฟ้าเดือน${TH_MONTHS[month]}`, W / 2, 250);
-  ctx.font = '40px Anuphan, sans-serif';
-  ctx.globalAlpha = 0.8;
-  ctx.fillText(`${year}  ·  เก็บไว้ ${skies.length} ท้องฟ้า`, W / 2, 322);
-  ctx.globalAlpha = 1;
+  const bw = 480, bh = 912, bx = (W - bw) / 2, by = 470;
+  drawBottle(ctx, { x: bx, y: by, w: bw, h: bh, skies, capacity: new Date(year, month + 1, 0).getDate(), ink: INK, glass: GLASS });
+  postmark(ctx, bx - 10, by + bh - 240, MONTHS_SHORT[month].toUpperCase(), String(year), 0.95);
 
-  const days = new Date(year, month + 1, 0).getDate();
-  drawJar(ctx, {
-    x: 230, y: 420, w: 620, h: 900, skies, capacity: days, lid: lidColor(month),
-    label: TH_MONTHS_SHORT[month], labelFont: '50px Itim, sans-serif', outline: 'rgba(31,36,68,.28)',
-  });
-
-  // One dot per sky: the month as a row of colors.
-  const dot = 34, gap = 12, perRow = 16;
+  // One square per sky: the month as a row of colors.
+  const size = 34, gap = 10, perRow = 16;
   const rows = Math.ceil(skies.length / perRow);
   skies.forEach((s, i) => {
     const r = Math.floor(i / perRow), col = i % perRow;
     const inRow = Math.min(perRow, skies.length - r * perRow);
-    const rowW = inRow * dot + (inRow - 1) * gap;
-    const cx = (W - rowW) / 2 + col * (dot + gap) + dot / 2;
-    const cy = 1440 + r * (dot + gap) + (rows === 1 ? 20 : 0);
+    const x = (W - (inRow * size + (inRow - 1) * gap)) / 2 + col * (size + gap);
     ctx.fillStyle = dominant(s.palette).hex;
-    ctx.beginPath();
-    ctx.arc(cx, cy, dot / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.8)';
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    ctx.fillRect(x, 1470 + r * (size + gap) + (rows === 1 ? 20 : 0), size, size);
   });
-
-  const counts = {};
-  skies.forEach((s) => { counts[s.type] = (counts[s.type] || 0) + 1; });
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-  if (top) pill(ctx, `ฟ้าที่เจอบ่อยสุด: ${SKY_TYPES[top[0]].th}`, W / 2, 1640, INK, 'rgba(255,255,255,.72)');
-  wordmark(ctx, fg, 1820);
+  footer(ctx);
   return toBlob(c);
 }
 
 async function storyYear({ year, skies }) {
-  const [c, ctx] = canvas();
-  backdrop(ctx, ['#c3c9ef', '#e9d4f0', '#ffd8c4'], 0.15);
-  const fg = INK;
+  const [c, ctx] = page();
+  masthead(ctx);
+  text(ctx, String(year), W / 2, 340, { font: `500 140px ${SERIF}` });
+  text(ctx, `${skies.length} ${t.kept(skies.length)}`, W / 2, 410, { font: `36px ${SANS}`, color: SOFT });
 
-  ctx.fillStyle = fg;
-  ctx.textAlign = 'center';
-  ctx.font = '96px Itim, sans-serif';
-  ctx.fillText(`ฟ้าของฉัน ${year}`, W / 2, 230);
-  const types = new Set(skies.map((s) => s.type)).size;
-  ctx.font = '40px Anuphan, sans-serif';
-  ctx.globalAlpha = 0.75;
-  ctx.fillText(`${skies.length} ท้องฟ้า  ·  ${types} จาก ${Object.keys(SKY_TYPES).length} แบบ`, W / 2, 300);
-  ctx.globalAlpha = 1;
-
-  const jw = 196, jh = 262, gapX = 44, rowH = 360;
-  const left = (W - (4 * jw + 3 * gapX)) / 2;
+  const bw = 150, bh = 285, gapX = 70, rowH = 385;
+  const left = (W - (4 * bw + 3 * gapX)) / 2;
   const now = new Date();
   for (let m = 0; m < 12; m++) {
     const r = Math.floor(m / 4), col = m % 4;
-    const x = left + col * (jw + gapX);
-    const y = 390 + r * rowH;
-    const monthSkies = skies.filter((s) => new Date(s.takenAt).getMonth() === m);
+    const x = left + col * (bw + gapX);
+    const y = 470 + r * rowH;
     const future = year > now.getFullYear() || (year === now.getFullYear() && m > now.getMonth());
-    drawJar(ctx, {
-      x, y, w: jw, h: jh, skies: monthSkies, capacity: new Date(year, m + 1, 0).getDate(),
-      lid: lidColor(m), ghost: future, outline: 'rgba(31,36,68,.28)',
+    drawBottle(ctx, {
+      x, y, w: bw, h: bh, skies: skies.filter((s) => new Date(s.takenAt).getMonth() === m),
+      capacity: new Date(year, m + 1, 0).getDate(), ghost: future, ink: INK, glass: GLASS,
     });
     if (col === 0) {
-      // plank
-      const py = y + jh + 4;
-      const pg = ctx.createLinearGradient(0, py, 0, py + 26);
-      pg.addColorStop(0, '#e8c79f');
-      pg.addColorStop(1, '#c79c6c');
-      ctx.fillStyle = pg;
-      ctx.shadowColor = 'rgba(60,40,20,.25)';
-      ctx.shadowBlur = 16;
-      ctx.shadowOffsetY = 8;
-      ctx.beginPath();
-      ctx.roundRect(left - 30, py, 4 * jw + 3 * gapX + 60, 26, 8);
-      ctx.fill();
-      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = INK;
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(left - 30, y + bh + 4, 4 * bw + 3 * gapX + 60, 2);
+      ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = 'rgba(31,36,68,.75)';
-    ctx.font = '500 30px Anuphan, sans-serif';
-    ctx.fillText(TH_MONTHS_SHORT[m], x + jw / 2, y + jh + 68);
+    text(ctx, MONTHS_SHORT[m], x + bw / 2, y + bh + 48, { font: `30px ${SANS}`, color: SOFT });
   }
 
   // The year as a strip of colors, one sliver per sky.
-  const stripY = 1520, stripH = 150, stripX = 90, stripW = W - 180;
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(stripX, stripY, stripW, stripH, 28);
-  ctx.clip();
-  ctx.fillStyle = 'rgba(255,255,255,.5)';
-  ctx.fillRect(stripX, stripY, stripW, stripH);
+  const sx = 90, sy = 1640, sw = W - 180, sh = 90;
+  ctx.fillStyle = TAG;
+  ctx.fillRect(sx, sy, sw, sh);
   if (skies.length) {
-    const bw = stripW / skies.length;
+    const bwid = sw / skies.length;
     skies.forEach((s, i) => {
-      const g = ctx.createLinearGradient(0, stripY, 0, stripY + stripH);
-      s.palette.forEach((p, j) => g.addColorStop(s.palette.length === 1 ? 0.5 : j / (s.palette.length - 1), p.hex));
-      ctx.fillStyle = g;
-      ctx.fillRect(stripX + i * bw, stripY, bw + 1, stripH);
+      const grad = ctx.createLinearGradient(0, sy, 0, sy + sh);
+      s.palette.forEach((p, j) => grad.addColorStop(s.palette.length === 1 ? 0.5 : j / (s.palette.length - 1), p.hex));
+      ctx.fillStyle = grad;
+      ctx.fillRect(sx + i * bwid, sy, bwid + 1, sh);
     });
   }
-  ctx.restore();
-  ctx.fillStyle = fg;
-  ctx.globalAlpha = 0.7;
-  ctx.font = '28px Anuphan, sans-serif';
-  ctx.fillText('ทุกท้องฟ้าที่เก็บไว้ เรียงตามวัน', W / 2, stripY + stripH + 52);
-  ctx.globalAlpha = 1;
-
-  wordmark(ctx, fg, 1830);
+  text(ctx, t.stripCaption, W / 2, sy + sh + 46, { font: `26px ${SANS}`, color: SOFT });
+  footer(ctx);
   return toBlob(c);
 }
 
 export async function makeStory(kind, payload) {
   await fontsReady();
-  if (kind === 'single') return storySingle(payload);
+  if (kind === 'single') return storySingle(payload.sky, payload.showPlace);
   if (kind === 'jar') return storyJar(payload);
   return storyYear(payload);
 }
 
-/** Mobile: native share sheet (pick Instagram → Story). Desktop or unsupported: save the file. */
+/** Mobile: native share sheet (pick Instagram, then Stories). Desktop or unsupported: save the file. */
 export async function shareImage(blob, filename) {
   const file = new File([blob], filename, { type: blob.type });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {

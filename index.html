@@ -1,17 +1,18 @@
 <!doctype html>
-<html lang="th">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Kepfa · เก็บฟ้า</title>
-<meta name="description" content="เก็บฟ้าใส่โหล ถ่ายฟ้าแล้วสีของฟ้ากลายเป็นชั้นสีในโหล">
-<meta name="theme-color" content="#c8d2f3">
+<title>Kepfa</title>
+<meta name="description" content="Keep the sky. Photograph the sky and cork it in a bottle on your shelf.">
+<meta name="theme-color" content="#F1EDE6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1B1916" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600&family=DM+Mono:wght@400;500&family=Itim&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans+Thai:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -19,43 +20,34 @@
   <main id="view"></main>
 </div>
 
-<nav class="tabbar" aria-label="เมนูหลัก">
-  <a href="#/" class="tab" data-tab="shelf">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M4 13h16M7 13V8.5A1.5 1.5 0 0 1 8.5 7h1A1.5 1.5 0 0 1 11 8.5V13m3 0V5.5A1.5 1.5 0 0 1 15.5 4h1A1.5 1.5 0 0 1 18 5.5V13M7 20v-3.5A1.5 1.5 0 0 1 8.5 15h1a1.5 1.5 0 0 1 1.5 1.5V20"/></svg>
-    <span>ชั้นวาง</span>
-  </a>
-  <button class="capture-btn" id="openCapture" type="button">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>
-    <span>เก็บฟ้า</span>
-  </button>
-  <a href="#/dex" class="tab" data-tab="dex">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>
-    <span>Sky dex</span>
-  </a>
+<nav class="tabbar" aria-label="Main">
+  <div class="tabbar-inner">
+    <a href="#/" class="tab" data-tab="shelf">Shelf</a>
+    <a href="#/months" class="tab" data-tab="months">Months</a>
+    <button class="btn capture-btn" id="openCapture" type="button">Keep a sky</button>
+  </div>
 </nav>
 
-<section id="capture" class="capture" hidden aria-label="เก็บฟ้า">
+<section id="capture" class="capture" hidden aria-label="Keep a sky">
   <div class="cap-step cam" data-step="camera">
     <video id="camVideo" playsinline muted></video>
+    <svg id="camFrame" class="cam-frame" aria-hidden="true"></svg>
     <div class="cam-fallback" id="camFallback" hidden>
-      <p class="cam-fallback-title">เปิดกล้องในหน้านี้ไม่ได้</p>
-      <p>ถ่ายด้วยแอปกล้อง หรือเลือกรูปฟ้าจากคลังภาพแทนได้เลย</p>
-      <label class="pill primary" for="fileCamera">ถ่ายรูปฟ้า</label>
-      <label class="pill on-dark" for="fileGallery">เลือกจากคลังภาพ</label>
+      <div class="fallback-bottle" id="fallbackBottle"></div>
+      <p class="cam-fallback-title">The camera can’t open here</p>
+      <p>Take the photo with your camera app, or pick a sky from your library.</p>
+      <label class="btn primary on-dark" for="fileCamera">Take a photo</label>
+      <label class="btn on-dark" for="fileGallery">Choose from library</label>
     </div>
     <div class="cam-top">
-      <button class="icon-btn on-dark" type="button" data-close-capture aria-label="ปิด">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <p class="cam-hint">หันกล้องขึ้นฟ้า แล้วกดเก็บ</p>
-      <span class="icon-btn-spacer"></span>
+      <button class="btn-text on-dark" type="button" data-close-capture>Cancel</button>
+      <p class="cam-hint">Hold the bottle up to the sky</p>
+      <span class="cam-spacer"></span>
     </div>
     <div class="cam-bottom">
-      <label class="icon-btn on-dark big" for="fileGallery" aria-label="เลือกจากคลังภาพ">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M4 17l5-4.5 3.5 3 3-2.5L20 16.5"/></svg>
-      </label>
-      <button class="shutter" id="shutter" type="button" aria-label="ถ่ายรูปฟ้า"></button>
-      <span class="icon-btn-spacer big"></span>
+      <label class="btn-text on-dark" for="fileGallery">Library</label>
+      <button class="shutter" id="shutter" type="button" aria-label="Take photo"></button>
+      <span class="cam-spacer"></span>
     </div>
     <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
     <input type="file" id="fileGallery" accept="image/*" hidden>
@@ -66,12 +58,12 @@
 
 <div id="sheet" class="overlay" hidden>
   <div class="overlay-backdrop" data-close-sheet></div>
-  <article class="sheet" role="dialog" aria-modal="true" aria-label="รายละเอียดท้องฟ้า"></article>
+  <article class="sheet" role="dialog" aria-modal="true" aria-label="Sky"></article>
 </div>
 
 <div id="storyModal" class="overlay" hidden>
   <div class="overlay-backdrop" data-close-story></div>
-  <article class="sheet story-sheet" role="dialog" aria-modal="true" aria-label="แชร์ลงสตอรี่"></article>
+  <article class="sheet story-sheet" role="dialog" aria-modal="true" aria-label="Share to story"></article>
 </div>
 
 <div id="toast" class="toast" role="status" hidden></div>

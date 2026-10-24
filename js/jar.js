@@ -1,33 +1,79 @@
-// Draws a glass mason jar filled with one wavy sand-art layer per sky.
-// Shared by the shelf, the jar view, the drop animation and the story exports.
+// One corked apothecary bottle, drawn the same everywhere: SVG on the app's screens,
+// canvas for exported images. Both read their outline from bottleShape().
 
-const LIDS = ['#f6b1a8', '#f7c98b', '#bfe3c0', '#a9d4f5', '#c9b8f2', '#f5b5d4',
-  '#ffd59e', '#a8e0d9', '#f2a7a0', '#b9c7f7', '#e8b4e6', '#9fd3f0'];
+const CORK = '#D8BF96';
+const CORK_DOT = '#A98756';
 
-export function lidColor(monthIndex) {
-  return LIDS[((monthIndex % 12) + 12) % 12];
+/** Bottle geometry in local coordinates (0,0 top-left), as SVG path strings so Path2D can reuse them. */
+export function bottleShape(w, h, inset = 1) {
+  const s = inset;
+  const cx = w / 2;
+  const nw = w * 0.34;
+  const lipY = h * 0.125;
+  const lipH = h * 0.035;
+  const lipW = nw * 1.36;
+  const nt = lipY + lipH / 2;
+  const ss = h * 0.27;
+  const bt = h * 0.42;
+  const r = w * 0.13;
+  const k = h * 0.07;
+  const body = `M${cx - nw / 2} ${nt} L${cx - nw / 2} ${ss} C${cx - nw / 2} ${ss + k} ${s} ${bt - k} ${s} ${bt}`
+    + ` L${s} ${h - r - s} Q${s} ${h - s} ${r + s} ${h - s} L${w - r - s} ${h - s} Q${w - s} ${h - s} ${w - s} ${h - r - s}`
+    + ` L${w - s} ${bt} C${w - s} ${bt - k} ${cx + nw / 2} ${ss + k} ${cx + nw / 2} ${ss} L${cx + nw / 2} ${nt} Z`;
+  const corkBottom = nt + h * 0.05;
+  const cork = `M${cx - nw * 0.5} ${s} L${cx + nw * 0.5} ${s} L${cx + nw * 0.4} ${corkBottom} L${cx - nw * 0.4} ${corkBottom} Z`;
+  const dots = [[-0.2, 0.045], [0.18, 0.09], [0.02, 0.14], [-0.12, 0.11]].map(([dx, dy]) => [cx + nw * dx, h * dy, w * 0.011]);
+  return {
+    w, h, cx, nw, nt, ss, bt, body, cork, dots,
+    lip: { x: cx - lipW / 2, y: lipY, w: lipW, h: lipH, r: lipH / 2 },
+    glare: { x: w * 0.11, y: bt + h * 0.03, w: w * 0.065, h: h * 0.3 },
+    photo: { y: nt, h: h - nt },
+    fillTop: bt - (bt - ss) * 0.35,
+    fillBottom: h - s,
+  };
 }
 
-function shade(hexColor, amt) {
-  const n = parseInt(hexColor.slice(1), 16);
-  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) =>
-    Math.max(0, Math.min(255, Math.round(amt >= 0 ? v + (255 - v) * amt : v * (1 + amt)))));
-  return `rgb(${ch.join(',')})`;
+/** Wavy sand-art layers, one per sky (oldest at the bottom). Returned top-most first so lower layers paint over the waves above. */
+export function layerShapes(shape, skies, capacity, grow = 1) {
+  const { w, fillTop, fillBottom } = shape;
+  const n = skies.length;
+  const unit = (fillBottom - fillTop) / Math.max(capacity, n, 1);
+  const amp = Math.min(unit * 0.32, w * 0.022);
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const yb = fillBottom - i * unit;
+    const yt = yb - unit * (i === n - 1 ? grow : 1);
+    if (yb - yt < 0.5) continue;
+    let d = `M0 ${yb + amp * 2 + 1} L0 ${yt}`;
+    for (let s = 0; s <= 28; s++) d += ` L${(w * s) / 28} ${yt + Math.sin((s / 28) * Math.PI * 3 + i * 1.7) * amp}`;
+    d += ` L${w} ${yb + amp * 2 + 1} Z`;
+    out.push({ index: i, d, top: yt - amp, bottom: yb, palette: skies[i].palette });
+  }
+  return out;
 }
 
-function roundRect(path, x, y, w, h, r) {
-  const [tl, tr, br, bl] = Array.isArray(r) ? r : [r, r, r, r];
-  path.moveTo(x + tl, y);
-  path.lineTo(x + w - tr, y);
-  path.quadraticCurveTo(x + w, y, x + w, y + tr);
-  path.lineTo(x + w, y + h - br);
-  path.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
-  path.lineTo(x + bl, y + h);
-  path.quadraticCurveTo(x, y + h, x, y + h - bl);
-  path.lineTo(x, y + tl);
-  path.quadraticCurveTo(x, y, x + tl, y);
-  path.closePath();
-  return path;
+let uid = 0;
+
+/** Bottle for the app's screens. Colors come from CSS classes so it follows the theme. */
+export function bottleSvg({ w = 100, h = 190, href = '', corked = true, label = '' } = {}) {
+  const g = bottleShape(w, h);
+  const id = `bottle${uid++}`;
+  const { lip, glare } = g;
+  return `<svg class="bottle" viewBox="0 0 ${w} ${h}" ${label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"'}>
+    <defs><clipPath id="${id}"><path d="${g.body}"/></clipPath></defs>
+    <path class="b-glass" d="${g.body}"/>
+    <g clip-path="url(#${id})">
+      ${href ? `<image href="${href}" x="0" y="${g.photo.y}" width="${w}" height="${g.photo.h}" preserveAspectRatio="xMidYMid slice"/>` : ''}
+      <rect class="b-glare" x="${glare.x}" y="${glare.y}" width="${glare.w}" height="${glare.h}" rx="${glare.w / 2}"/>
+    </g>
+    <path class="b-line" d="${g.body}"/>
+    <rect class="b-line b-lip" x="${lip.x}" y="${lip.y}" width="${lip.w}" height="${lip.h}" rx="${lip.r}"/>
+    ${corked ? corkSvg(g) : ''}
+  </svg>`;
+}
+
+export function corkSvg(g) {
+  return `<g class="b-cork"><path d="${g.cork}"/>${g.dots.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>`;
 }
 
 /** Size a canvas for crisp drawing at devicePixelRatio and return a context in CSS pixels. */
@@ -44,142 +90,62 @@ export function setupCanvas(canvas, cssW, cssH) {
 }
 
 /**
- * @param ctx 2d context
- * @param o.skies     oldest first; each needs `.palette` (top-to-bottom colors)
- * @param o.capacity  how many layers fill the jar (days in the month)
- * @param o.grow      0..1 height of the newest layer, for the pour animation
- * @param o.lid       lid color
- * @param o.ghost     faded jar for months that haven't happened yet
- * @param o.label     optional text on a strip of washi tape
- * @returns layer rects (CSS px) for hit-testing taps: [{index, top, bottom}]
+ * Canvas bottle, filled with either a photo or one layer per sky.
+ * @returns layer rects for hit-testing taps: [{index, top, bottom}] in the caller's coordinates
  */
-export function drawJar(ctx, o) {
-  const { x, y, w, h, skies = [], capacity = 31, grow = 1, lid = LIDS[0], ghost = false, label, labelFont, outline = 'rgba(31,36,68,.22)' } = o;
+export function drawBottle(ctx, { x, y, w, h, image = null, skies = null, capacity = 31, grow = 1, ghost = false, ink = '#2A2723', glass = 'rgba(255,255,255,.4)' }) {
+  const line = Math.max(1, w * 0.008);
+  const g = bottleShape(w, h, line);
+  const body = new Path2D(g.body);
+  let layers = [];
+
   ctx.save();
-  if (ghost) ctx.globalAlpha = 0.38;
-
-  const lidH = h * 0.085;
-  const lidW = w * 0.74;
-  const lidX = x + (w - lidW) / 2;
-  const neckH = h * 0.06;
-  const neckW = w * 0.68;
-  const neckX = x + (w - neckW) / 2;
-  const neckY = y + lidH * 0.8;
-  const bodyY = neckY + neckH * 0.6;
-  const bodyH = y + h - bodyY - h * 0.02;
-  const rTop = w * 0.26;
-  const rBot = w * 0.17;
-  const t = Math.max(1.5, w * 0.035);
-
-  // contact shadow
-  ctx.fillStyle = 'rgba(20,24,50,.14)';
-  ctx.beginPath();
-  ctx.ellipse(x + w / 2, bodyY + bodyH, w * 0.44, Math.max(2, h * 0.02), 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  const body = roundRect(new Path2D(), x, bodyY, w, bodyH, [rTop, rTop, rBot, rBot]);
-  const neck = roundRect(new Path2D(), neckX, neckY, neckW, neckH + rTop * 0.3, w * 0.04);
-
-  ctx.fillStyle = 'rgba(255,255,255,.26)';
-  ctx.fill(neck);
+  ctx.translate(x, y);
+  if (ghost) ctx.globalAlpha = 0.35;
+  ctx.fillStyle = glass;
   ctx.fill(body);
 
-  // contents
-  const inner = roundRect(new Path2D(), x + t, bodyY + t, w - 2 * t, bodyH - 2 * t, [rTop - t, rTop - t, rBot - t, rBot - t]);
-  const innerBottom = bodyY + bodyH - t;
-  const innerTop = bodyY + t + bodyH * 0.07;
-  const n = skies.length;
-  const unit = (innerBottom - innerTop) / Math.max(capacity, n, 1);
-  const amp = Math.min(unit * 0.32, w * 0.022);
-  const layers = [];
+  ctx.save();
+  ctx.clip(body);
+  if (image) {
+    const iw = image.naturalWidth || image.width;
+    const ih = image.naturalHeight || image.height;
+    const s = Math.max(w / iw, g.photo.h / ih);
+    ctx.drawImage(image, (w - iw * s) / 2, g.photo.y + (g.photo.h - ih * s) / 2, iw * s, ih * s);
+  } else if (skies) {
+    layers = layerShapes(g, skies, capacity, grow);
+    for (const l of layers) {
+      const grad = ctx.createLinearGradient(0, l.top, 0, l.bottom);
+      l.palette.forEach((c, j) => grad.addColorStop(l.palette.length === 1 ? 0.5 : j / (l.palette.length - 1), c.hex));
+      ctx.fillStyle = grad;
+      ctx.fill(new Path2D(l.d));
+    }
+  }
+  ctx.fillStyle = 'rgba(255,255,255,.38)';
+  ctx.beginPath();
+  ctx.roundRect(g.glare.x, g.glare.y, g.glare.w, g.glare.h, g.glare.w / 2);
+  ctx.fill();
+  ctx.restore();
 
   ctx.save();
-  ctx.clip(inner);
-  for (let i = n - 1; i >= 0; i--) {
-    const yb = innerBottom - i * unit;
-    const yt = yb - unit * (i === n - 1 ? grow : 1);
-    if (yb - yt < 0.5) continue;
-    const phase = i * 1.7;
-    const p = new Path2D();
-    p.moveTo(x, yb + amp * 2 + 1);
-    p.lineTo(x, yt);
-    const steps = 28;
-    for (let s = 0; s <= steps; s++) {
-      const sx = x + (w * s) / steps;
-      p.lineTo(sx, yt + Math.sin((s / steps) * Math.PI * 3 + phase) * amp);
-    }
-    p.lineTo(x + w, yb + amp * 2 + 1);
-    p.closePath();
-    const pal = skies[i].palette;
-    const g = ctx.createLinearGradient(0, yt - amp, 0, yb + amp);
-    pal.forEach((c, j) => g.addColorStop(pal.length === 1 ? 0.5 : j / (pal.length - 1), c.hex));
-    ctx.fillStyle = g;
-    ctx.fill(p);
-    layers.push({ index: i, top: yt, bottom: yb });
-  }
-  // soft depth inside the glass
-  const depth = ctx.createLinearGradient(x, 0, x + w, 0);
-  depth.addColorStop(0, 'rgba(255,255,255,.18)');
-  depth.addColorStop(0.5, 'rgba(255,255,255,0)');
-  depth.addColorStop(1, 'rgba(20,24,50,.12)');
-  ctx.fillStyle = depth;
-  ctx.fillRect(x, bodyY, w, bodyH);
+  ctx.globalAlpha *= 0.38;
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = line;
+  ctx.stroke(body);
+  ctx.beginPath();
+  ctx.roundRect(g.lip.x, g.lip.y, g.lip.w, g.lip.h, g.lip.r);
+  ctx.stroke();
   ctx.restore();
 
-  // glass
-  ctx.lineWidth = t;
-  ctx.strokeStyle = 'rgba(255,255,255,.62)';
-  ctx.stroke(body);
-  ctx.lineWidth = Math.max(1, w * 0.008);
-  ctx.strokeStyle = outline;
-  ctx.stroke(body);
-  ctx.fillStyle = 'rgba(255,255,255,.5)';
-  ctx.fill(roundRect(new Path2D(), x + w * 0.1, bodyY + bodyH * 0.16, w * 0.065, bodyH * 0.46, w * 0.033));
-  ctx.fill(roundRect(new Path2D(), x + w * 0.1, bodyY + bodyH * 0.67, w * 0.065, bodyH * 0.07, w * 0.033));
-
-  ctx.fillStyle = 'rgba(255,255,255,.4)';
-  ctx.fill(neck);
-  ctx.stroke(neck);
-
-  // lid
-  const lidPath = roundRect(new Path2D(), lidX, y, lidW, lidH, lidH * 0.3);
-  const lg = ctx.createLinearGradient(0, y, 0, y + lidH);
-  lg.addColorStop(0, shade(lid, 0.35));
-  lg.addColorStop(0.55, lid);
-  lg.addColorStop(1, shade(lid, -0.12));
-  ctx.fillStyle = lg;
-  ctx.fill(lidPath);
-  ctx.strokeStyle = 'rgba(0,0,0,.08)';
-  ctx.lineWidth = Math.max(0.75, w * 0.006);
-  for (let r = 1; r <= 3; r++) {
-    const ly = y + (lidH * r) / 4;
+  ctx.fillStyle = CORK;
+  ctx.fill(new Path2D(g.cork));
+  ctx.fillStyle = CORK_DOT;
+  for (const [cx, cy, r] of g.dots) {
     ctx.beginPath();
-    ctx.moveTo(lidX + lidH * 0.25, ly);
-    ctx.lineTo(lidX + lidW - lidH * 0.25, ly);
-    ctx.stroke();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
   }
-  ctx.strokeStyle = outline;
-  ctx.lineWidth = Math.max(1, w * 0.008);
-  ctx.stroke(lidPath);
-
-  if (label) {
-    ctx.save();
-    ctx.translate(x + w / 2, bodyY + bodyH * 0.4);
-    ctx.rotate(-0.05);
-    const tw = w * 0.64, th = Math.max(12, h * 0.095);
-    ctx.fillStyle = 'rgba(255,251,242,.92)';
-    ctx.shadowColor = 'rgba(20,24,50,.18)';
-    ctx.shadowBlur = th * 0.25;
-    ctx.fillRect(-tw / 2, -th / 2, tw, th);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#3b3654';
-    ctx.font = labelFont || `${Math.round(th * 0.55)}px Itim, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, 0, th * 0.04);
-    ctx.restore();
-  }
-
   ctx.restore();
-  return layers;
+
+  return layers.map((l) => ({ index: l.index, top: y + l.top, bottom: y + l.bottom }));
 }

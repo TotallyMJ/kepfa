@@ -1,11 +1,11 @@
 {
-  "name": "Kepfa · เก็บฟ้า",
+  "name": "Kepfa",
   "short_name": "Kepfa",
-  "description": "เก็บฟ้าใส่โหล",
+  "description": "Keep the sky.",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#c8d2f3",
-  "theme_color": "#c8d2f3",
+  "background_color": "#F1EDE6",
+  "theme_color": "#F1EDE6",
   "icons": [
     { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
