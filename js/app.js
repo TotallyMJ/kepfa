@@ -1,7 +1,7 @@
 import { store, newId } from './store.js';
-import { prepareImage, makeSampleSky, hexToRgb, luminance, dominant, hex, mix } from './sky.js';
+import { prepareImage, makeSampleSky, hexToRgb, dominant, hex, mix } from './sky.js';
 import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
-import { foldStage } from './fold.js';
+import { foldStage, MOTION, reduceMotion } from './fold.js';
 import { sunTimes } from './sun.js';
 import { makeStory, shareImage, saveImage } from './story.js';
 import { chime } from './sound.js';
@@ -55,26 +55,14 @@ function forgetUrls(id) {
   }
 }
 
-function toLocalInput(ms) {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
 
 /** Canvas jars can't read CSS, so tell them which glass layer suits the theme. */
 const isDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
 
 let toastTimer;
-function toast(msg, { action = '', onAction = null, ms = 2200 } = {}) {
+function toast(msg, ms = 2200) {
   const el = $('#toast');
   el.textContent = msg;
-  if (action) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'toast-action';
-    b.textContent = action;
-    b.addEventListener('click', () => { el.hidden = true; onAction?.(); }, { once: true });
-    el.append(b);
-  }
   el.hidden = false;
   el.style.animation = 'none';
   void el.offsetWidth;
@@ -100,13 +88,6 @@ function nextQuote() {
   const pick = bag.shift();
   try { localStorage.setItem('kepfa.quotes', JSON.stringify(bag)); } catch { /* fine without */ }
   return QUOTES[pick];
-}
-
-function paletteHtml(palette) {
-  return palette.map((p) => {
-    const fg = luminance(hexToRgb(p.hex)) > 0.55 ? '#1E1C19' : '#FBF9F5';
-    return `<button type="button" data-hex="${p.hex}" style="background:${p.hex};color:${fg}" aria-label="Copy ${p.hex}">${p.hex.slice(1).toUpperCase()}</button>`;
-  }).join('');
 }
 
 // ---------- sun, prompt, memory ----------
@@ -154,6 +135,16 @@ const tagUrl = (tag) => `https://www.instagram.com/explore/tags/${tag.toLowerCas
 function challengeProgress() {
   const n = new Set(state.skies.filter((s) => s.prompt && !s.sample).map((s) => s.prompt)).size;
   return { filled: n ? ((n - 1) % CHALLENGE_SIZE) + 1 : 0, round: Math.max(1, Math.ceil(n / CHALLENGE_SIZE)) };
+}
+
+/** Index of a dot filled since the shelf was last drawn, so it can fill in with a little bounce; -1 if none. */
+function newDot(filled) {
+  let seen = filled;
+  try {
+    seen = +(localStorage.getItem('kepfa.dots') ?? filled);
+    localStorage.setItem('kepfa.dots', filled);
+  } catch { /* no bounce without storage */ }
+  return filled > seen ? filled - 1 : -1;
 }
 
 /** What a challenge share carries: the prompt as it was kept, its day and its hashtag. */
@@ -232,6 +223,7 @@ function renderShelf() {
   const now = new Date();
   const prompt = todayPrompt(now);
   const { filled, round } = challengeProgress();
+  const fresh = newDot(filled);
   const memory = onThisDay();
   const groups = [];
   for (const s of state.skies.slice().reverse()) {
@@ -262,7 +254,7 @@ function renderShelf() {
         </div>
         <div class="prompt-progress">
           <div class="prompt-head"><span class="eyebrow">${t.challenge(round)}</span><span class="prompt-day">${filled} / ${CHALLENGE_SIZE}</span></div>
-          <div class="dots" role="img" aria-label="${filled} of ${CHALLENGE_SIZE}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ' class="on"' : ''}></i>`).join('')}</div>
+          <div class="dots" role="img" aria-label="${filled} of ${CHALLENGE_SIZE}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ` class="on${i === fresh ? ' is-new' : ''}"` : ''}></i>`).join('')}</div>
         </div>
       </div>
     </section>
@@ -287,9 +279,27 @@ function renderShelf() {
   state.redraw = null;
 }
 
+/** Tap a jar to open it; press and hold for the delete menu. Moving the finger means scrolling, so it cancels. */
 function bindJarSlots(root) {
   root.querySelectorAll('.jar-slot').forEach((el) => {
-    el.addEventListener('click', () => openDetail(state.skies.find((s) => s.id === el.dataset.id)));
+    const sky = () => state.skies.find((s) => s.id === el.dataset.id);
+    let timer = 0, x0 = 0, y0 = 0, held = false;
+    const cancel = () => { clearTimeout(timer); el.classList.remove('is-pressing'); };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button) return;
+      held = false;
+      x0 = e.clientX;
+      y0 = e.clientY;
+      el.classList.add('is-pressing');
+      timer = setTimeout(() => { held = true; cancel(); openJarMenu(el, sky()); }, HOLD_MS);
+    });
+    el.addEventListener('pointermove', (e) => { if (Math.hypot(e.clientX - x0, e.clientY - y0) > 8) cancel(); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => el.addEventListener(type, cancel));
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('click', () => {
+      if (held) { held = false; return; }
+      openDetail(sky());
+    });
   });
 }
 
@@ -522,8 +532,8 @@ function picked(e) {
   e.target.value = '';
   if (!f) return;
   stopCamera();
-  // Gallery photos: lastModified is usually when the photo was taken; the user can fix it on the next screen.
-  review(f, Math.min(f.lastModified || Date.now(), Date.now()));
+  // Only the camera app can hand a photo in (no library), so the sky was taken just now.
+  review(f, Date.now());
 }
 
 async function review(blob, takenAt) {
@@ -534,7 +544,7 @@ async function review(blob, takenAt) {
     draft = { ...(await prepareImage(blob)), takenAt };
   } catch {
     el.innerHTML = `<div class="loading"><p>${t.cantOpen}</p>
-      <button type="button" class="btn primary" id="tryAgain">${t.chooseAnother}</button></div>`;
+      <button type="button" class="btn primary" id="tryAgain">${t.tryAgain}</button></div>`;
     $('#tryAgain').addEventListener('click', openCapture);
     return;
   }
@@ -564,37 +574,24 @@ async function review(blob, takenAt) {
   draft.stage = stage;
   draft.prompt = prompt;
 
-  bindSkyFields(el, (ms) => { draft.takenAt = ms; });
+  $('#noteInput').addEventListener('input', (e) => { e.target.className = `field note ${handClass(e.target.value)}`; });
   $('#retake').addEventListener('click', () => { URL.revokeObjectURL(draft.url); draft = null; openCapture(); });
   $('#keepIt').addEventListener('click', saveDraft);
 }
 
-/** Note, place and time: the same fields when keeping a sky and when editing one. */
-function skyFields({ note = '', place = '', takenAt }) {
+/** Note and place; the time is the moment of the shot, shown as it is. */
+function skyFields({ takenAt }) {
   const placeholder = t.notePrompts[Math.floor(Math.random() * t.notePrompts.length)];
   return `
     <div>
       <label class="field-label" for="noteInput">${t.note}</label>
-      <input id="noteInput" class="field note ${handClass(note)}" maxlength="80" value="${esc(note)}" placeholder="${placeholder}" autocomplete="off">
+      <input id="noteInput" class="field note hand" maxlength="80" placeholder="${placeholder}" autocomplete="off" enterkeyhint="next">
     </div>
-    <div class="field-row">
-      <div class="field-place">
-        <label class="field-label" for="placeInput">${t.place}</label>
-        <input id="placeInput" class="field" maxlength="24" value="${esc(place)}" placeholder="${t.placeHint}" autocomplete="off">
-      </div>
-      <div class="field-when">
-        <label class="field-label" for="whenInput">${t.taken}</label>
-        <input id="whenInput" class="field mono" type="datetime-local" value="${toLocalInput(takenAt)}" max="${toLocalInput(Date.now())}">
-      </div>
+    <div>
+      <label class="field-label" for="placeInput">${t.place}</label>
+      <input id="placeInput" class="field" maxlength="24" placeholder="${t.placeHint}" autocomplete="off" enterkeyhint="done">
+      <p class="kept-at">${t.keptAt(fmt.stamp(takenAt))}</p>
     </div>`;
-}
-
-function bindSkyFields(root, onWhen) {
-  $('#noteInput', root).addEventListener('input', (e) => { e.target.className = `field note ${handClass(e.target.value)}`; });
-  $('#whenInput', root).addEventListener('change', (e) => {
-    const ms = new Date(e.target.value).getTime();
-    if (Number.isFinite(ms)) onWhen(Math.min(ms, Date.now()));
-  });
 }
 
 async function saveDraft() {
@@ -642,7 +639,7 @@ function showKept(sky) {
       <h2>${t.keptDone}</h2>
       <p>${fmt.long(sky.takenAt)}</p>
       <div class="actions">
-        <button type="button" class="btn" id="dropShare">${t.shareStory}</button>
+        <button type="button" class="btn" id="dropShare">${t.shareSky}</button>
         <button type="button" class="btn primary" id="dropOpen">${t.seeShelf}</button>
       </div>
     </div>`;
@@ -650,110 +647,257 @@ function showKept(sky) {
   $('#dropOpen').addEventListener('click', () => { closeCapture(); go('#/'); });
 }
 
-// ---------- detail sheet ----------
+// ---------- viewer: a sky out of its jar, as a polaroid ----------
 
-/** @param from  1 or -1 when arriving by swipe, so the new sky slides in from that side */
+const PEN = '<svg class="pen" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+const viewer = { stage: null, pol: null, busy: false, editing: false };
+
+/** Long notes write a little smaller so the polaroid's strip stays two or three lines. */
+const noteClass = (note) => `${handClass(note)}${note.length > 40 ? ' is-long' : ''}`;
+
+function stripHtml(sky) {
+  const note = sky.note
+    ? `<span class="${noteClass(sky.note)}">${esc(sky.note)}</span>`
+    : `<span class="polaroid-empty">${t.note}</span>`;
+  return `<button type="button" class="polaroid-note" id="editNote" aria-label="${t.editNote}">${note}${PEN}</button>
+    <p class="polaroid-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.stamp(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>`;
+}
+
+const shareHtml = () => `<button type="button" class="btn light" id="shareOne">${t.shareSky}</button>`;
+
+function bindPolaroid(sky) {
+  $('#editNote').addEventListener('click', () => startEdit(sky));
+  $('#shareOne').addEventListener('click', () => openStory('single', { sky }));
+}
+
+/** @param from  1 or -1 when arriving by swipe: the polaroid slides in from that side, no jar to open */
 function openDetail(sky, { from = 0 } = {}) {
   if (!sky) return;
   const wrap = $('#sheet');
-  const art = wrap.querySelector('.sheet');
-  const meta = `<p class="detail-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.long(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>`;
-  art.innerHTML = `
-    <div class="grabber"></div>
-    <div id="detailStage" role="img" aria-label="${t.openSky(fmt.long(sky.takenAt))}"></div>
-    ${sky.note ? `<div class="slip note detail-slip"><p class="detail-note ${handClass(sky.note)}">${esc(sky.note)}</p>${meta}</div>` : meta}
-    <div class="palette">${paletteHtml(sky.palette)}</div>
-    <div class="sheet-actions even">
-      <button type="button" class="btn" id="putBack" disabled>${t.putBack}</button>
-      <button type="button" class="btn primary" id="shareOne">${t.shareStory}</button>
-    </div>
-    <div class="sheet-more">
-      <button type="button" class="btn-text" id="editSky">${t.edit}</button>
-      <button type="button" class="btn-text danger" id="deleteSky">${t.deleteSky}</button>
+  const body = wrap.querySelector('.viewer-body');
+  const swapping = !wrap.hidden && from !== 0;
+  body.className = 'viewer-body';
+  body.innerHTML = `
+    <div class="viewer-stage" id="viewerStage"></div>
+    <div class="viewer-stack">
+      <div class="polaroid">
+        <button type="button" class="polaroid-close" id="closeJar" aria-label="${t.closeJar}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+        <div class="polaroid-photo" style="background-image:url('${photoUrl(sky, 'photo')}')" role="img" aria-label="${t.openSky(fmt.long(sky.takenAt))}"></div>
+        <div class="polaroid-strip" id="strip">${stripHtml(sky)}</div>
+      </div>
+      <div class="viewer-actions" id="viewerActions">${shareHtml()}</div>
     </div>`;
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
-  art.scrollTop = 0;
   state.detail = sky;
-  if (from) art.animate([{ transform: `translateX(${from * 40}px)`, opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 220, easing: 'cubic-bezier(.2,.8,.3,1)' });
+  viewer.editing = false;
 
-  const size = Math.round(Math.min(160, innerWidth * 0.42));
-  const stage = foldStage(photoUrl(sky, 'photo'), size, 'kept');
-  // Two strips of tape pin the photo once it's out of the jar.
-  const pins = document.createElement('div');
-  pins.className = 'photo-tapes';
-  pins.style.cssText = `width:${size}px;height:${size}px;left:calc(50% - ${size / 2}px)`;
-  pins.innerHTML = tape('tape-tl') + tape('tape-br');
-  stage.el.append(pins);
-  $('#detailStage').append(stage.el);
-  // A tap skips the animation. The full unfold plays once per visit; after that a short one.
-  stage.el.addEventListener('click', stage.skip);
+  const stage = foldStage(photoUrl(sky, 'photo'), Math.round(Math.min(150, innerWidth * 0.4)), swapping ? 'open' : 'kept');
+  $('#viewerStage').append(stage.el);
+  viewer.stage = stage;
+  viewer.pol = $('.polaroid', body);
+  $('#closeJar').addEventListener('click', closeJar);
+  bindPolaroid(sky);
+
+  if (swapping) {
+    stage.card.style.opacity = 0;
+    stage.el.classList.add('is-behind');
+    body.classList.add('is-out', 'is-swap');
+    if (!reduceMotion()) {
+      viewer.pol.animate([{ transform: `translateX(${from * 60}px) rotate(-2deg)`, opacity: 0 }, { transform: 'rotate(-2deg)', opacity: 1 }],
+        { duration: MOTION.move, easing: MOTION.out });
+    }
+    return;
+  }
+  // The full unfold plays once per visit; after that a short one. A tap anywhere skips it.
   const quick = state.unfolded;
   state.unfolded = true;
-  const putBack = $('#putBack');
-  // Put it back only once the photo is fully out, so the two animations never overlap.
+  viewer.busy = true;
   requestAnimationFrame(async () => {
     await stage.foldOut({ quick });
-    pins.classList.add('is-on');
-    putBack.disabled = false;
+    if (viewer.stage !== stage) return;
+    await popOut(stage, viewer.pol, body);
+    viewer.busy = false;
   });
-  putBack.addEventListener('click', async () => {
-    putBack.disabled = true;
-    $('#shareOne').disabled = true;
-    pins.classList.remove('is-on');
-    await stage.foldIn();
-    navigator.vibrate?.(18);
-    closeSheet();
-  });
+}
 
-  $('#shareOne').addEventListener('click', () => openStory('single', { sky }));
-  $('#editSky').addEventListener('click', () => openEdit(sky));
-  $('#deleteSky').addEventListener('click', () => deleteSky(sky));
+/** Where the polaroid has to start (or end) so its photo sits exactly on the unfolded card. */
+function onTheCard(card, pol) {
+  const c = card.getBoundingClientRect();
+  pol.style.transform = 'none';
+  const p = pol.getBoundingClientRect();
+  const ph = pol.querySelector('.polaroid-photo').getBoundingClientRect();
+  pol.style.transform = '';
+  const k = c.width / ph.width;
+  return {
+    transform: `translate(${c.left - p.left - k * (ph.left - p.left)}px, ${c.top - p.top - k * (ph.top - p.top)}px) scale(${k})`,
+    backgroundColor: 'rgba(253, 252, 248, 0)',
+  };
+}
+
+/** The unfolded photo grows into a polaroid while the jar falls back out of focus. */
+async function popOut(stage, pol, body) {
+  stage.el.classList.add('is-behind');
+  body.classList.add('is-out');
+  const start = reduceMotion() ? null : onTheCard(stage.card, pol);
+  stage.card.style.opacity = 0;
+  if (!start) return;
+  await pol.animate([start, { transform: 'rotate(-2deg)', backgroundColor: 'rgb(253, 252, 248)' }],
+    { duration: MOTION.pop, easing: MOTION.spring }).finished.catch(() => {});
+}
+
+/** ✕: the polaroid shrinks back onto the card, which folds into the jar; then back to the shelf. */
+async function closeJar() {
+  const { stage, pol } = viewer;
+  if (!stage) { closeSheet(); return; }
+  if (viewer.busy) { stage.skip(); return; }
+  if (viewer.editing) endEdit(state.detail);
+  viewer.busy = true;
+  const body = $('#sheet .viewer-body');
+  body.classList.add('is-closing');
+  if (!reduceMotion()) {
+    await pol.animate([{ transform: 'rotate(-2deg)' }, onTheCard(stage.card, pol)],
+      { duration: MOTION.move, easing: MOTION.in, fill: 'forwards' }).finished.catch(() => {});
+  }
+  body.classList.remove('is-out');
+  stage.card.style.opacity = 1;
+  stage.el.classList.remove('is-behind');
+  await stage.foldIn();
+  navigator.vibrate?.(18);
+  viewer.busy = false;
+  closeSheet();
+  holdHintOnce();
+}
+
+/** The note and place are edited right on the polaroid's strip. */
+function startEdit(sky) {
+  if (viewer.busy) return;
+  viewer.editing = true;
+  $('#sheet .viewer-body').classList.add('is-editing');
+  $('#strip').innerHTML = `
+    <form class="polaroid-form" id="noteForm">
+      <input id="noteInput" class="polaroid-input ${handClass(sky.note)}" maxlength="80" value="${esc(sky.note)}" placeholder="${t.note}" aria-label="${t.note}" autocomplete="off" enterkeyhint="next">
+      <input id="placeInput" class="polaroid-input place" maxlength="24" value="${esc(sky.place)}" placeholder="${t.addPlace}" aria-label="${t.place}" autocomplete="off" enterkeyhint="done">
+      <p class="polaroid-meta">${fmt.stamp(sky.takenAt)}</p>
+    </form>`;
+  $('#viewerActions').innerHTML = `
+    <button type="button" class="btn-text on-dark" id="cancelNote">${t.cancel}</button>
+    <button type="submit" form="noteForm" class="btn light">${t.done}</button>`;
+  const note = $('#noteInput');
+  note.addEventListener('input', () => { note.className = `polaroid-input ${handClass(note.value)}`; });
+  note.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#placeInput').focus(); } });
+  // Done, or ✓ on the keyboard, both submit the form.
+  $('#noteForm').addEventListener('submit', (e) => { e.preventDefault(); saveNote(sky); });
+  $('#cancelNote').addEventListener('click', () => endEdit(sky));
+  note.focus();
+}
+
+async function saveNote(sky) {
+  const next = { ...sky, note: $('#noteInput').value.trim(), place: $('#placeInput').value.trim() };
+  try {
+    await store.put(next);
+  } catch {
+    toast(t.saveFailed);
+    return;
+  }
+  Object.assign(sky, next);
+  endEdit(sky);
+  render();
+  toast(t.noteSaved);
+}
+
+function endEdit(sky) {
+  viewer.editing = false;
+  document.activeElement?.blur();
+  $('#sheet .viewer-body').classList.remove('is-editing');
+  $('#strip').innerHTML = stripHtml(sky);
+  $('#viewerActions').innerHTML = shareHtml();
+  bindPolaroid(sky);
 }
 
 /** Swipe between skies in the order they were taken. dir 1 = older (swipe left), -1 = newer. */
 function stepDetail(dir) {
+  if (viewer.busy || viewer.editing) return;
   const i = state.skies.findIndex((s) => s.id === state.detail?.id);
   const next = i < 0 ? null : state.skies[i - dir];
   if (next) openDetail(next, { from: dir });
-  else $('#sheet .sheet').animate([{ transform: 'none' }, { transform: `translateX(${-dir * 14}px)` }, { transform: 'none' }], { duration: 240 });
+  else viewer.pol?.animate([{ transform: 'rotate(-2deg)' }, { transform: `translateX(${-dir * 14}px) rotate(-2deg)` }, { transform: 'rotate(-2deg)' }], { duration: 240 });
 }
 
-function openEdit(sky) {
+function closeSheet() {
+  $('#sheet').hidden = true;
+  $('#sheet .viewer-body').style.transform = '';
   state.detail = null;
-  const art = $('#sheet .sheet');
-  let takenAt = sky.takenAt;
-  art.innerHTML = `
-    <div class="grabber"></div>
-    <div class="page-head">
-      <button type="button" class="eyebrow back" id="cancelEdit">${t.cancel}</button>
-      <span class="eyebrow">${t.editTitle}</span>
-    </div>
-    <div class="edit-fields">${skyFields(sky)}</div>
-    <div class="sheet-actions"><button type="button" class="btn primary" id="saveEdit">${t.save}</button></div>`;
-  art.scrollTop = 0;
-  bindSkyFields(art, (ms) => { takenAt = ms; });
-  $('#cancelEdit').addEventListener('click', () => openDetail(sky));
-  $('#saveEdit').addEventListener('click', async (e) => {
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    const next = { ...sky, note: $('#noteInput').value.trim(), place: $('#placeInput').value.trim(), takenAt };
-    try {
-      await store.put(next);
-    } catch {
-      btn.disabled = false;
-      toast(t.saveFailed);
-      return;
-    }
-    Object.assign(sky, next);
-    sortSkies();
-    render();
-    openDetail(sky);
+  viewer.stage = null;
+  viewer.busy = false;
+  viewer.editing = false;
+  if (cap.hidden && $('#storyModal').hidden) document.body.style.overflow = '';
+}
+
+/** Drag the polaroid down to put it back, or sideways to the next sky. A tap on the dimmed space closes. */
+function bindViewerGestures() {
+  const body = $('#sheet .viewer-body');
+  let x0 = 0, y0 = 0, dx = 0, dy = 0, axis = '', active = false;
+  const settle = () => {
+    if (body.style.transform) body.animate([{ transform: body.style.transform }, { transform: 'none' }], { duration: MOTION.quick, easing: MOTION.spring });
+    body.style.transform = '';
+  };
+  body.addEventListener('click', (e) => {
+    if (e.target.closest('button, input, form')) return;
+    if (viewer.busy) viewer.stage?.skip();
+    else if (e.target === body && !viewer.editing) closeJar();
+  });
+  body.addEventListener('touchstart', (e) => {
+    active = e.touches.length === 1 && !viewer.editing && !viewer.busy && !e.target.closest('input, button');
+    if (!active) return;
+    axis = '';
+    dx = dy = 0;
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+  }, { passive: true });
+  body.addEventListener('touchmove', (e) => {
+    if (!active) return;
+    dx = e.touches[0].clientX - x0;
+    dy = e.touches[0].clientY - y0;
+    if (!axis && Math.hypot(dx, dy) > 10) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : dy > 0 ? 'y' : 'none';
+    if (axis === 'y') { e.preventDefault(); body.style.transform = `translateY(${dy * 0.5}px)`; }
+    else if (axis === 'x') { e.preventDefault(); body.style.transform = `translateX(${dx * 0.35}px)`; }
+  }, { passive: false });
+  body.addEventListener('touchend', () => {
+    if (!active) return;
+    active = false;
+    const swipe = axis === 'x' && Math.abs(dx) > 60;
+    const drop = axis === 'y' && dy > 110;
+    settle();
+    if (swipe) stepDetail(dx < 0 ? 1 : -1);
+    else if (drop) closeJar();
+  });
+  body.addEventListener('touchcancel', () => { active = false; settle(); });
+}
+
+// ---------- delete: press and hold a jar on the shelf ----------
+
+const HOLD_MS = 500;
+
+function confirmDialog({ title, body, no, yes }) {
+  const el = $('#confirm');
+  $('#confirmTitle').textContent = title;
+  $('#confirmBody').textContent = body;
+  $('#confirmNo').textContent = no;
+  $('#confirmYes').textContent = yes;
+  el.hidden = false;
+  $('#confirmNo').focus();
+  return new Promise((resolve) => {
+    const done = (answer) => { el.hidden = true; resolve(answer); };
+    $('#confirmNo').onclick = () => done(false);
+    $('#confirmYes').onclick = () => done(true);
+    el.onclick = (e) => { if (e.target === el) done(false); };
   });
 }
 
-/** Deleted at once; the toast offers a few seconds to bring it back. */
 async function deleteSky(sky) {
+  const yes = await confirmDialog({ title: t.deleteTitle, body: t.deleteBody, no: t.keepIt, yes: t.deleteYes });
+  if (!yes) return;
   try {
     await store.remove(sky.id);
   } catch {
@@ -761,70 +905,42 @@ async function deleteSky(sky) {
     return;
   }
   state.skies = state.skies.filter((s) => s.id !== sky.id);
-  closeSheet();
   forgetUrls(sky.id);
   render();
-  toast(t.deleted, {
-    action: t.undo,
-    ms: 4000,
-    onAction: async () => {
-      await store.put(sky);
-      state.skies.push(sky);
-      sortSkies();
-      render();
-    },
-  });
+  toast(t.deleted);
 }
 
-function closeSheet() {
-  $('#sheet').hidden = true;
-  $('#sheet .sheet').style.transform = '';
-  state.detail = null;
-  if (cap.hidden && $('#storyModal').hidden) document.body.style.overflow = '';
-}
-
-/** Drag the sheet down to close it (from the top of its scroll), or sideways to the next sky. */
-function bindSheetGestures() {
-  const art = $('#sheet .sheet');
-  let x0 = 0, y0 = 0, dx = 0, dy = 0, axis = '', active = false;
-  const settle = () => {
-    if (art.style.transform) art.animate([{ transform: art.style.transform }, { transform: 'none' }], { duration: 180, easing: 'ease-out' });
-    art.style.transform = '';
+function openJarMenu(slot, sky) {
+  if (!sky) return;
+  navigator.vibrate?.(12);
+  const menu = $('#jarMenu');
+  view.classList.add('is-holding');
+  slot.classList.add('is-held');
+  menu.hidden = false;
+  const r = slot.querySelector('.jar').getBoundingClientRect();
+  const m = menu.getBoundingClientRect();
+  menu.style.left = `${Math.min(Math.max(12, r.left + r.width / 2 - m.width / 2), innerWidth - m.width - 12)}px`;
+  menu.style.top = `${Math.max(12, r.top - m.height - 10)}px`;
+  const close = () => {
+    menu.hidden = true;
+    view.classList.remove('is-holding');
+    slot.classList.remove('is-held');
+    document.removeEventListener('pointerdown', outside, true);
+    window.removeEventListener('scroll', close);
   };
-  art.addEventListener('touchstart', (e) => {
-    active = e.touches.length === 1 && !e.target.closest('input');
-    if (!active) return;
-    axis = '';
-    dx = dy = 0;
-    x0 = e.touches[0].clientX;
-    y0 = e.touches[0].clientY;
-  }, { passive: true });
-  art.addEventListener('touchmove', (e) => {
-    if (!active) return;
-    dx = e.touches[0].clientX - x0;
-    dy = e.touches[0].clientY - y0;
-    if (!axis && Math.hypot(dx, dy) > 10) {
-      if (Math.abs(dx) > Math.abs(dy)) axis = state.detail ? 'x' : 'none';
-      else axis = dy > 0 && art.scrollTop <= 0 ? 'y' : 'none';
-    }
-    if (axis === 'y') { e.preventDefault(); art.style.transform = `translateY(${Math.max(0, dy)}px)`; }
-    else if (axis === 'x') { e.preventDefault(); art.style.transform = `translateX(${dx * 0.35}px)`; }
-  }, { passive: false });
-  art.addEventListener('touchend', async () => {
-    if (!active) return;
-    active = false;
-    if (axis === 'y' && dy > 110) {
-      await art.animate([{ transform: art.style.transform }, { transform: 'translateY(100%)' }], { duration: 180, easing: 'ease-in', fill: 'forwards' }).finished;
-      closeSheet();
-      art.getAnimations().forEach((a) => a.cancel());
-    } else if (axis === 'x' && Math.abs(dx) > 60) {
-      art.style.transform = '';
-      stepDetail(dx < 0 ? 1 : -1);
-    } else {
-      settle();
-    }
-  });
-  art.addEventListener('touchcancel', () => { active = false; settle(); });
+  const outside = (e) => { if (!menu.contains(e.target)) close(); };
+  setTimeout(() => document.addEventListener('pointerdown', outside, true));
+  window.addEventListener('scroll', close, { once: true });
+  menu.querySelector('button').onclick = () => { close(); deleteSky(sky); };
+}
+
+/** Holding to delete can't be seen, so say it once, the first time a sky goes back on the shelf. */
+function holdHintOnce() {
+  try {
+    if (localStorage.getItem('kepfa.holdHint')) return;
+    localStorage.setItem('kepfa.holdHint', '1');
+  } catch { return; }
+  toast(t.holdHint, 3200);
 }
 
 // ---------- story export ----------
@@ -971,32 +1087,22 @@ function bindGlobal() {
   $('#openCapture').addEventListener('click', () => { state.viaPrompt = false; openCapture(); });
   $('#shutter').addEventListener('click', snap);
   $('#fileCamera').addEventListener('change', picked);
-  $('#fileGallery').addEventListener('change', picked);
   cap.addEventListener('click', (e) => { if (e.target.closest('[data-close-capture]')) closeCapture(); });
-  $('#sheet').addEventListener('click', (e) => { if (e.target.closest('[data-close-sheet]')) closeSheet(); });
   $('#storyModal').addEventListener('click', (e) => { if (e.target.closest('[data-close-story]')) closeStory(); });
+  $('#jarMenu button').textContent = t.deleteSky;
 
-  document.addEventListener('click', async (e) => {
-    const b = e.target.closest('.palette button[data-hex]');
-    if (!b) return;
-    const code = b.dataset.hex.toUpperCase();
-    try {
-      await navigator.clipboard.writeText(code);
-      toast(t.copied(code));
-    } catch {
-      toast(code);
-    }
-  });
-
-  bindSheetGestures();
+  bindViewerGestures();
   document.addEventListener('keydown', (e) => {
-    if (state.detail && $('#storyModal').hidden && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    const quiet = $('#storyModal').hidden && $('#confirm').hidden;
+    if (state.detail && quiet && !viewer.editing && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
       stepDetail(e.key === 'ArrowRight' ? 1 : -1);
       return;
     }
     if (e.key !== 'Escape') return;
-    if (!$('#storyModal').hidden) closeStory();
-    else if (!$('#sheet').hidden) closeSheet();
+    if (!$('#confirm').hidden) $('#confirmNo').click();
+    else if (!$('#storyModal').hidden) closeStory();
+    else if (viewer.editing) endEdit(state.detail);
+    else if (!$('#sheet').hidden) closeJar();
     else if (!cap.hidden) closeCapture();
   });
 

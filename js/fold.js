@@ -4,8 +4,18 @@
 import { jarSvg, JAR_RATIO } from './jar.js';
 import { whoosh, click } from './sound.js';
 
-const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+export const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const EASE = 'cubic-bezier(.55,0,.35,1)';
+// The same motion tokens as css/style.css (--ease-*, --t-*), for animations driven from JS.
+export const MOTION = {
+  out: 'cubic-bezier(.22,1,.36,1)',
+  in: 'cubic-bezier(.55,0,1,.45)',
+  spring: 'cubic-bezier(.34,1.56,.64,1)',
+  quick: 220,
+  move: 380,
+  pop: 520,
+  stagger: 70,
+};
 const SQUARE = 'polygon(0 0,0 100%,100% 100%)';     // while fold 1 lifts the top-right half away
 const HALF = 'polygon(0 0,0 100%,50% 50%)';         // after fold 2
 const QUARTER = 'polygon(0 0,0 50%,50% 50%)';       // after fold 3: the triangle that goes in
@@ -169,5 +179,5 @@ export function foldStage(href, size, state) {
     show('open');
   }
 
-  return { el, foldIn, foldOut, skip };
+  return { el, card: main, foldIn, foldOut, skip };
 }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Kepfa</title>
 <meta name="description" content="Keep the sky. Photograph the sky and keep it in a jar on your shelf.">
 <meta name="theme-color" content="#F1EDE6" media="(prefers-color-scheme: light)">
@@ -40,9 +40,8 @@
     <div class="cam-fallback" id="camFallback" hidden>
       <div class="fallback-jar" id="fallbackJar"></div>
       <p class="cam-fallback-title">The camera can’t open here</p>
-      <p>Take the photo with your camera app, or pick a sky from your library.</p>
+      <p>Take the photo with your camera app instead.</p>
       <label class="btn primary on-dark" for="fileCamera">Take a photo</label>
-      <label class="btn on-dark" for="fileGallery">Choose from library</label>
     </div>
     <div class="cam-top">
       <button class="btn-text on-dark" type="button" data-close-capture>Cancel</button>
@@ -50,25 +49,37 @@
       <span class="cam-spacer"></span>
     </div>
     <div class="cam-bottom">
-      <label class="btn-text on-dark" for="fileGallery">Library</label>
+      <span class="cam-spacer"></span>
       <button class="shutter" id="shutter" type="button" aria-label="Take photo"></button>
       <span class="cam-spacer"></span>
     </div>
     <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
-    <input type="file" id="fileGallery" accept="image/*" hidden>
   </div>
   <div class="cap-step review" data-step="review" hidden></div>
   <div class="cap-step drop" data-step="drop" hidden></div>
 </section>
 
-<div id="sheet" class="overlay" hidden>
-  <div class="overlay-backdrop" data-close-sheet></div>
-  <article class="sheet" role="dialog" aria-modal="true" aria-label="Sky"></article>
+<div id="sheet" class="viewer" hidden>
+  <div class="viewer-backdrop"></div>
+  <article class="viewer-body" role="dialog" aria-modal="true" aria-label="Sky"></article>
 </div>
 
 <div id="storyModal" class="overlay" hidden>
   <div class="overlay-backdrop" data-close-story></div>
   <article class="sheet story-sheet" role="dialog" aria-modal="true" aria-label="Share to story"></article>
+</div>
+
+<div id="jarMenu" class="jar-menu" hidden><button type="button" class="jar-menu-delete">Delete this sky</button></div>
+
+<div id="confirm" class="confirm" hidden>
+  <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h2 id="confirmTitle"></h2>
+    <p id="confirmBody"></p>
+    <div class="confirm-actions">
+      <button type="button" class="btn" id="confirmNo"></button>
+      <button type="button" class="btn danger" id="confirmYes"></button>
+    </div>
+  </div>
 </div>
 
 <div id="toast" class="toast" role="status" hidden></div>

@@ -40,6 +40,17 @@
   --radius: 2px;
   --gutter-l: max(16px, env(safe-area-inset-left, 0px));
   --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+
+  /* Motion: three curves and a few durations, the same everywhere (mirrored in js/fold.js MOTION). */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);       /* arriving: fast, then settles */
+  --ease-in: cubic-bezier(.55, 0, 1, .45);        /* leaving: gathers speed */
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1); /* a small overshoot, then rest */
+  --t-press: 120ms;
+  --t-quick: 220ms;
+  --t-move: 380ms;
+  --t-pop: 520ms;
+  --stagger: 70ms;
+  --polaroid: #FDFCF8;
   color-scheme: light;
 }
 
@@ -173,6 +184,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .dots { display: grid; grid-template-columns: repeat(30, minmax(0, 6px)); justify-content: space-between; gap: 2px; margin-top: var(--s-2); }
 .dots i { aspect-ratio: 1; border: 1px solid var(--ink); }
 .dots i.on { background: var(--ink); }
+/* The dot just earned fills in with a bounce. */
+.dots i.is-new { background: none; position: relative; }
+.dots i.is-new::after { content: ""; position: absolute; inset: 0; background: var(--ink); animation: dot-in var(--t-pop) var(--ease-spring) 300ms both; }
+@keyframes dot-in { from { transform: scale(0); } }
 .memory-block { margin-top: var(--s-5); }
 .memory-block .eyebrow { margin: 0; }
 .memory { display: flex; align-items: flex-end; gap: var(--s-3); margin-top: var(--s-2); }
@@ -230,6 +245,18 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 }
 .btn-text.danger { color: var(--danger); }
 .btn-text.on-dark { color: var(--camera-ink); }
+/* The light button sits on the dimmed viewer, paper on dark. */
+.btn.light { background: var(--polaroid); border-color: var(--polaroid); color: #1E1C19; border-radius: 5px; }
+
+/* Press: sinks fast, springs back when let go. */
+.btn, .btn-text, .keep-btn, .shutter, .tick-row, .polaroid-close {
+  transition: transform var(--t-quick) var(--ease-spring);
+}
+.btn:active:not(:disabled), .btn-text:active, .keep-btn:active, .shutter:active, .tick-row:active, .polaroid-close:active {
+  transform: scale(.95);
+  transition-duration: var(--t-press);
+  transition-timing-function: var(--ease-out);
+}
 
 .actions { display: flex; gap: var(--s-3); justify-content: center; flex-wrap: wrap; margin-top: var(--s-4); }
 
@@ -294,8 +321,41 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   background: none;
   min-width: 0;
 }
-.jar-slot .jar { max-width: 96px; transition: transform .15s ease; }
+/* No browser "save image" menu on a long press: holding a jar is ours (it opens the delete menu). */
+.jar-slot { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; position: relative; }
+.jar-slot .jar { max-width: 96px; transition: transform var(--t-move) var(--ease-spring), opacity var(--t-quick) var(--ease-out); }
 .jar-slot:active .jar { transform: translateY(-3px); }
+.jar-slot.is-held .jar { transform: translateY(-8px) scale(1.06); filter: drop-shadow(0 10px 10px rgba(30, 28, 25, .3)); }
+.is-holding .jar-slot:not(.is-held) .jar { opacity: .35; }
+/* A ring grows while the finger stays down, so a hold feels counted; plain taps end before it shows. */
+.jar-slot::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 20%;
+  width: 40px;
+  height: 40px;
+  margin-left: -20px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  opacity: 0;
+  pointer-events: none;
+}
+.jar-slot.is-pressing::after { animation: hold-ring 380ms linear 120ms both; }
+@keyframes hold-ring { from { opacity: .5; transform: scale(.4); } to { opacity: 0; transform: scale(1.4); } }
+
+.jar-menu {
+  position: fixed;
+  z-index: 45;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  box-shadow: 0 10px 24px -8px rgba(30, 28, 25, .35);
+  transform-origin: 50% 100%;
+  animation: menu-in var(--t-move) var(--ease-spring) both;
+}
+.jar-menu button { min-height: 44px; padding: 0 var(--s-4); border: 0; background: none; color: var(--danger); font-size: var(--t-sm); }
+@keyframes menu-in { from { opacity: 0; transform: scale(.85) translateY(6px); } }
 .month-slot canvas { display: block; }
 .month-slot:disabled { cursor: default; }
 
@@ -383,7 +443,6 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   color: var(--paper);
 }
 .keep-btn svg { width: 28px; height: 28px; }
-.keep-btn:active { transform: scale(.96); }
 
 /* ---------- capture ---------- */
 .capture { position: fixed; inset: 0; z-index: 40; background: var(--camera); color: var(--camera-ink); }
@@ -481,11 +540,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .field::placeholder { color: var(--ink-soft); }
 .field:focus-visible { outline: none; border-bottom-width: 2px; }
 .field.note { font-family: var(--f-display); font-size: var(--t-lg); }
-/* Where and When side by side; on narrow phones When drops under Where. */
-.field-row { display: flex; flex-wrap: wrap; gap: var(--s-5) var(--s-4); }
-.field-place { flex: 1 1 110px; min-width: 0; }
-.field-when { flex: 1 1 180px; min-width: 0; }
-.field-when .field { font-size: var(--t-sm); }
+.kept-at { margin: var(--s-2) 0 0; font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
 
 .tick-row {
   display: flex;
@@ -512,6 +567,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   border-radius: 0;
   cursor: pointer;
 }
+.tick-row input { transition: background-color var(--t-quick) var(--ease-out); }
 .tick-row input:checked { background: var(--ink); }
 .tick-row input:checked::after {
   content: "";
@@ -521,7 +577,9 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   border: solid var(--paper);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
+  animation: tick-in var(--t-move) var(--ease-spring) both;
 }
+@keyframes tick-in { from { transform: rotate(45deg) scale(0); } }
 
 /* Keep stays in thumb reach while the fields scroll under it. */
 .review-actions {
@@ -535,20 +593,6 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   padding: var(--s-3) 0 calc(env(safe-area-inset-bottom, 0px) + var(--s-3));
   background: var(--paper);
   border-top: 1px solid var(--rule);
-}
-
-.palette { display: flex; gap: var(--s-1); height: 40px; }
-.palette button {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  border-radius: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: var(--s-1);
-  font-family: var(--f-mono);
-  font-size: var(--t-cap);
 }
 
 .loading { display: grid; place-items: center; align-content: center; gap: var(--s-3); min-height: 60vh; color: var(--ink-soft); text-align: center; }
@@ -583,24 +627,136 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   padding-left: var(--gutter-l);
   padding-right: var(--gutter-r);
   padding-block: var(--s-3) calc(env(safe-area-inset-bottom, 0px) + var(--s-5));
-  animation: rise .32s cubic-bezier(.2, .9, .3, 1) backwards;
+  animation: rise var(--t-move) var(--ease-out) backwards;
 }
 @keyframes rise { from { transform: translateY(40%); opacity: 0; } }
 .grabber { width: 36px; height: 4px; background: var(--rule); margin: 0 auto var(--s-4); }
-.detail-note { margin: 0; overflow-wrap: anywhere; }
-.detail-meta { margin: var(--s-2) 0 var(--s-4); font-family: var(--f-mono); font-size: var(--t-sm); color: var(--ink-soft); }
-.detail-slip { width: fit-content; max-width: 88%; margin: var(--s-5) auto var(--s-4); padding: var(--s-2) var(--s-4); transform: rotate(-1.5deg); }
-.detail-slip .detail-note.hand { font-size: var(--t-hand-lg); line-height: 1.1; }
-.detail-slip .detail-meta { margin: var(--s-1) 0 0; font-size: var(--t-cap); }
-.photo-tapes { position: absolute; top: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .2s ease; }
-.photo-tapes.is-on { opacity: 1; }
-.photo-tapes .tape { width: 60px; height: 17px; --tilt: -40deg; }
-.photo-tapes .tape-tl { left: -20px; top: 2px; }
-.photo-tapes .tape-br { right: -20px; bottom: 4px; }
 .sheet-actions { display: flex; gap: var(--s-4); align-items: center; margin-top: var(--s-5); }
-.sheet-actions .btn.primary, .sheet-actions.even .btn { flex: 1; }
-.sheet-more { display: flex; justify-content: center; gap: var(--s-6); margin-top: var(--s-2); }
-.edit-fields { display: grid; gap: var(--s-5); margin-top: var(--s-3); }
+.sheet-actions .btn.primary { flex: 1; }
+
+/* ---------- viewer: the sky out of its jar, as a polaroid over the dimmed shelf ---------- */
+.viewer { position: fixed; inset: 0; z-index: 50; }
+.viewer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(18, 16, 13, .62);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: fade var(--t-quick) var(--ease-out) both;
+}
+.viewer-body {
+  --pw: min(300px, calc(100vw - 64px));   /* polaroid width */
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + var(--s-5)) var(--gutter-r) calc(env(safe-area-inset-bottom, 0px) + var(--s-5)) var(--gutter-l);
+  overflow-y: auto;
+}
+.viewer-stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.viewer-stage .fold-stage { width: 220px; }
+/* Once the polaroid is out, the jar falls back out of focus. */
+.viewer-stage .fold-jar { transition: filter var(--t-move) var(--ease-out), opacity var(--t-move) var(--ease-out); }
+.viewer-stage .is-behind .fold-jar { filter: blur(6px); opacity: .35; }
+.viewer-stack { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: var(--s-6); visibility: hidden; }
+.is-out .viewer-stack { visibility: visible; }
+
+.polaroid {
+  position: relative;
+  width: var(--pw);
+  padding: 14px 14px 0;
+  background: var(--polaroid);
+  border-radius: 5px;
+  color: #1E1C19;
+  transform: rotate(-2deg);
+  transform-origin: 0 0;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .18), 0 24px 40px -12px rgba(0, 0, 0, .5);
+}
+.polaroid-photo { aspect-ratio: 1; border-radius: 3px; background: #CFC7BB center / cover no-repeat; }
+.polaroid-strip { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 64px; padding: var(--s-2) var(--s-2) var(--s-3); text-align: center; }
+.polaroid-note { display: inline; padding: 0; border: 0; background: none; color: inherit; text-align: center; line-height: 1.05; cursor: text; }
+.polaroid-note .hand { font-size: 27px; line-height: 1.05; overflow-wrap: anywhere; }
+.polaroid-note .hand.is-long { font-size: 22px; }
+.polaroid-note .hand.is-thai { font-size: var(--t-body); line-height: 1.5; }
+.polaroid-empty { font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: #8A8277; }
+.pen { width: 14px; height: 14px; margin-left: 6px; vertical-align: -1px; stroke: #8A8277; }
+.polaroid-meta { margin: 6px 0 0; font-family: var(--f-mono); font-size: 10px; color: #6B645B; }
+.polaroid-close {
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1E1C19;
+}
+.polaroid-close::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: var(--polaroid);
+  border: 1px solid #CFC7BB;
+  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, .35);
+}
+.polaroid-close svg { position: relative; width: 16px; height: 16px; }
+.viewer-actions { display: flex; align-items: center; justify-content: center; gap: var(--s-5); }
+.viewer-actions .btn.light { min-width: calc(var(--pw) * .6); }
+
+/* After the pop, the strip, ✕ and the button arrive one after another. */
+.is-out:not(.is-swap) .polaroid-strip > *,
+.is-out:not(.is-swap) .polaroid-close,
+.is-out:not(.is-swap) .viewer-actions { animation: rise-in var(--t-move) var(--ease-out) both; }
+.is-out:not(.is-swap) .polaroid-strip > :first-child { animation-delay: calc(var(--t-pop) * .5); }
+.is-out:not(.is-swap) .polaroid-strip > :nth-child(2) { animation-delay: calc(var(--t-pop) * .5 + var(--stagger)); }
+.is-out:not(.is-swap) .polaroid-close { animation-name: pop-in; animation-timing-function: var(--ease-spring); animation-delay: calc(var(--t-pop) * .5 + var(--stagger) * 2); }
+.is-out:not(.is-swap) .viewer-actions { animation-delay: calc(var(--t-pop) * .5 + var(--stagger) * 3); }
+.is-closing .polaroid-close, .is-closing .viewer-actions { opacity: 0; transition: opacity var(--t-quick) var(--ease-in); }
+@keyframes rise-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes pop-in { from { opacity: 0; transform: scale(.3); } }
+
+/* Editing the note right on the strip: the polaroid moves up so the keyboard has room. */
+.viewer-body.is-editing { place-items: start center; }
+.is-editing .viewer-stack { gap: var(--s-4); }
+.is-editing .polaroid { --pw: min(240px, calc(100vw - 96px)); transition: width var(--t-move) var(--ease-out); }
+.is-editing .polaroid-close { display: none; }
+.polaroid-form { display: flex; flex-direction: column; align-items: center; gap: var(--s-1); width: 100%; }
+.polaroid-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid #1E1C19;
+  border-radius: 0;
+  background: transparent;
+  color: #1E1C19;
+  text-align: center;
+}
+.polaroid-input.hand { font-size: 24px; }
+.polaroid-input.hand.is-thai { font-size: var(--t-body); }
+.polaroid-input.place { width: 70%; min-height: 32px; font-family: var(--f-mono); font-size: var(--t-cap); border-bottom-color: #CFC7BB; }
+.polaroid-input::placeholder { color: #8A8277; }
+.polaroid-input:focus-visible { outline: none; border-bottom-width: 2px; }
+
+/* ---------- confirm ---------- */
+.confirm { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 0 var(--s-5); background: var(--scrim); animation: fade var(--t-quick) var(--ease-out) both; }
+.confirm-box {
+  width: 100%;
+  max-width: 320px;
+  padding: var(--s-5) var(--s-5) var(--s-4);
+  background: var(--paper-raised);
+  border-radius: 5px;
+  animation: confirm-in var(--t-move) var(--ease-spring) both;
+}
+.confirm-box h2 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); line-height: 1.1; }
+.confirm-box p { margin: var(--s-2) 0 0; color: var(--ink-soft); }
+.confirm-actions { display: flex; gap: var(--s-3); margin-top: var(--s-5); }
+.confirm-actions .btn { flex: 1; }
+@keyframes confirm-in { from { opacity: 0; transform: translateY(16px) scale(.96); } }
 
 .story-sheet h2 { margin: 0 0 var(--s-4); font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); text-align: center; }
 .story-preview {
@@ -656,18 +812,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   background: var(--ink);
   color: var(--paper);
   font-size: var(--t-sm);
-  animation: rise .25s ease both;
+  border-radius: 5px;
+  animation: toast-in var(--t-move) var(--ease-spring) both;
 }
-.toast-action {
-  margin-left: var(--s-4);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font-weight: 500;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 24px); } }
 
 /* ---------- handwriting: people's own notes ---------- */
 .hand, .field.note.hand { font-family: var(--f-hand); font-size: var(--t-hand); line-height: 1.3; letter-spacing: 0; }

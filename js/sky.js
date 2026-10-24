@@ -12,11 +12,6 @@ export function hexToRgb(h) {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-/** Relative luminance 0..1, good enough to pick dark or light text. */
-export function luminance([r, g, b]) {
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-}
-
 export function mix(a, b, t) {
   return [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * t);
 }
