@@ -171,7 +171,12 @@ export const t = {
   caption: ({ text, day, kept, tag }) =>
     `${text}\n${day} · day ${kept} of my ${CHALLENGE_SIZE}-day sky challenge.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #${tag}`,
 
-  footer: 'kepfa · start your own sky collection',
+  footerLine: 'Start your own sky collection',
+  issueLine: (month, year) => `Issue · ${month} ${year}`,
+  issueNo: (n) => `No. ${n}`,
+  volume: (year) => `Vol. ${year}`,
+  keptRing: (month, year) => `KEPT · ${month.toUpperCase()} · ${year} · KEPFA · `,
+  keptWord: 'KEPT',
   storyKept: (y, n) => `${y} · ${n} ${skies(n)} kept`,
   stripCaption: 'Every sky you kept, in order',
 };

@@ -2,7 +2,7 @@
 // one jarred sky with its handwritten note, one month's jar, or the whole year's shelf.
 
 import { drawJar, jarPoint, JAR_RATIO } from './jar.js';
-import { loadThumbs } from './pile.js';
+import { loadThumbs, ROLLS, paperIndex } from './pile.js';
 import { loadImage } from './sky.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG } from './strings.js';
 
@@ -65,21 +65,107 @@ function text(ctx, str, x, y, { font, color = INK, align = 'center', spacing = 0
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
-/** Name, then the quote that invites people in, then a rule. Returns the rule's y. */
-function masthead(ctx, quote) {
-  text(ctx, 'Kepfa', W / 2, 140, { font: `500 64px ${SERIF}` });
-  const font = `italic 40px ${SERIF}`;
+// Laid out like a page of a quiet magazine: wide margins, a running line at the top with a hairline under it,
+// the name set large in the serif, the quote as its dek, and a hairline footer with an issue number.
+const MARGIN = 86;
+const smallCaps = (ctx, str, x, y, align) => text(ctx, str.toUpperCase(), x, y, { font: `500 25px ${SANS}`, color: SOFT, align, spacing: 6 });
+
+/**
+ * @param issue  the running line's right side, e.g. "Issue · October 2026"
+ * @param title  the one big title: the name on a single sky's page, the month or the year on theirs (set in italic)
+ * @param kicker a line under the quote, between two hairlines, e.g. "2026 · 8 skies kept"
+ * @returns where the page's content starts
+ */
+function masthead(ctx, quote, issue, { title = 'Kepfa', kicker = '' } = {}) {
+  smallCaps(ctx, 'Kepfa', MARGIN, 118, 'left');
+  smallCaps(ctx, issue, W - MARGIN, 118, 'right');
+  ctx.fillStyle = INK;
+  ctx.fillRect(MARGIN, 140, W - MARGIN * 2, 2);
+  text(ctx, title, W / 2, 268, { font: `${title === 'Kepfa' ? '' : 'italic '}500 122px ${SERIF}` });
+  const font = `italic 41px ${SERIF}`;
   ctx.font = font;
-  const lines = wrap(ctx, `“${quote}”`, W - 220, 2);
-  lines.forEach((ln, i) => text(ctx, ln, W / 2, 205 + i * 50, { font, color: '#3A3631' }));
-  const y = 205 + (lines.length - 1) * 50 + 40;
-  ctx.fillStyle = RULE;
-  ctx.fillRect(90, y, W - 180, 2);
+  const lines = wrap(ctx, `“${quote}”`, W - MARGIN * 2 - 60, 2);
+  lines.forEach((ln, i) => text(ctx, ln, W / 2, 330 + i * 50, { font, color: '#4A443D' }));
+  let y = 330 + (lines.length - 1) * 50 + 30;
+  if (kicker) {
+    const ky = y + 34;
+    smallCaps(ctx, kicker, W / 2, ky, 'center');
+    ctx.font = `500 25px ${SANS}`;
+    const half = (ctx.measureText(kicker.toUpperCase()).width + kicker.length * 6) / 2 + 30;
+    ctx.fillStyle = RULE;
+    ctx.fillRect(MARGIN, ky - 9, W / 2 - half - MARGIN, 2);
+    ctx.fillRect(W / 2 + half, ky - 9, W / 2 - half - MARGIN, 2);
+    y = ky + 20;
+  }
   return y;
 }
 
-function footer(ctx) {
-  text(ctx, t.footer, W / 2, 1840, { font: `28px ${SANS}`, color: SOFT });
+/** A pale oak shelf w wide whose top is at y: a lit top edge, a slightly darker front, a soft shadow on the page. */
+function shelf(ctx, x, y, w) {
+  const h = 30;
+  const shade = ctx.createLinearGradient(0, y + h - 6, 0, y + h + 30);
+  shade.addColorStop(0, 'rgba(60, 40, 20, .3)');
+  shade.addColorStop(1, 'rgba(60, 40, 20, 0)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(x + 6, y + h - 6, w - 12, 36);
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, '#EFE3CD'); g.addColorStop(0.17, '#EFE3CD');
+  g.addColorStop(0.17, '#D9C6A5'); g.addColorStop(0.45, '#D9C6A5');
+  g.addColorStop(0.45, '#C8B08A'); g.addColorStop(1, '#C3AA82');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 5); ctx.fill();
+}
+
+/** The soft shadow a jar casts where it stands, centred under cx at y. */
+function standShadow(ctx, cx, y, w) {
+  const g = ctx.createRadialGradient(cx, y, 0, cx, y, w / 2);
+  g.addColorStop(0, 'rgba(40, 28, 15, .32)');
+  g.addColorStop(1, 'rgba(40, 28, 15, 0)');
+  ctx.save();
+  ctx.translate(cx, y);
+  ctx.scale(1, 0.18);
+  ctx.translate(-cx, -y);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, y, w / 2, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * A low folded card standing at the front of the shelf: the month, and how many skies in red, on one line.
+ * Kept short so it hides as little as possible of what's piled in the jar behind it. Its foot is at y.
+ */
+function tentCard(ctx, cx, y, w, month, count) {
+  const h = w * 0.36, x = cx - w / 2, top = y - h;
+  // The back half, showing as a sliver above the fold.
+  ctx.fillStyle = '#DCCFB6';
+  ctx.fillRect(x + w * 0.08, top - h * 0.12, w * 0.84, h * 0.12);
+  ctx.shadowColor = 'rgba(60, 40, 20, .38)';
+  ctx.shadowBlur = h * 0.3;
+  ctx.shadowOffsetY = h * 0.12;
+  const g = ctx.createLinearGradient(0, top, 0, y);
+  g.addColorStop(0, '#F7F1E6');
+  g.addColorStop(1, '#EAE0CF');
+  ctx.fillStyle = g;
+  ctx.fillRect(x, top, w, h);
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = 'rgba(70, 45, 20, .35)';
+  ctx.fillRect(x, y - 1.5, w, 2);
+  const k = w / 38, base = top + h * 0.66;
+  const label = month.toUpperCase();
+  ctx.font = `600 ${4.6 * k}px ${SANS}`;
+  const lw = ctx.measureText(label).width + label.length * k;
+  ctx.font = `${4.4 * k}px ${MONO}`;
+  const cw = ctx.measureText(count).width, gap = 3.2 * k, start = cx - (lw + gap + cw) / 2;
+  text(ctx, label, start, base, { font: `600 ${4.6 * k}px ${SANS}`, color: INK, align: 'left', spacing: k });
+  text(ctx, count, start + lw + gap, base, { font: `${4.4 * k}px ${MONO}`, color: '#B3261E', align: 'left' });
+}
+
+/** @param number  the footer's right side, e.g. "No. 24" */
+function footer(ctx, number) {
+  ctx.fillStyle = INK;
+  ctx.fillRect(MARGIN, H - 112, W - MARGIN * 2, 2);
+  smallCaps(ctx, t.footerLine, MARGIN, H - 74, 'left');
+  smallCaps(ctx, number, W - MARGIN, H - 74, 'right');
 }
 
 function wrap(ctx, str, maxW, maxLines) {
@@ -163,7 +249,7 @@ function cloud(ctx, x, y, s) {
 
 /** The tag itself, hanging from the knot on the right of the neck, with the place written on it by hand. */
 function tag(ctx, bx, by, bw, label) {
-  const k = bw / 540;
+  const k = Math.max(bw / 540, 0.62);   // a small jar still gets a tag you can read
   const thai = isThai(label);
   const stitch = 12 * k;
   const pad = stitch + 18 * k;   // the writing keeps clear of the stitched line on both sides
@@ -256,7 +342,6 @@ function texture(name) {
 // Edges in the source photo [top, right, bottom, left] and how thick they draw. The torn edge is the tall bottom band.
 const SLIPS = {
   torn: { src: [12, 12, 84, 12], dst: [8, 8, 57, 8] },
-  note: { src: [12, 12, 12, 12], dst: [8, 8, 8, 8] },
 };
 
 /** The paper stretched to w×h without bending its edges: corners stay, sides and middle stretch. */
@@ -278,8 +363,27 @@ function stretchPaper(img, w, h, { src, dst }) {
   return c;
 }
 
-/** A slip of paper w×h, top-centre at cx,y, tilted; `inside` draws on it with 0,0 at its top-left. */
-function slip(ctx, img, kind, cx, y, w, h, tilt, inside) {
+/** The paper multiplied by a colour, keeping its own torn outline. */
+function tintPaper(paper, color) {
+  const c = document.createElement('canvas');
+  c.width = paper.width;
+  c.height = paper.height;
+  const x = c.getContext('2d');
+  x.drawImage(paper, 0, 0);
+  // Take the colour's hue but keep the paper's own light and grain, then lift it a little so it stays a pale paper.
+  x.globalCompositeOperation = 'color';
+  x.fillStyle = color;
+  x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'soft-light';
+  x.fillStyle = 'rgba(255, 255, 255, .5)';
+  x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'destination-in';
+  x.drawImage(paper, 0, 0);
+  return c;
+}
+
+/** A slip of paper w×h, top-centre at cx,y, tilted; `inside` draws on it with 0,0 at its top-left. `tint` colours the paper. */
+function slip(ctx, img, kind, cx, y, w, h, tilt, inside, tint) {
   ctx.save();
   ctx.translate(cx, y + h / 2);
   ctx.rotate((tilt * Math.PI) / 180);
@@ -287,7 +391,10 @@ function slip(ctx, img, kind, cx, y, w, h, tilt, inside) {
   ctx.shadowColor = 'rgba(30, 28, 25, .16)';
   ctx.shadowBlur = 26;
   ctx.shadowOffsetY = 10;
-  if (img) ctx.drawImage(stretchPaper(img, w, h, SLIPS[kind]), 0, 0);
+  if (img) {
+    const paper = stretchPaper(img, w, h, SLIPS[kind]);
+    ctx.drawImage(tint ? tintPaper(paper, tint) : paper, 0, 0);
+  }
   else { ctx.fillStyle = TAG; ctx.fillRect(0, 0, w, h); }
   ctx.shadowColor = 'transparent';
   inside();
@@ -304,82 +411,177 @@ function tapeStrip(ctx, img, cx, cy, w, tilt) {
   ctx.restore();
 }
 
-function swatches(ctx, palette, y) {
-  const sw = palette.slice(0, 5);
-  const size = 72, gap = 22;
-  let x = (W - (sw.length * size + (sw.length - 1) * gap)) / 2;
-  for (const p of sw) {
-    ctx.fillStyle = p.hex;
-    ctx.fillRect(x, y, size, size);
-    text(ctx, p.hex.slice(1).toUpperCase(), x + size / 2, y + size + 40, { font: `22px ${MONO}`, color: SOFT });
-    x += size + gap;
+
+/** A photo print with its white border, the time written on the bottom edge, tilted; cx,y is its top centre. */
+function polaroid(ctx, img, cx, y, w, tilt, caption) {
+  const pad = w * 0.044, foot = w * 0.14, ph = w - pad * 2;
+  const h = pad + ph + foot;
+  ctx.save();
+  ctx.translate(cx, y + h / 2);
+  ctx.rotate((tilt * Math.PI) / 180);
+  ctx.translate(-w / 2, -h / 2);
+  ctx.shadowColor = 'rgba(30, 28, 25, .32)';
+  ctx.shadowBlur = 50;
+  ctx.shadowOffsetY = 24;
+  ctx.fillStyle = '#FDFCF8';
+  ctx.fillRect(0, 0, w, h);
+  ctx.shadowColor = 'transparent';
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const s = Math.min(iw, ih);
+  ctx.drawImage(img, (iw - s) / 2, (ih - s) / 2, s, s, pad, pad, ph, ph);
+  text(ctx, caption, w / 2, h - foot * 0.36, { font: `32px ${MONO}`, color: SOFT, spacing: 3 });
+  ctx.restore();
+  return h;
+}
+
+/** Letters set round a circle, starting at the top and running clockwise. */
+function ringText(ctx, str, cx, cy, r, font) {
+  ctx.font = font;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const total = [...str].reduce((a, ch) => a + ctx.measureText(ch).width, 0);
+  const gap = (Math.PI * 2 * r - total) / str.length;
+  let a = -Math.PI / 2;
+  for (const ch of str) {
+    const cw = ctx.measureText(ch).width;
+    a += (cw / 2) / r;
+    ctx.save();
+    ctx.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    ctx.rotate(a + Math.PI / 2);
+    ctx.fillText(ch, 0, 0);
+    ctx.restore();
+    a += (cw / 2 + gap) / r;
   }
+  ctx.textBaseline = 'alphabetic';
+}
+
+/** The red KEPT postmark: two rings, the month round the edge, the day in the middle. A thin cream glow keeps it legible on dark photos. */
+function postmark(ctx, cx, cy, size, takenAt) {
+  const d = new Date(takenAt), k = size / 104;
+  const ink = () => {
+    ctx.strokeStyle = ctx.fillStyle = '#C8352A';
+    ctx.lineWidth = 3 * k;
+    ctx.beginPath(); ctx.arc(0, 0, 47 * k, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1.6 * k;
+    ctx.beginPath(); ctx.arc(0, 0, 29 * k, 0, Math.PI * 2); ctx.stroke();
+    ringText(ctx, t.keptRing(MONTHS[d.getMonth()], d.getFullYear()), 0, 0, 37.5 * k, `600 ${8.6 * k}px ${MONO}`);
+    text(ctx, t.keptWord, 0, -1 * k, { font: `600 ${9 * k}px ${MONO}`, color: '#C8352A', spacing: 2 * k });
+    text(ctx, String(d.getDate()), 0, 15 * k, { font: `500 ${19 * k}px ${SERIF}`, color: '#C8352A' });
+  };
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate((-12 * Math.PI) / 180);
+  ctx.globalAlpha = 0.95;
+  ctx.shadowColor = 'rgba(253, 252, 248, .95)';
+  ctx.shadowBlur = 5;
+  ink();
+  ctx.restore();
 }
 
 /** @param challenge  {text, day, tag} when the sky was kept for that day's prompt */
 async function storySingle(sky, showPlace, quote, challenge) {
   const [c, ctx] = page();
-  const top = masthead(ctx, quote);
-  const [paperImg, noteImg, tapeImg] = await Promise.all(['paper', 'note', 'tape'].map(texture));
+  const d = new Date(sky.takenAt);
+  const top = masthead(ctx, quote, t.issueLine(MONTHS[d.getMonth()], d.getFullYear()));
+  const [paperImg, tapeImg] = await Promise.all(['paper', 'tape'].map(texture));
 
-  // A challenge sky makes room for the prompt slip and hashtags; the palette steps aside.
-  const bw = challenge ? 430 : 540, bh = Math.round(bw * JAR_RATIO), bx = (W - bw) / 2, by = top + 50;
-  const { img, release } = await loadImage(sky.photo);
-  const placed = showPlace && sky.place;
-  if (placed) tagThreadBack(ctx, bx, by, bw);
-  drawJar(ctx, { x: bx, y: by, w: bw, image: img });
-  release();
-  if (placed) tag(ctx, bx, by, bw, sky.place);
-
-  let y = by + bh + 60;
+  // The print is the hero, centred and tilted left; a challenge sky makes room for its prompt slip.
+  // The note and the prompt are measured first so the whole group can sit centred on the page.
+  const pw = challenge ? 600 : 734;
+  let note = null, prompt = null;
   if (sky.note) {
-    // Handwriting for English; Thai keeps the regular face at a regular size.
+    // On a torn slip: handwriting for English, the regular face for Thai.
     const thai = isThai(sky.note);
-    const font = thai ? `44px ${SANS}` : `66px ${HAND}`;
-    const lh = thai ? 62 : 68, pad = 30;
+    const font = thai ? `56px ${SANS}` : `92px ${HAND}`;
+    const lh = thai ? 76 : 82, padX = 64;
     ctx.font = font;
-    const lines = wrap(ctx, sky.note, W - 320, 3);
-    const w = Math.min(W - 180, Math.max(...lines.map((ln) => ctx.measureText(ln).width)) + 110);
-    const h = lines.length * lh + pad * 2;
-    slip(ctx, noteImg, 'note', W / 2, y, w, h, -2, () => {
-      lines.forEach((ln, i) => text(ctx, ln, w / 2, pad + lh * 0.74 + i * lh, { font }));
-    });
-    y += h + 26;
+    const lines = wrap(ctx, sky.note, W - MARGIN * 2 - padX * 2, 2);
+    const w = Math.min(W - MARGIN * 2, Math.max(...lines.map((ln) => ctx.measureText(ln).width)) + padX * 2);
+    note = { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn.dst[2] };
   }
-  text(ctx, fmt.stamp(sky.takenAt), W / 2, y + 36, { font: `36px ${MONO}`, color: SOFT });
-  y += 66;
-
   if (challenge) {
-    const w = 820, lh = 56;
-    const font = `500 48px ${SERIF}`;
+    // The day's prompt on a small pale-blue ticket, smaller than the note and above it.
+    const w = 560, lh = 50, font = `500 44px ${SERIF}`;
     ctx.font = font;
     const lines = wrap(ctx, challenge.text, w - 110, 2);
-    const h = 56 + lines.length * lh + 24 + SLIPS.torn.dst[2];
-    y += 34;
-    slip(ctx, paperImg, 'torn', W / 2, y, w, h, 1, () => {
-      text(ctx, `${t.lookFor} · ${challenge.day}`.toUpperCase(), w / 2, 56, { font: `22px ${SANS}`, color: SOFT, spacing: 4 });
-      lines.forEach((ln, i) => text(ctx, ln, w / 2, 56 + lh + i * lh, { font }));
-    });
-    tapeStrip(ctx, tapeImg, W / 2 - 24, y + 2, 230, 4);
-    text(ctx, `#${CHALLENGE_TAG} #${challenge.tag}`, W / 2, y + h + 64, { font: `32px ${MONO}` });
-  } else {
-    swatches(ctx, sky.palette, y + 40);
+    prompt = { font, lh, lines, w, h: 92 + (lines.length - 1) * lh };
   }
-  footer(ctx);
+  // Whatever comes under the print starts below the jar that leans on its corner.
+  const below = pw * 0.37 * JAR_RATIO * 0.38 + 50;
+  const total = pw * 1.096 + below + (prompt ? prompt.h + 34 : 0) + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
+  const py = top + Math.max(60, (H - 112 - top - total) / 2);
+  const { img, release } = await loadImage(sky.photo);
+  const ph = polaroid(ctx, img, W / 2, py, pw, -3, fmt.time(d));
+  tapeStrip(ctx, tapeImg, W / 2, py + 4, 216, -4);
+
+  // The jar leans the other way against the print's bottom-right corner (the place tag hangs from its neck).
+  const bw = pw * 0.37, bh = bw * JAR_RATIO, jx = W / 2 + pw * 0.5 - bw * 0.62, jy = py + ph - bh * 0.62;
+  const placed = showPlace && sky.place;
+  ctx.save();
+  ctx.translate(jx + bw / 2, jy + bh / 2);
+  ctx.rotate((7 * Math.PI) / 180);
+  ctx.translate(-bw / 2, -bh / 2);
+  // A soft shadow where it stands.
+  const g = ctx.createRadialGradient(bw / 2, bh, 0, bw / 2, bh, bw * 0.5);
+  g.addColorStop(0, 'rgba(30, 28, 25, .28)');
+  g.addColorStop(1, 'rgba(30, 28, 25, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, bh - bw * 0.2, bw, bw * 0.4);
+  if (placed) tagThreadBack(ctx, 0, 0, bw);
+  drawJar(ctx, { x: 0, y: 0, w: bw, image: img });
+  if (placed) tag(ctx, 0, 0, bw, sky.place);
+  ctx.restore();
+  release();
+
+  // KEPT, stamped across the print's left edge.
+  postmark(ctx, W / 2 - pw / 2 - pw * 0.04, py + ph * 0.5, pw * 0.55, sky.takenAt);
+
+  let y = py + ph + below;
+  if (prompt) {
+    const { font, lh, lines, w, h } = prompt;
+    ctx.save();
+    ctx.translate(W / 2, y + h / 2);
+    ctx.rotate((2 * Math.PI) / 180);
+    ctx.translate(-w / 2, -h / 2);
+    ctx.shadowColor = 'rgba(30, 28, 25, .28)';
+    ctx.shadowBlur = 28;
+    ctx.shadowOffsetY = 12;
+    ctx.fillStyle = '#DCE7F0';
+    ctx.beginPath(); ctx.roundRect(0, 0, w, h, 6); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    // A perforated tear line near the left end, like a ticket stub.
+    ctx.strokeStyle = '#9FB4C8';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath(); ctx.moveTo(30, 18); ctx.lineTo(30, h - 18); ctx.stroke();
+    ctx.setLineDash([]);
+    text(ctx, `${t.challengeBadge} · ${challenge.day}`.toUpperCase(), 64, 40, { font: `500 20px ${SANS}`, color: '#2C4A8C', align: 'left', spacing: 4 });
+    lines.forEach((ln, i) => text(ctx, ln, 64, 78 + i * lh, { font, color: '#1F2F55', align: 'left' }));
+    ctx.restore();
+    y += h + 34;
+  }
+  if (note) {
+    // The note's slip is the sky's own paper colour, as in the app.
+    const { font, lh, lines, w, h } = note;
+    slip(ctx, paperImg, 'torn', W / 2, y, w, h, -1.5, () => {
+      lines.forEach((ln, i) => text(ctx, ln, w / 2, 30 + lh * 0.78 + i * lh, { font }));
+    }, ROLLS[paperIndex(sky.id)]);
+    y += h + 30;
+  }
+  if (challenge) text(ctx, `#${CHALLENGE_TAG} #${challenge.tag}`, W / 2, y + 40, { font: `32px ${MONO}`, color: '#4A443D' });
+  footer(ctx, t.issueNo(d.getDate()));
   return toBlob(c);
 }
 
 async function storyJar({ year, month, skies, quote }) {
   const [c, ctx] = page();
-  const top = masthead(ctx, quote);
-  text(ctx, MONTHS[month], W / 2, top + 130, { font: `500 128px ${SERIF}` });
-  text(ctx, t.storyKept(year, skies.length), W / 2, top + 195, { font: `36px ${SANS}`, color: SOFT });
+  const top = masthead(ctx, quote, t.issueLine(MONTHS[month], year), { title: MONTHS[month], kicker: t.storyKept(year, skies.length) });
 
   // The month's shelf: every sky in its own jar, newest first, the day under each.
   // Try each column count and keep the one that gives the biggest jars in the space left.
   const list = skies.slice().reverse();
   const n = Math.max(list.length, 1);
-  const gridTop = top + 260, gridBottom = 1760, gap = 24, label = 56;
+  const gridTop = top + 40, gridBottom = H - 160, gap = 24, label = 96;
   const fit = (cols) => {
     const rows = Math.ceil(n / cols);
     return Math.min((W - 200 - gap * (cols - 1)) / cols, ((gridBottom - gridTop) / rows - label) / JAR_RATIO, 300);
@@ -393,51 +595,44 @@ async function storyJar({ year, month, skies, quote }) {
     const row = list.slice(r * cols, r * cols + cols);
     const rowW = row.length * jw + (row.length - 1) * gap;
     let x = (W - rowW) / 2;
+    shelf(ctx, Math.min(MARGIN, x - 24), y + jh - 3, Math.max(W - MARGIN * 2, rowW + 48));
     for (const s of row) {
       // Thumbnails, one at a time, so a full month doesn't hold 31 photos in memory at once.
       const { img, release } = await loadImage(s.thumb);
+      standShadow(ctx, x + jw / 2, y + jh, jw * 0.9);
       drawJar(ctx, { x, y, w: jw, image: img });
       release();
-      text(ctx, String(new Date(s.takenAt).getDate()).padStart(2, '0'), x + jw / 2, y + jh + 44, { font: `26px ${MONO}`, color: SOFT });
+      text(ctx, String(new Date(s.takenAt).getDate()).padStart(2, '0'), x + jw / 2, y + jh + 74, { font: `26px ${MONO}`, color: SOFT });
       x += jw + gap;
     }
-    ctx.fillStyle = INK;
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(Math.min(90, (W - rowW) / 2 - 20), y + jh + 2, Math.max(W - 180, rowW + 40), 4);
-    ctx.globalAlpha = 1;
     y += jh + label;
   }
-  footer(ctx);
+  footer(ctx, t.issueNo(month + 1));
   return toBlob(c);
 }
 
 async function storyYear({ year, skies, quote }) {
   const [c, ctx] = page();
-  const top = masthead(ctx, quote);
-  text(ctx, String(year), W / 2, top + 140, { font: `500 140px ${SERIF}` });
-  text(ctx, `${skies.length} ${t.kept(skies.length)}`, W / 2, top + 205, { font: `36px ${SANS}`, color: SOFT });
+  const top = masthead(ctx, quote, t.volume(year), { title: String(year), kicker: `${skies.length} ${t.kept(skies.length)}` });
 
-  const bw = 160, bh = Math.round(160 * JAR_RATIO), gapX = 70, rowH = bh + 90, firstRow = top + 260;
+  // Three shelves of four; each jar has a tent card in front saying which month it is and how many skies.
+  const bw = 150, bh = Math.round(150 * JAR_RATIO), gapX = 76, rowH = bh + 90, firstRow = top + 50;
   const left = (W - (4 * bw + 3 * gapX)) / 2;
   await loadThumbs(skies);
   for (let m = 0; m < 12; m++) {
     const r = Math.floor(m / 4), col = m % 4;
     const x = left + col * (bw + gapX);
     const y = firstRow + r * rowH;
+    if (col === 0) shelf(ctx, MARGIN, y + bh - 3, W - MARGIN * 2);
     const inMonth = skies.filter((s) => new Date(s.takenAt).getMonth() === m);
     // Months with nothing in them stay faint, so the jars that were filled stand out.
+    standShadow(ctx, x + bw / 2, y + bh, bw * 0.9);
     drawJar(ctx, { x, y, w: bw, skies: inMonth, ghost: !inMonth.length });
-    if (col === 0) {
-      ctx.fillStyle = INK;
-      ctx.globalAlpha = 0.6;
-      ctx.fillRect(left - 30, y + bh + 4, 4 * bw + 3 * gapX + 60, 2);
-      ctx.globalAlpha = 1;
-    }
-    text(ctx, MONTHS_SHORT[m], x + bw / 2, y + bh + 48, { font: `30px ${SANS}`, color: SOFT });
+    tentCard(ctx, x + bw / 2, y + bh + 9, bw * 0.66, MONTHS_SHORT[m], inMonth.length ? String(inMonth.length) : '–');
   }
 
   // The year as a strip of colors, one sliver per sky.
-  const sx = 90, sy = firstRow + 3 * rowH + 20, sw = W - 180, sh = 90;
+  const sx = MARGIN, sy = firstRow + 3 * rowH - 10, sw = W - MARGIN * 2, sh = 80;
   ctx.fillStyle = TAG;
   ctx.fillRect(sx, sy, sw, sh);
   if (skies.length) {
@@ -450,7 +645,7 @@ async function storyYear({ year, skies, quote }) {
     });
   }
   text(ctx, t.stripCaption, W / 2, sy + sh + 46, { font: `26px ${SANS}`, color: SOFT });
-  footer(ctx);
+  footer(ctx, t.volume(year));
   return toBlob(c);
 }
 

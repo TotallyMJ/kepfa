@@ -14,6 +14,7 @@
   --scrim: rgba(27, 25, 22, .45);
   --camera: #15130F;
   --camera-ink: #EDE6DA;
+  --grid: rgba(74, 120, 184, .1);
 
   --f-display: "Cormorant Garamond", "IBM Plex Sans Thai", "Leelawadee UI", Georgia, serif;
   --f-body: "IBM Plex Sans", "IBM Plex Sans Thai", "Leelawadee UI", "Thonburi", system-ui, sans-serif;
@@ -66,6 +67,7 @@
     --fold-paper: #3A352F;
     --danger: #E08A7A;
     --scrim: rgba(0, 0, 0, .6);
+    --grid: rgba(236, 230, 220, .05);
     color-scheme: dark;
   }
 }
@@ -76,7 +78,11 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   min-height: 100dvh;
-  background: var(--paper);
+  /* Grid paper, faint enough to read as the page's texture rather than lines to follow. */
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px) -1px -1px / 22px 22px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) -1px -1px / 22px 22px,
+    var(--paper);
   color: var(--ink);
   font-family: var(--f-body);
   font-size: var(--t-body);
