@@ -628,11 +628,33 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .fold-stage { position: relative; perspective: 800px; }
 .fold-jar { position: absolute; left: 50%; transform: translateX(-50%); }
 .fold-card { position: absolute; top: 0; transform-style: preserve-3d; transform-origin: 16.667% 33.333%; }
-.fold-piece { position: absolute; inset: 0; background-size: cover; background-position: center; }
+/* The photo being folded casts a soft shadow. A filter would flatten preserve-3d, so the card keeps
+   its own perspective for the flaps instead. */
+.fold-main {
+  transform-style: flat;
+  perspective: 600px;
+  filter: drop-shadow(0 3px 3px rgba(30, 28, 25, .22)) drop-shadow(0 10px 14px rgba(30, 28, 25, .14));
+}
+.fold-piece { position: absolute; inset: 0; border-radius: 2px; background-size: cover; background-position: center; }
+.fold-base, .fold-f1 { background-image: var(--photo); }
 .fold-f1 { clip-path: polygon(0 0, 100% 0, 100% 100%); transform-origin: 0 0; }
-.fold-f2 { clip-path: polygon(0 100%, 100% 100%, 50% 50%); transform-origin: 0 100%; background: var(--fold-paper); }
-.fold-f3 { clip-path: polygon(0 50%, 50% 50%, 0 100%); transform-origin: 0 50%; background: var(--fold-paper); }
-.fold-piece.is-paper { background: var(--fold-paper); }
+/* The back of a photo print: the paper colour with a faint grain and a little light across it. */
+.fold-f2, .fold-f3, .fold-piece.is-paper {
+  background:
+    repeating-linear-gradient(35deg, rgba(120, 100, 70, .018) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-55deg, rgba(255, 255, 255, .12) 0 1px, transparent 1px 7px),
+    linear-gradient(135deg, rgba(255, 255, 255, .35), rgba(0, 0, 0, .04)),
+    var(--fold-paper);
+}
+.fold-f2 { clip-path: polygon(0 100%, 100% 100%, 50% 50%); transform-origin: 0 100%; }
+.fold-f3 { clip-path: polygon(0 50%, 50% 50%, 0 100%); transform-origin: 0 50%; }
+.fold-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, .4) 50%, transparent 65%) 100% 0 / 300% 100%;
+  pointer-events: none;
+}
+.is-paper .fold-sheen { display: none; }
 .fold-ghost { opacity: 0; pointer-events: none; }
 .fold-ghost .fold-piece { background: var(--flash); clip-path: polygon(0 0, 0 50%, 50% 50%); }
 .fold-ghost-1 .fold-piece { filter: blur(1px); }
@@ -771,25 +793,28 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   background: repeating-radial-gradient(circle at 50% 50%, #EFE9DE 0 1.5px, #CDC3B2 1.5px 2.5px);
   transform: scaleY(.55);
 }
+/* Three turns of fine red thread, a little on the slant, darker where they curve round the back. */
 .note-roll::after {
   content: "";
   position: absolute;
-  left: -3px; right: -3px; top: 44%;
-  height: 5px;
-  border-radius: 2px;
-  background: repeating-linear-gradient(90deg, #7B5A36 0 2px, #9C7A4F 2px 4px);
-  box-shadow: 0 1px 1px rgba(0, 0, 0, .25);
+  left: -1px; right: -1px; top: calc(46% - 4px);
+  height: 8px;
+  background: linear-gradient(90deg, #7F1714, #B3261E 25%, #E2584C 50%, #B3261E 75%, #7F1714);
+  -webkit-mask: linear-gradient(transparent 0 1.1px, #fff 1.1px 2.1px, transparent 2.1px 3.5px, #fff 3.5px 4.5px, transparent 4.5px 5.9px, #fff 5.9px 6.9px, transparent 6.9px);
+  mask: linear-gradient(transparent 0 1.1px, #fff 1.1px 2.1px, transparent 2.1px 3.5px, #fff 3.5px 4.5px, transparent 4.5px 5.9px, #fff 5.9px 6.9px, transparent 6.9px);
+  transform: skewY(-9deg);
 }
 .note-roll .bow {
   position: absolute;
   left: 50%; top: 46%;
   z-index: 2;
-  width: 44px;
-  height: 28px;
+  width: 40px;
+  height: 26px;
   overflow: visible;
   stroke-linecap: round;
+  stroke-linejoin: round;
   transform: translate(-50%, -50%) rotate(90deg);
-  filter: drop-shadow(0 1px .5px rgba(40, 25, 10, .35));
+  filter: drop-shadow(0 .8px .5px rgba(60, 20, 15, .35));
 }
 /* At rest on the bottom of the jar, lying almost flat, in front of the sky. */
 .note-roll.is-resting {

@@ -37,14 +37,15 @@ export function foldStage(href, size, state) {
   const el = document.createElement('div');
   el.className = 'fold-stage';
   el.style.height = `${jarTop + jh}px`;
-  const photo = `background-image:url('${href}')`;
+  // As a variable, so the paper back (.is-paper) can replace it from CSS.
+  const photo = `--photo:url('${href}')`;
   const card = (cls, inner) => `<div class="fold-card ${cls}" style="width:${s}px;height:${s}px;left:calc(50% - ${s / 2}px)">${inner}</div>`;
   el.innerHTML = `
     <div class="fold-jar" style="top:${jarTop}px;width:${jw}px">${jarSvg({ href })}</div>
     ${[1, 2, 3].map((i) => card(`fold-ghost fold-ghost-${i}`, '<div class="fold-piece"></div>')).join('')}
     ${card('fold-main', `
       <div class="fold-piece fold-base" style="${photo}"></div>
-      <div class="fold-piece fold-f1" style="${photo}"></div>
+      <div class="fold-piece fold-f1" style="${photo}"><i class="fold-sheen"></i></div>
       <div class="fold-piece fold-f2"></div>
       <div class="fold-piece fold-f3"></div>`)}`;
 
@@ -73,6 +74,10 @@ export function foldStage(href, size, state) {
     : node.animate(frames, { fill: 'forwards', ...opts }).finished.catch(() => {}));
   const skip = () => { skipped = true; el.getAnimations({ subtree: true }).forEach((a) => a.finish()); };
   const asPaper = (node, on) => node.classList.toggle('is-paper', on);
+  // Light on the paper: a flap darkens as it tips away and brightens as it lands; a sheen crosses the print as it turns.
+  const shade = (node, levels, duration) => !skipped && node.animate(levels.map((b) => ({ filter: `brightness(${b})` })), { duration });
+  const tipAway = [1, 0.78, 1.05, 1];
+  const sheen = (from, to, duration) => !skipped && f1.firstElementChild.animate([{ backgroundPosition: `${from} 0` }, { backgroundPosition: `${to} 0` }], { duration });
 
   /** 'open' = photo out, jar empty; 'filled' = photo in the jar, lid still off; 'kept' = lid on. */
   const show = (st) => {
@@ -138,19 +143,24 @@ export function foldStage(href, size, state) {
     if (reduceMotion()) return show(withLid ? 'kept' : 'filled');
     // Fold 1: top-right half over the diagonal; its back is paper.
     base.style.clipPath = SQUARE;
+    shade(f1, [1, 0.72], 140);
+    sheen('100%', '0%', 140);
     await run(f1, [{ transform: 'rotate3d(1,1,0,0deg)' }, { transform: 'rotate3d(1,1,0,90deg)' }], { duration: 140, easing: 'cubic-bezier(.6,0,1,1)' });
     asPaper(f1, true);
+    shade(f1, [0.8, 1.04, 1], 140);
     await run(f1, [{ transform: 'rotate3d(1,1,0,90deg)' }, { transform: 'rotate3d(1,1,0,180deg)' }], { duration: 140, easing: 'cubic-bezier(0,0,.4,1)' });
     // Fold 2: the triangle in half.
     asPaper(base, true);
     f1.hidden = true;
     base.style.clipPath = HALF;
     f2.hidden = false;
+    shade(f2, tipAway, 220);
     await run(f2, [{ transform: 'rotate3d(1,-1,0,0deg)' }, { transform: 'rotate3d(1,-1,0,-180deg)' }], { duration: 220, easing: EASE });
     // Fold 3: and in half again.
     f2.hidden = true;
     base.style.clipPath = QUARTER;
     f3.hidden = false;
+    shade(f3, tipAway, 200);
     await run(f3, [{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(180deg)' }], { duration: 200, easing: EASE });
     // Flip into the jar with a short light trail.
     const flight = [{ transform: 'none' }, { transform: midAir, offset: 0.45 }, { transform: inJar }];
@@ -190,18 +200,23 @@ export function foldStage(href, size, state) {
     whoosh(true);
     trail(flight, 400);
     await run(main, flight.map((f, i) => ({ ...f, opacity: i === 0 ? 0 : 1 })), { duration: 400, easing: 'cubic-bezier(.2,.6,.3,1)' });
+    shade(f3, tipAway, 180);
     await run(f3, [{ transform: 'rotateX(180deg)' }, { transform: 'rotateX(0deg)' }], { duration: 180, easing: EASE });
     f3.hidden = true;
     base.style.clipPath = HALF;
     f2.hidden = false;
+    shade(f2, tipAway, 200);
     await run(f2, [{ transform: 'rotate3d(1,-1,0,-180deg)' }, { transform: 'rotate3d(1,-1,0,0deg)' }], { duration: 200, easing: EASE });
     f2.hidden = true;
     base.style.clipPath = SQUARE;
     f1.hidden = false;
     asPaper(f1, true);
+    shade(f1, [1, 1.04, 0.8], 130);
     await run(f1, [{ transform: 'rotate3d(1,1,0,180deg)' }, { transform: 'rotate3d(1,1,0,90deg)' }], { duration: 130, easing: 'cubic-bezier(.6,0,1,1)' });
     asPaper(f1, false);
     asPaper(base, false);
+    shade(f1, [0.72, 1], 130);
+    sheen('0%', '100%', 130);
     await run(f1, [{ transform: 'rotate3d(1,1,0,90deg)' }, { transform: 'rotate3d(1,1,0,0deg)' }], { duration: 130, easing: 'cubic-bezier(0,0,.4,1)' });
     show('open');
   }
@@ -209,14 +224,13 @@ export function foldStage(href, size, state) {
   return { el, card: main, foldIn, foldOut, lidOn, skip, isSkipped: () => skipped };
 }
 
-// Twine tied in a bow: dark edge, mid tone, and a dashed light twist on top; frayed ends and a wrapped knot.
-const TWINE = 'M22 12C16 2 3 3 4.5 10.5 6 16.5 16 15 22 12ZM22 12C27.5 4 39 5 38 11.5 37 16 28 15 22 12ZM22 12C19 17 15.5 21.5 10 26.5M22 12C25 17 27.5 21 32.5 25';
-const BOW = `<svg class="bow" viewBox="0 0 44 28" aria-hidden="true">
-  <path d="${TWINE}" stroke="#5e4327" stroke-width="2.8"/><path d="${TWINE}" stroke="#a07c4c" stroke-width="1.9"/>
-  <path d="${TWINE}" stroke="#d6bb8e" stroke-width="1.2" stroke-dasharray=".7 1.6"/>
-  <path d="M10 26.5 8.3 27.6M10 26.5 9.4 28.2M32.5 25 34.3 25.8M32.5 25 33.2 26.9" stroke="#a07c4c" stroke-width=".7"/>
-  <ellipse cx="22" cy="12" rx="2.3" ry="2.8" fill="#8a6a43" stroke="#5e4327" stroke-width=".8"/>
-  <path d="M21.2 9.8C22.6 11 22.6 13 21.2 14.2" stroke="#d6bb8e" stroke-width=".6"/></svg>`;
+// A small bow of fine red thread: a dark edge, the red, a broken highlight, long thin tails and a tiny knot.
+const THREAD = 'M20 12C15 4.5 5 4.5 6 10.5 7 15.5 15 14.5 20 12ZM20 12C24.5 5.5 34 6 33.5 11 33 15.5 25.5 14.5 20 12Z'
+  + 'M20 12C18 17 15 21 10.5 25.5M20 12C22.5 16.5 25 20.5 29.5 24.5';
+const BOW = `<svg class="bow" viewBox="0 0 40 26" aria-hidden="true">
+  <path d="${THREAD}" stroke="#7f1714" stroke-width="1.4"/><path d="${THREAD}" stroke="#b3261e" stroke-width=".9"/>
+  <path d="${THREAD}" stroke="#e2584c" stroke-width=".32" stroke-dasharray="2 3"/>
+  <circle cx="20" cy="12" r="1.8" fill="#b3261e" stroke="#7f1714" stroke-width=".5"/></svg>`;
 
 /** The rolled note lying on the bottom of a jar, tied with its bow. */
 export function noteScroll(paper) {
