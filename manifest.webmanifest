@@ -1,0 +1,12 @@
+{
+  "name": "Kepfa · เก็บฟ้า",
+  "short_name": "Kepfa",
+  "description": "เก็บฟ้าใส่โหล",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#c8d2f3",
+  "theme_color": "#c8d2f3",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

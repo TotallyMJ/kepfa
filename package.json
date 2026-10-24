@@ -1,0 +1,9 @@
+{
+  "name": "kepfa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "เก็บฟ้าใส่โหล — ถ่ายฟ้าแล้วสีของฟ้ากลายเป็นชั้นสีในโหล",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
