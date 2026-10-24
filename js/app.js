@@ -5,7 +5,7 @@ import { foldStage } from './fold.js';
 import { sunTimes } from './sun.js';
 import { makeStory, shareImage, saveImage } from './story.js';
 import { chime } from './sound.js';
-import { t, fmt, MONTHS, MONTHS_SHORT, DARES, QUOTES } from './strings.js';
+import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, QUOTES, CHALLENGE_SIZE } from './strings.js';
 
 const ICON = {
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>',
@@ -17,7 +17,7 @@ const view = $('#view');
 const cap = $('#capture');
 
 const BANGKOK = { lat: 13.7563, lon: 100.5018 };
-const state = { skies: [], year: new Date().getFullYear(), redraw: null, lastRoute: '', viaPrompt: false };
+const state = { skies: [], year: new Date().getFullYear(), redraw: null, lastRoute: '', viaPrompt: false, unfolded: false, detail: null };
 
 // ---------- helpers ----------
 
@@ -64,15 +64,23 @@ function toLocalInput(ms) {
 const isDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, { action = '', onAction = null, ms = 2200 } = {}) {
   const el = $('#toast');
   el.textContent = msg;
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'toast-action';
+    b.textContent = action;
+    b.addEventListener('click', () => { el.hidden = true; onAction?.(); }, { once: true });
+    el.append(b);
+  }
   el.hidden = false;
   el.style.animation = 'none';
   void el.offsetWidth;
   el.style.animation = '';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+  toastTimer = setTimeout(() => { el.hidden = true; }, ms);
 }
 
 /** Handwriting suits short English lines; Thai stays in the regular face at its regular size. */
@@ -131,11 +139,32 @@ function askLocation() {
   }, () => toast(t.locationDenied), { maximumAge: 864e5, timeout: 10000 });
 }
 
-/** Today's dare: the same for everyone, changes at local midnight. */
-function todayDare(d = new Date()) {
-  const day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
-  return { key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, text: DARES[day % DARES.length] };
+/** Today's prompt: the same for everyone, changes at local midnight. */
+function todayPrompt(d = new Date()) {
+  return promptFor(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`);
 }
+function promptFor(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const day = Math.floor(Date.UTC(y, m - 1, d) / 864e5);
+  return { key, text: PROMPTS[day % PROMPTS.length], tag: fmt.dayTag(key) };
+}
+const tagUrl = (tag) => `https://www.instagram.com/explore/tags/${tag.toLowerCase()}/`;
+
+/** The 30-sky challenge: one per prompt day, counted in rounds of 30. */
+function challengeProgress() {
+  const n = new Set(state.skies.filter((s) => s.prompt && !s.sample).map((s) => s.prompt)).size;
+  return { filled: n ? ((n - 1) % CHALLENGE_SIZE) + 1 : 0, round: Math.max(1, Math.ceil(n / CHALLENGE_SIZE)) };
+}
+
+/** What a challenge share carries: the prompt as it was kept, its day and its hashtag. */
+function challengeFor(sky) {
+  if (!sky.prompt) return null;
+  const p = promptFor(sky.prompt);
+  return { text: sky.promptText || p.text, day: fmt.dayLong(sky.prompt), tag: p.tag, kept: challengeProgress().filled };
+}
+
+/** A strip of masking tape; where it sits and how it tilts lives in CSS. */
+const tape = (where) => `<span class="tape ${where}" aria-hidden="true"></span>`;
 
 function onThisDay() {
   const now = new Date();
@@ -201,8 +230,8 @@ function shelfRowsHtml(list) {
 
 function renderShelf() {
   const now = new Date();
-  const dare = todayDare(now);
-  const taken = state.skies.filter((s) => s.prompt === dare.key).length;
+  const prompt = todayPrompt(now);
+  const { filled, round } = challengeProgress();
   const memory = onThisDay();
   const groups = [];
   for (const s of state.skies.slice().reverse()) {
@@ -221,10 +250,21 @@ function renderShelf() {
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
       <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${savedPlace() ? t.herePlace : t.defaultPlace}</button></div>` : ''}
     ${bannerHtml()}
-    <section class="dare">
-      <div class="dare-head"><span class="eyebrow">${t.skyDare}</span><span class="dare-when">${t.newDare}</span></div>
-      <h2 class="dare-text hand">${dare.text}</h2>
-      <div class="dare-foot"><span>${t.takenToday(taken)}</span><button type="button" class="btn-text" id="takeDare">${t.takeDare}</button></div>
+    <section class="prompt">
+      ${tape('tape-top')}
+      <div class="slip torn">
+        <div class="prompt-head"><span class="eyebrow">${t.lookFor}</span><span class="prompt-day">${fmt.dayShort(prompt.key)}</span></div>
+        <h2 class="prompt-text">${prompt.text}</h2>
+        <p class="prompt-line">${t.sameSky}</p>
+        <div class="prompt-foot">
+          <a class="btn-text" href="${tagUrl(prompt.tag)}" target="_blank" rel="noopener">${t.seeTag(prompt.tag)}</a>
+          <button type="button" class="btn primary" id="lookUp">${t.lookUp}</button>
+        </div>
+        <div class="prompt-progress">
+          <div class="prompt-head"><span class="eyebrow">${t.challenge(round)}</span><span class="prompt-day">${filled} / ${CHALLENGE_SIZE}</span></div>
+          <div class="dots" role="img" aria-label="${filled} of ${CHALLENGE_SIZE}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ' class="on"' : ''}></i>`).join('')}</div>
+        </div>
+      </div>
     </section>
     ${memory ? `<section class="memory-block">
       <p class="eyebrow">${memory.label}</p>
@@ -243,7 +283,7 @@ function renderShelf() {
   bindJarSlots(view);
   $('#clearSamples')?.addEventListener('click', clearSamples);
   $('#setPlace')?.addEventListener('click', askLocation);
-  $('#takeDare').addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
+  $('#lookUp').addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
   state.redraw = null;
 }
 
@@ -489,8 +529,7 @@ async function review(blob, takenAt) {
     return;
   }
   draft.url = URL.createObjectURL(draft.photo);
-  const dare = todayDare();
-  const placeholder = t.notePrompts[Math.floor(Math.random() * t.notePrompts.length)];
+  const prompt = todayPrompt();
 
   el.innerHTML = `
     <div class="review-inner">
@@ -499,20 +538,11 @@ async function review(blob, takenAt) {
         <span class="eyebrow">${t.newSky}</span>
       </div>
       <div id="foldSlot"></div>
-      <div><p class="field-label">${t.colors}</p><div class="palette">${paletteHtml(draft.palette)}</div></div>
-      <div>
-        <label class="field-label" for="noteInput">${t.note} <span>${t.optional}</span></label>
-        <input id="noteInput" class="field note hand" maxlength="80" placeholder="${placeholder}" autocomplete="off">
-      </div>
-      <div>
-        <label class="field-label" for="placeInput">${t.place} <span>${t.optional}</span></label>
-        <input id="placeInput" class="field" maxlength="24" placeholder="${t.placeHint}" autocomplete="off">
-      </div>
-      <label class="switch"><span>${t.countForDare}</span><input type="checkbox" id="forPrompt" ${state.viaPrompt ? 'checked' : ''}></label>
-      <div>
-        <label class="field-label" for="whenInput">${t.taken}</label>
-        <input id="whenInput" class="field mono" type="datetime-local" value="${toLocalInput(takenAt)}" max="${toLocalInput(Date.now())}">
-      </div>
+      ${skyFields({ takenAt })}
+      <label class="tick-row">
+        <input type="checkbox" id="forPrompt" ${state.viaPrompt ? 'checked' : ''}>
+        <span><span class="eyebrow">${t.keptForToday}</span><span class="tick-prompt">${prompt.text}</span></span>
+      </label>
       <div class="review-actions">
         <button type="button" class="btn" id="retake">${t.retake}</button>
         <button type="button" class="btn primary" id="keepIt">${t.keep}</button>
@@ -522,15 +552,39 @@ async function review(blob, takenAt) {
   const stage = foldStage(draft.url, Math.min(150, innerWidth * 0.4), 'open');
   $('#foldSlot').append(stage.el);
   draft.stage = stage;
-  draft.promptKey = dare.key;
+  draft.prompt = prompt;
 
-  $('#noteInput').addEventListener('input', (e) => { e.target.className = `field note ${handClass(e.target.value)}`; });
-  $('#whenInput').addEventListener('change', (e) => {
-    const ms = new Date(e.target.value).getTime();
-    if (Number.isFinite(ms)) draft.takenAt = Math.min(ms, Date.now());
-  });
+  bindSkyFields(el, (ms) => { draft.takenAt = ms; });
   $('#retake').addEventListener('click', () => { URL.revokeObjectURL(draft.url); draft = null; openCapture(); });
   $('#keepIt').addEventListener('click', saveDraft);
+}
+
+/** Note, place and time: the same fields when keeping a sky and when editing one. */
+function skyFields({ note = '', place = '', takenAt }) {
+  const placeholder = t.notePrompts[Math.floor(Math.random() * t.notePrompts.length)];
+  return `
+    <div>
+      <label class="field-label" for="noteInput">${t.note}</label>
+      <input id="noteInput" class="field note ${handClass(note)}" maxlength="80" value="${esc(note)}" placeholder="${placeholder}" autocomplete="off">
+    </div>
+    <div class="field-row">
+      <div class="field-place">
+        <label class="field-label" for="placeInput">${t.place}</label>
+        <input id="placeInput" class="field" maxlength="24" value="${esc(place)}" placeholder="${t.placeHint}" autocomplete="off">
+      </div>
+      <div class="field-when">
+        <label class="field-label" for="whenInput">${t.taken}</label>
+        <input id="whenInput" class="field mono" type="datetime-local" value="${toLocalInput(takenAt)}" max="${toLocalInput(Date.now())}">
+      </div>
+    </div>`;
+}
+
+function bindSkyFields(root, onWhen) {
+  $('#noteInput', root).addEventListener('input', (e) => { e.target.className = `field note ${handClass(e.target.value)}`; });
+  $('#whenInput', root).addEventListener('change', (e) => {
+    const ms = new Date(e.target.value).getTime();
+    if (Number.isFinite(ms)) onWhen(Math.min(ms, Date.now()));
+  });
 }
 
 async function saveDraft() {
@@ -541,7 +595,8 @@ async function saveDraft() {
     takenAt: draft.takenAt,
     note: $('#noteInput').value.trim(),
     place: $('#placeInput').value.trim(),
-    prompt: $('#forPrompt').checked ? draft.promptKey : '',
+    prompt: $('#forPrompt').checked ? draft.prompt.key : '',
+    promptText: $('#forPrompt').checked ? draft.prompt.text : '',
     palette: draft.palette,
     photo: draft.photo,
     thumb: draft.thumb,
@@ -587,62 +642,179 @@ function showKept(sky) {
 
 // ---------- detail sheet ----------
 
-function openDetail(sky) {
+/** @param from  1 or -1 when arriving by swipe, so the new sky slides in from that side */
+function openDetail(sky, { from = 0 } = {}) {
   if (!sky) return;
   const wrap = $('#sheet');
   const art = wrap.querySelector('.sheet');
+  const meta = `<p class="detail-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.long(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>`;
   art.innerHTML = `
     <div class="grabber"></div>
     <div id="detailStage" role="img" aria-label="${t.openSky(fmt.long(sky.takenAt))}"></div>
-    ${sky.note ? `<p class="detail-note ${handClass(sky.note)}">${esc(sky.note)}</p>` : ''}
-    <p class="detail-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.long(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>
+    ${sky.note ? `<div class="slip note detail-slip"><p class="detail-note ${handClass(sky.note)}">${esc(sky.note)}</p>${meta}</div>` : meta}
     <div class="palette">${paletteHtml(sky.palette)}</div>
     <div class="sheet-actions even">
       <button type="button" class="btn" id="putBack" disabled>${t.putBack}</button>
       <button type="button" class="btn primary" id="shareOne">${t.shareStory}</button>
     </div>
-    <div class="sheet-delete"><button type="button" class="btn-text danger" id="askDelete">${t.deleteSky}</button></div>
-    <div id="confirmBox"></div>`;
+    <div class="sheet-more">
+      <button type="button" class="btn-text" id="editSky">${t.edit}</button>
+      <button type="button" class="btn-text danger" id="deleteSky">${t.deleteSky}</button>
+    </div>`;
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
+  art.scrollTop = 0;
+  state.detail = sky;
+  if (from) art.animate([{ transform: `translateX(${from * 40}px)`, opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 220, easing: 'cubic-bezier(.2,.8,.3,1)' });
 
-  const stage = foldStage(photoUrl(sky, 'photo'), Math.min(160, innerWidth * 0.42), 'kept');
+  const size = Math.round(Math.min(160, innerWidth * 0.42));
+  const stage = foldStage(photoUrl(sky, 'photo'), size, 'kept');
+  // Two strips of tape pin the photo once it's out of the jar.
+  const pins = document.createElement('div');
+  pins.className = 'photo-tapes';
+  pins.style.cssText = `width:${size}px;height:${size}px;left:calc(50% - ${size / 2}px)`;
+  pins.innerHTML = tape('tape-tl') + tape('tape-br');
+  stage.el.append(pins);
   $('#detailStage').append(stage.el);
+  // A tap skips the animation. The full unfold plays once per visit; after that a short one.
+  stage.el.addEventListener('click', stage.skip);
+  const quick = state.unfolded;
+  state.unfolded = true;
+  const putBack = $('#putBack');
   // Put it back only once the photo is fully out, so the two animations never overlap.
   requestAnimationFrame(async () => {
-    await stage.foldOut();
-    const btn = $('#putBack');
-    if (btn) btn.disabled = false;
+    await stage.foldOut({ quick });
+    pins.classList.add('is-on');
+    putBack.disabled = false;
   });
-  $('#putBack').addEventListener('click', async (e) => {
-    e.currentTarget.disabled = true;
+  putBack.addEventListener('click', async () => {
+    putBack.disabled = true;
     $('#shareOne').disabled = true;
+    pins.classList.remove('is-on');
     await stage.foldIn();
     navigator.vibrate?.(18);
     closeSheet();
   });
 
   $('#shareOne').addEventListener('click', () => openStory('single', { sky }));
-  $('#askDelete').addEventListener('click', () => {
-    $('#confirmBox').innerHTML = `<div class="confirm">
-      <p>${t.deleteConfirm}</p>
-      <div class="actions"><button type="button" class="btn" id="noDelete">${t.keepIt}</button>
-      <button type="button" class="btn danger" id="yesDelete">${t.deleteSky}</button></div></div>`;
-    $('#noDelete').addEventListener('click', () => { $('#confirmBox').innerHTML = ''; });
-    $('#yesDelete').addEventListener('click', async () => {
-      await store.remove(sky.id);
-      state.skies = state.skies.filter((s) => s.id !== sky.id);
-      closeSheet();
-      forgetUrls(sky.id);
+  $('#editSky').addEventListener('click', () => openEdit(sky));
+  $('#deleteSky').addEventListener('click', () => deleteSky(sky));
+}
+
+/** Swipe between skies in the order they were taken. dir 1 = older (swipe left), -1 = newer. */
+function stepDetail(dir) {
+  const i = state.skies.findIndex((s) => s.id === state.detail?.id);
+  const next = i < 0 ? null : state.skies[i - dir];
+  if (next) openDetail(next, { from: dir });
+  else $('#sheet .sheet').animate([{ transform: 'none' }, { transform: `translateX(${-dir * 14}px)` }, { transform: 'none' }], { duration: 240 });
+}
+
+function openEdit(sky) {
+  state.detail = null;
+  const art = $('#sheet .sheet');
+  let takenAt = sky.takenAt;
+  art.innerHTML = `
+    <div class="grabber"></div>
+    <div class="page-head">
+      <button type="button" class="eyebrow back" id="cancelEdit">${t.cancel}</button>
+      <span class="eyebrow">${t.editTitle}</span>
+    </div>
+    <div class="edit-fields">${skyFields(sky)}</div>
+    <div class="sheet-actions"><button type="button" class="btn primary" id="saveEdit">${t.save}</button></div>`;
+  art.scrollTop = 0;
+  bindSkyFields(art, (ms) => { takenAt = ms; });
+  $('#cancelEdit').addEventListener('click', () => openDetail(sky));
+  $('#saveEdit').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const next = { ...sky, note: $('#noteInput').value.trim(), place: $('#placeInput').value.trim(), takenAt };
+    try {
+      await store.put(next);
+    } catch {
+      btn.disabled = false;
+      toast(t.saveFailed);
+      return;
+    }
+    Object.assign(sky, next);
+    sortSkies();
+    render();
+    openDetail(sky);
+  });
+}
+
+/** Deleted at once; the toast offers a few seconds to bring it back. */
+async function deleteSky(sky) {
+  try {
+    await store.remove(sky.id);
+  } catch {
+    toast(t.saveFailed);
+    return;
+  }
+  state.skies = state.skies.filter((s) => s.id !== sky.id);
+  closeSheet();
+  forgetUrls(sky.id);
+  render();
+  toast(t.deleted, {
+    action: t.undo,
+    ms: 4000,
+    onAction: async () => {
+      await store.put(sky);
+      state.skies.push(sky);
+      sortSkies();
       render();
-      toast(t.deleted);
-    });
+    },
   });
 }
 
 function closeSheet() {
   $('#sheet').hidden = true;
+  $('#sheet .sheet').style.transform = '';
+  state.detail = null;
   if (cap.hidden && $('#storyModal').hidden) document.body.style.overflow = '';
+}
+
+/** Drag the sheet down to close it (from the top of its scroll), or sideways to the next sky. */
+function bindSheetGestures() {
+  const art = $('#sheet .sheet');
+  let x0 = 0, y0 = 0, dx = 0, dy = 0, axis = '', active = false;
+  const settle = () => {
+    if (art.style.transform) art.animate([{ transform: art.style.transform }, { transform: 'none' }], { duration: 180, easing: 'ease-out' });
+    art.style.transform = '';
+  };
+  art.addEventListener('touchstart', (e) => {
+    active = e.touches.length === 1 && !e.target.closest('input');
+    if (!active) return;
+    axis = '';
+    dx = dy = 0;
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+  }, { passive: true });
+  art.addEventListener('touchmove', (e) => {
+    if (!active) return;
+    dx = e.touches[0].clientX - x0;
+    dy = e.touches[0].clientY - y0;
+    if (!axis && Math.hypot(dx, dy) > 10) {
+      if (Math.abs(dx) > Math.abs(dy)) axis = state.detail ? 'x' : 'none';
+      else axis = dy > 0 && art.scrollTop <= 0 ? 'y' : 'none';
+    }
+    if (axis === 'y') { e.preventDefault(); art.style.transform = `translateY(${Math.max(0, dy)}px)`; }
+    else if (axis === 'x') { e.preventDefault(); art.style.transform = `translateX(${dx * 0.35}px)`; }
+  }, { passive: false });
+  art.addEventListener('touchend', async () => {
+    if (!active) return;
+    active = false;
+    if (axis === 'y' && dy > 110) {
+      await art.animate([{ transform: art.style.transform }, { transform: 'translateY(100%)' }], { duration: 180, easing: 'ease-in', fill: 'forwards' }).finished;
+      closeSheet();
+      art.getAnimations().forEach((a) => a.cancel());
+    } else if (axis === 'x' && Math.abs(dx) > 60) {
+      art.style.transform = '';
+      stepDetail(dx < 0 ? 1 : -1);
+    } else {
+      settle();
+    }
+  });
+  art.addEventListener('touchcancel', () => { active = false; settle(); });
 }
 
 // ---------- story export ----------
@@ -654,12 +826,14 @@ async function openStory(kind, payload) {
   const art = wrap.querySelector('.sheet');
   const title = kind === 'single' ? t.shareTitle.single : kind === 'jar' ? t.shareTitle.jar(MONTHS[payload.month]) : t.shareTitle.year(payload.year);
   const canShowPlace = kind === 'single' && payload.sky.place;
+  const challenge = kind === 'single' ? challengeFor(payload.sky) : null;
   art.innerHTML = `
     <div class="grabber"></div>
     <h2>${title}</h2>
     <div class="story-preview" id="storyPreview"><div class="spinner"></div></div>
     ${canShowPlace ? `<label class="switch"><span>${t.showPlace}</span><input type="checkbox" id="showPlace"></label>
       <p class="hint left">${t.showPlaceHint}</p>` : ''}
+    ${challenge ? `<p class="hint left">${t.captionHint}</p>` : ''}
     <p class="hint left">${t.storyTip}</p>
     <div class="sheet-actions">
       <button type="button" class="btn" id="saveStory" disabled>${t.saveImage}</button>
@@ -678,7 +852,7 @@ async function openStory(kind, payload) {
     $('#shareStory').disabled = true;
     let out;
     try {
-      out = await makeStory(kind, { ...payload, showPlace, quote });
+      out = await makeStory(kind, { ...payload, showPlace, quote, challenge });
     } catch {
       $('#storyPreview').innerHTML = `<p class="hint">${t.storyFailed}</p>`;
       return;
@@ -692,9 +866,20 @@ async function openStory(kind, payload) {
     $('#shareStory').disabled = false;
   };
 
-  $('#saveStory').addEventListener('click', () => { saveImage(blob, filename); toast(t.saved); });
+  // Challenge skies carry a ready caption. Copying starts in the same tap as sharing, since both need the gesture.
+  const copyCaption = () => (challenge && navigator.clipboard
+    ? navigator.clipboard.writeText(t.caption(challenge)).then(() => true, () => false)
+    : Promise.resolve(false));
+  $('#saveStory').addEventListener('click', async () => {
+    const copying = copyCaption();
+    saveImage(blob, filename);
+    toast((await copying) ? t.captionCopied : t.saved);
+  });
   $('#shareStory').addEventListener('click', async () => {
-    if ((await shareImage(blob, filename)) === 'saved') toast(t.sharedFallback);
+    const copying = copyCaption();
+    const how = await shareImage(blob, filename);
+    if (how === 'saved') toast(t.sharedFallback);
+    else if (await copying) toast(t.captionCopied);
   });
   // Place stays off every time the sheet opens, so it never leaves the phone by accident.
   $('#showPlace')?.addEventListener('change', (e) => make(e.target.checked));
@@ -793,7 +978,12 @@ function bindGlobal() {
     }
   });
 
+  bindSheetGestures();
   document.addEventListener('keydown', (e) => {
+    if (state.detail && $('#storyModal').hidden && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      stepDetail(e.key === 'ArrowRight' ? 1 : -1);
+      return;
+    }
     if (e.key !== 'Escape') return;
     if (!$('#storyModal').hidden) closeStory();
     else if (!$('#sheet').hidden) closeSheet();

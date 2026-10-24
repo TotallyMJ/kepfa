@@ -3,7 +3,7 @@
 
 import { drawJar, jarPoint, JAR_RATIO } from './jar.js';
 import { dominant, loadImage } from './sky.js';
-import { t, fmt, MONTHS, MONTHS_SHORT } from './strings.js';
+import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG } from './strings.js';
 
 const isThai = (s) => /[฀-๿]/.test(s);
 
@@ -81,11 +81,6 @@ function footer(ctx) {
   text(ctx, t.footer, W / 2, 1840, { font: `28px ${SANS}`, color: SOFT });
 }
 
-function rule(ctx, y, half = 140) {
-  ctx.fillStyle = RULE;
-  ctx.fillRect(W / 2 - half, y, half * 2, 2);
-}
-
 function wrap(ctx, str, maxW, maxLines) {
   // Wrap by words, falling back to characters for scripts without spaces (Thai).
   const tokens = str.includes(' ') ? str.split(/(\s+)/) : Array.from(str);
@@ -137,6 +132,69 @@ function tag(ctx, nx, ny, label) {
   ctx.restore();
 }
 
+// Real paper and tape (photos cut out of their backgrounds). A missing file falls back to a flat card.
+const textures = {};
+function texture(name) {
+  textures[name] ||= new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = `assets/${name}.webp`;
+  });
+  return textures[name];
+}
+
+// Edges in the source photo [top, right, bottom, left] and how thick they draw. The torn edge is the tall bottom band.
+const SLIPS = {
+  torn: { src: [12, 12, 84, 12], dst: [8, 8, 57, 8] },
+  note: { src: [12, 12, 12, 12], dst: [8, 8, 8, 8] },
+};
+
+/** The paper stretched to w×h without bending its edges: corners stay, sides and middle stretch. */
+function stretchPaper(img, w, h, { src, dst }) {
+  const c = document.createElement('canvas');
+  c.width = Math.round(w);
+  c.height = Math.round(h);
+  const ctx = c.getContext('2d');
+  const sw = img.naturalWidth, sh = img.naturalHeight;
+  const sx = [0, src[3], sw - src[1], sw], sy = [0, src[0], sh - src[2], sh];
+  const dx = [0, dst[3], c.width - dst[1], c.width], dy = [0, dst[0], c.height - dst[2], c.height];
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      // Half a pixel of overlap so no hairline shows between pieces.
+      ctx.drawImage(img, sx[i], sy[j], sx[i + 1] - sx[i], sy[j + 1] - sy[j],
+        dx[i], dy[j], dx[i + 1] - dx[i] + (i < 2 ? 0.5 : 0), dy[j + 1] - dy[j] + (j < 2 ? 0.5 : 0));
+    }
+  }
+  return c;
+}
+
+/** A slip of paper w×h, top-centre at cx,y, tilted; `inside` draws on it with 0,0 at its top-left. */
+function slip(ctx, img, kind, cx, y, w, h, tilt, inside) {
+  ctx.save();
+  ctx.translate(cx, y + h / 2);
+  ctx.rotate((tilt * Math.PI) / 180);
+  ctx.translate(-w / 2, -h / 2);
+  ctx.shadowColor = 'rgba(30, 28, 25, .16)';
+  ctx.shadowBlur = 26;
+  ctx.shadowOffsetY = 10;
+  if (img) ctx.drawImage(stretchPaper(img, w, h, SLIPS[kind]), 0, 0);
+  else { ctx.fillStyle = TAG; ctx.fillRect(0, 0, w, h); }
+  ctx.shadowColor = 'transparent';
+  inside();
+  ctx.restore();
+}
+
+function tapeStrip(ctx, img, cx, cy, w, tilt) {
+  if (!img) return;
+  const h = (w * img.naturalHeight) / img.naturalWidth;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate((tilt * Math.PI) / 180);
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
 function swatches(ctx, palette, y) {
   const sw = palette.slice(0, 5);
   const size = 72, gap = 22;
@@ -149,11 +207,14 @@ function swatches(ctx, palette, y) {
   }
 }
 
-async function storySingle(sky, showPlace, quote) {
+/** @param challenge  {text, day, tag} when the sky was kept for that day's prompt */
+async function storySingle(sky, showPlace, quote, challenge) {
   const [c, ctx] = page();
   const top = masthead(ctx, quote);
+  const [paperImg, noteImg, tapeImg] = await Promise.all(['paper', 'note', 'tape'].map(texture));
 
-  const bw = 580, bh = Math.round(580 * JAR_RATIO), bx = (W - bw) / 2, by = top + 50;
+  // A challenge sky makes room for the prompt slip and hashtags; the palette steps aside.
+  const bw = challenge ? 430 : 540, bh = Math.round(bw * JAR_RATIO), bx = (W - bw) / 2, by = top + 50;
   const { img, release } = await loadImage(sky.photo);
   drawJar(ctx, { x: bx, y: by, w: bw, image: img });
   release();
@@ -162,18 +223,40 @@ async function storySingle(sky, showPlace, quote) {
     tag(ctx, bx + nx, by + ny, sky.place);
   }
 
-  let y = by + bh + 110;
+  let y = by + bh + 60;
   if (sky.note) {
     // Handwriting for English; Thai keeps the regular face at a regular size.
-    const font = isThai(sky.note) ? `46px ${SANS}` : `68px ${HAND}`;
+    const thai = isThai(sky.note);
+    const font = thai ? `44px ${SANS}` : `66px ${HAND}`;
+    const lh = thai ? 62 : 68, pad = 30;
     ctx.font = font;
-    const lines = wrap(ctx, sky.note, W - 260, 2);
-    lines.forEach((ln, i) => text(ctx, ln, W / 2, y + i * 76, { font }));
-    y += lines.length * 76 - 26;
+    const lines = wrap(ctx, sky.note, W - 320, 3);
+    const w = Math.min(W - 180, Math.max(...lines.map((ln) => ctx.measureText(ln).width)) + 110);
+    const h = lines.length * lh + pad * 2;
+    slip(ctx, noteImg, 'note', W / 2, y, w, h, -2, () => {
+      lines.forEach((ln, i) => text(ctx, ln, w / 2, pad + lh * 0.74 + i * lh, { font }));
+    });
+    y += h + 26;
   }
-  rule(ctx, y);
-  text(ctx, fmt.stamp(sky.takenAt), W / 2, y + 70, { font: `40px ${MONO}`, color: SOFT });
-  swatches(ctx, sky.palette, y + 150);
+  text(ctx, fmt.stamp(sky.takenAt), W / 2, y + 36, { font: `36px ${MONO}`, color: SOFT });
+  y += 66;
+
+  if (challenge) {
+    const w = 820, lh = 56;
+    const font = `500 48px ${SERIF}`;
+    ctx.font = font;
+    const lines = wrap(ctx, challenge.text, w - 110, 2);
+    const h = 56 + lines.length * lh + 24 + SLIPS.torn.dst[2];
+    y += 34;
+    slip(ctx, paperImg, 'torn', W / 2, y, w, h, 1, () => {
+      text(ctx, `${t.lookFor} · ${challenge.day}`.toUpperCase(), w / 2, 56, { font: `22px ${SANS}`, color: SOFT, spacing: 4 });
+      lines.forEach((ln, i) => text(ctx, ln, w / 2, 56 + lh + i * lh, { font }));
+    });
+    tapeStrip(ctx, tapeImg, W / 2 - 24, y + 2, 230, 4);
+    text(ctx, `#${CHALLENGE_TAG} #${challenge.tag}`, W / 2, y + h + 64, { font: `32px ${MONO}` });
+  } else {
+    swatches(ctx, sky.palette, y + 40);
+  }
   footer(ctx);
   return toBlob(c);
 }
@@ -248,7 +331,7 @@ async function storyYear({ year, skies, quote }) {
 
 export async function makeStory(kind, payload) {
   await fontsReady();
-  if (kind === 'single') return storySingle(payload.sky, payload.showPlace, payload.quote);
+  if (kind === 'single') return storySingle(payload.sky, payload.showPlace, payload.quote, payload.challenge);
   if (kind === 'jar') return storyJar(payload);
   return storyYear(payload);
 }

@@ -15,22 +15,31 @@ export const fmt = {
   time: (d) => hm(d),
   duration: (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return `${Math.floor(m / 60)}:${pad2(m % 60)}`; },
   issueDate: (d) => `${MONTHS[d.getMonth()]} ${d.getFullYear()}`,
+  // Prompt days are keyed 'YYYY-MM-DD'.
+  dayShort: (key) => { const [, m, d] = key.split('-').map(Number); return `${d} ${MONTHS_SHORT[m - 1]}`; },
+  dayLong: (key) => { const [y, m, d] = key.split('-').map(Number); return `${d} ${MONTHS_SHORT[m - 1]} ${y}`; },
+  // One hashtag per day, written so people can read it: #Kepfa24Oct.
+  dayTag: (key) => { const [, m, d] = key.split('-').map(Number); return `Kepfa${d}${MONTHS_SHORT[m - 1]}`; },
 };
 
 const skies = (n) => (n === 1 ? 'sky' : 'skies');
 
-// One dare a day, the same for everyone; 30 lines so a month goes by before one comes back.
-export const DARES = [
-  'Catch the sky right after rain.', 'Find the sky from your window.', 'Keep the first sky you see today.',
-  'Look up on your way somewhere.', 'Take the sky over lunch.', 'Frame one with a bird in it.',
-  'Find the sky through the trees.', 'Keep the sky behind your home.', 'Catch the moon still out.',
-  'Find the bluest sky you can.', 'Keep the sky outside your favorite café.', 'Spot a cloud that looks like something.',
-  'Catch the very last light.', 'Find the sky reflected in something.', 'Keep a sky from somewhere new.',
-  'Look straight up. No buildings.', 'Share the sky with someone you love.', 'Find a grey sky worth keeping.',
-  'Catch the sky before a storm.', 'Keep the sky right after sunset.', 'Find the sky between two buildings.',
-  'Catch a plane crossing the sky.', 'Keep the sky at exactly noon.', 'Find the pinkest sky today.',
-  'Look up from the bus or train.', 'Keep a sky with no clouds at all.', 'Catch the sky through a window frame.',
-  'Find the sky over water.', 'Keep the sky that made you stop.', 'Catch the sky just before you sleep.',
+export const CHALLENGE_TAG = 'kepfachallenge';
+export const CHALLENGE_SIZE = 30;
+const SITE = 'totallymj.github.io/kepfa';
+
+// One prompt a day, the same for everyone. Each works in any weather; 30 so a month goes by before one comes back.
+export const PROMPTS = [
+  'The sky from your window.', 'The first sky you see today.', 'The sky on your way somewhere.',
+  'The sky over lunch.', 'The sky through the trees.', 'The sky above your home.',
+  'The sky between two buildings.', 'The sky straight above you.', 'The sky behind someone you love.',
+  'The sky from where you sit right now.', 'The sky just before you sleep.', 'The sky at exactly noon.',
+  'The sky reflected in something.', 'The sky over the street you know best.', 'The sky through a window frame.',
+  'The sky from somewhere you’ve never stood.', 'The sky with a wire or a pole in it.', 'The sky over water, any water.',
+  'The sky outside your favorite café.', 'The sky from the bus or train.', 'The sky that made you stop.',
+  'The sky behind a plant.', 'The sky from the lowest spot you can find.', 'The sky from the highest spot you can reach.',
+  'The sky as the lights come on.', 'The sky over your work or school.', 'The sky with your hand in it.',
+  'The color of the sky right now.', 'The sky someone else is looking at too.', 'The last sky of your day.',
 ];
 
 // Written for Kepfa; one is drawn at random per share, without repeats until all 30 are used.
@@ -66,11 +75,12 @@ export const t = {
   useLocation: 'Use my location for sun times',
   locationDenied: 'Location is off. Sun times stay set to Bangkok.',
 
-  skyDare: 'Sky dare · today',
-  newDare: 'new at midnight',
-  takenToday: (n) => `${n} taken today`,
-  takeDare: 'Take the dare',
-  countForDare: 'Count it for today’s dare',
+  lookFor: 'Today, look for',
+  sameSky: 'Wherever you are today, we’re all under the same sky.',
+  seeTag: (tag) => `See #${tag} ↗`,
+  lookUp: 'Look up',
+  challenge: (round) => (round > 1 ? `${CHALLENGE_SIZE} skies · round ${round}` : `${CHALLENGE_SIZE} skies`),
+  keptForToday: 'Kept for today',
   keepSky: 'Keep a sky',
   yearAgo: 'A year ago',
   monthAgo: 'A month ago',
@@ -105,12 +115,10 @@ export const t = {
 
   newSky: 'New sky',
   cancel: 'Cancel',
-  colors: 'Colors · tap to copy',
-  note: 'Note',
-  place: 'Place',
-  optional: 'optional',
-  taken: 'Taken',
-  notePrompts: ['Name this sky', 'What did it remind you of?', 'Where were you headed?', 'Who were you with?'],
+  note: 'Tell this sky something',
+  place: 'Where',
+  taken: 'When',
+  notePrompts: ['you made my whole day', 'thanks for waiting for me', 'same time tomorrow?', 'you look like peach soda', 'stay a little longer'],
   placeHint: 'Bangkok',
   retake: 'Retake',
   keep: 'Keep',
@@ -122,10 +130,12 @@ export const t = {
   seeShelf: 'See shelf',
 
   putBack: 'Put it back',
+  edit: 'Edit',
+  editTitle: 'Edit sky',
+  save: 'Save',
   deleteSky: 'Delete',
-  deleteConfirm: 'Delete this sky? This can’t be undone.',
-  keepIt: 'Keep it',
   deleted: 'Sky deleted',
+  undo: 'Undo',
   copied: (hex) => `Copied ${hex}`,
 
   shareTitle: { single: 'Share this sky', jar: (m) => `Share ${m}`, year: (y) => `Share ${y}` },
@@ -137,6 +147,10 @@ export const t = {
   saved: 'Image saved',
   sharedFallback: 'This device can’t share directly, so the image was saved.',
   storyFailed: 'Couldn’t make the image. Close this and try again.',
+  captionHint: 'A caption with the hashtags is copied for you. Paste it in your post.',
+  captionCopied: 'Caption copied. Paste it in your post.',
+  caption: ({ text, day, kept, tag }) =>
+    `${text}\n${day} · ${kept} of ${CHALLENGE_SIZE} skies kept.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #${tag}`,
 
   footer: 'kepfa · start your own collection',
   storyKept: (y, n) => `${y} · ${n} ${skies(n)} kept`,

@@ -53,7 +53,11 @@ export function foldStage(href, size, state) {
   const inJar = `translate(${s / 3}px, ${jarTop + jh * 0.3 - s / 3}px) rotate(200deg) rotateY(180deg) scale(.24)`;
   const midAir = `translate(${s / 3}px, ${jarTop * 0.4}px) rotate(80deg) rotateY(90deg) scale(.55)`;
 
-  const run = (node, frames, opts) => node.animate(frames, { fill: 'forwards', ...opts }).finished;
+  // Once skipped, every remaining step resolves at once and the sequence lands on its final state.
+  let skipped = false;
+  const run = (node, frames, opts) => (skipped ? Promise.resolve()
+    : node.animate(frames, { fill: 'forwards', ...opts }).finished.catch(() => {}));
+  const skip = () => { skipped = true; el.getAnimations({ subtree: true }).forEach((a) => a.finish()); };
   const asPaper = (node, on) => node.classList.toggle('is-paper', on);
 
   const show = (st) => {
@@ -75,21 +79,23 @@ export function foldStage(href, size, state) {
   };
   show(state);
 
-  const trail = (frames, duration) => ghosts.forEach((g, i) => {
+  const trail = (frames, duration) => !skipped && ghosts.forEach((g, i) => {
     g.animate(frames.map((f, k) => ({ ...f, opacity: k === 0 || k === frames.length - 1 ? 0 : 0.45 - i * 0.12 })),
       { duration, delay: (i + 1) * 35, easing: 'cubic-bezier(.45,0,.75,.5)' });
   });
   const energy = () => {
+    if (skipped) return;
     ripple.animate([{ opacity: 0.9, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(1.35, 1.8)' }], { duration: 420, easing: 'cubic-bezier(.2,.7,.3,1)' });
     glow.animate([{ opacity: 0 }, { opacity: 0.35, offset: 0.25 }, { opacity: 0 }], { duration: 420, easing: 'ease-out' });
   };
   // The lid is a photo, so a twist reads as a sweep of light across the brass and a small tilt.
   const twist = (dir) => {
-    shine.animate([{ opacity: 1, transform: `translateX(${dir > 0 ? 0 : shineTravel}px)` }, { opacity: 1, transform: `translateX(${dir > 0 ? shineTravel : 0}px)` }], { duration: 180 });
+    if (!skipped) shine.animate([{ opacity: 1, transform: `translateX(${dir > 0 ? 0 : shineTravel}px)` }, { opacity: 1, transform: `translateX(${dir > 0 ? shineTravel : 0}px)` }], { duration: 180 });
     return run(lid, [{ transform: 'rotate(0)' }, { transform: `rotate(${dir * 1.5}deg)`, offset: 0.6 }, { transform: 'rotate(0)' }], { duration: 180 });
   };
 
   async function foldIn() {
+    skipped = false;
     if (reduceMotion()) return show('kept');
     // Fold 1: top-right half over the diagonal; its back is paper.
     base.style.clipPath = SQUARE;
@@ -122,9 +128,21 @@ export function foldStage(href, size, state) {
     show('kept');
   }
 
-  async function foldOut() {
+  /** @param quick  the short version (~0.55s) for every open after the first: lid off, photo out already flat */
+  async function foldOut({ quick = false } = {}) {
+    // No reset here: a tap that lands before the first frame still skips.
     if (reduceMotion()) return show('open');
     show('kept');
+    if (quick) {
+      await run(lid, [{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(-200px) rotate(-6deg)', opacity: 0 }], { duration: 160, easing: 'cubic-bezier(.2,.7,.3,1)' });
+      sky.style.opacity = 0;
+      f3.hidden = true;
+      base.style.clipPath = 'none';
+      asPaper(base, false);
+      whoosh(true);
+      await run(main, [{ transform: inJar, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 380, easing: 'cubic-bezier(.2,.7,.3,1)' });
+      return show('open');
+    }
     // One twist and a click, then the lid lifts off.
     click();
     await twist(1);
@@ -151,5 +169,5 @@ export function foldStage(href, size, state) {
     show('open');
   }
 
-  return { el, foldIn, foldOut };
+  return { el, foldIn, foldOut, skip };
 }
