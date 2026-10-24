@@ -1,5 +1,5 @@
 import { store, newId } from './store.js';
-import { prepareImage, makeSampleSky, hexToRgb, dominant, hex, mix } from './sky.js';
+import { prepareImage, hexToRgb, dominant, hex, mix } from './sky.js';
 import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
 import { foldStage, MOTION, reduceMotion } from './fold.js';
 import { sunTimes } from './sun.js';
@@ -1027,51 +1027,38 @@ function closeStory() {
 
 // ---------- sample shelf ----------
 
-const SAMPLE_RECIPES = [
-  ['sunset', 18, 12, 'the one after work', 'Bangkok'],
-  ['clear', 11, 5, 'saturday blue', ''],
-  ['pink', 18, 34, 'peach bus ride', 'Bangkok'],
-  ['cloudy', 14, 20, 'all clouds', ''],
-  ['cloudy', 16, 2, '', ''],
-  ['night', 21, 40, 'grandma’s stars', 'Chiang Mai'],
-  ['sunrise', 6, 18, 'slow morning', ''],
-  ['bluehour', 18, 55, 'blue hour on the bridge', 'Bangkok'],
-  ['sunset', 17, 58, 'the river one', 'Bangkok'],
-  ['clear', 9, 30, '', ''],
-  ['cloudy', 12, 45, 'grey but fine', ''],
-  ['pink', 18, 20, 'the cotton candy one', 'Hua Hin'],
+// Real skies (photos in assets/sky/), one jar each. `ago` is days back within this month;
+// the one 7 days back gives the home screen an "A week ago". `day` places one in last month.
+const SAMPLE_SKIES = [
+  { file: 'sky-5.jpg', ago: 1, at: [18, 25], note: 'cotton candy hour' },
+  { file: 'sky-8.jpg', ago: 3, at: [12, 50], note: 'blue after lunch' },
+  { file: 'sky-3.jpg', ago: 5, at: [18, 5], note: 'is that a rainbow in the clouds' },
+  { file: 'sky-7.jpg', ago: 7, at: [15, 40], note: 'storm coming' },
+  { file: 'sky-4.jpg', ago: 9, at: [16, 40], note: 'the drive home' },
+  { file: 'sky-1.jpg', ago: 12, at: [10, 20], note: 'above the clouds' },
+  { file: 'sky-6.jpg', day: 26, at: [18, 10], note: 'last light at the beach' },
+  { file: 'sky-2.jpg', day: 12, at: [7, 40], note: 'woke up to this' },
 ];
 const SEED_KEY = 'skyjar.seeded';
-const SEED_VERSION = '2';
+const SEED_VERSION = '3';
 
 async function seedSamples(onProgress) {
   const now = new Date();
-  const plan = [];
-  const months = [
-    { back: 0, count: Math.min(15, now.getDate()) },
-    { back: 1, count: 14 },
-    { back: 2, count: 10 },
-    { back: 3, count: 6 },
-  ];
-  let k = 0;
-  for (const mo of months) {
-    const first = new Date(now.getFullYear(), now.getMonth() - mo.back, 1);
-    const y = first.getFullYear(), m = first.getMonth();
-    const last = mo.back === 0 ? now.getDate() : daysIn(y, m);
-    for (let i = 0; i < mo.count; i++) {
-      const day = Math.max(1, Math.round(((i + 0.5) * last) / mo.count));
-      const [kind, hh, mm, note, place] = SAMPLE_RECIPES[k % SAMPLE_RECIPES.length];
-      k++;
-      const takenAt = new Date(y, m, day, hh, mm).getTime();
-      if (takenAt <= Date.now()) plan.push({ kind, takenAt, note, place, seed: k * 7919 });
-    }
-  }
+  const y = now.getFullYear(), m = now.getMonth();
+  const plan = SAMPLE_SKIES.map((s, i) => {
+    let takenAt = s.day
+      ? new Date(y, m - 1, s.day, ...s.at).getTime()
+      : new Date(y, m, Math.max(1, now.getDate() - s.ago), ...s.at).getTime();
+    // Early in the month several land on the 1st; none may be later than now.
+    if (takenAt > now.getTime()) takenAt = now.getTime() - (i + 1) * 3600e3;
+    return { ...s, takenAt };
+  });
 
   for (let i = 0; i < plan.length; i++) {
     const p = plan[i];
-    const prep = await prepareImage(await makeSampleSky(p.kind, p.seed));
+    const prep = await prepareImage(await (await fetch(`assets/sky/${p.file}`)).blob());
     const sky = {
-      id: newId(), takenAt: p.takenAt, note: p.note, place: p.place, prompt: '',
+      id: newId(), takenAt: p.takenAt, note: p.note, place: '', prompt: '',
       palette: prep.palette, photo: prep.photo, thumb: prep.thumb, sample: true, createdAt: Date.now(),
     };
     await store.put(sky);

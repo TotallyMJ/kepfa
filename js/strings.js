@@ -122,7 +122,11 @@ export const t = {
   note: 'Tell this sky something',
   place: 'Where',
   keptAt: (stamp) => `Kept ${stamp}`,
-  notePrompts: ['you made my whole day', 'thanks for waiting for me', 'same time tomorrow?', 'you look like peach soda', 'stay a little longer'],
+  notePrompts: [
+    'you made my whole day', 'thanks for waiting for me', 'same time tomorrow?', 'you look like peach soda',
+    'stay a little longer', 'you were worth the stop', 'pov: i forgot my phone was in my hand', 'the bus can wait',
+    'you again, my favorite', 'who painted you today?', 'saving you for a bad day', 'this one’s for mom',
+  ],
   placeHint: 'Bangkok',
   retake: 'Retake',
   keep: 'Keep',
