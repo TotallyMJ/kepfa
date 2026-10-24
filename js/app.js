@@ -604,17 +604,30 @@ function openDetail(sky) {
     ${sky.note ? `<p class="detail-note ${handClass(sky.note)}">${esc(sky.note)}</p>` : ''}
     <p class="detail-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.long(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>
     <div class="palette">${paletteHtml(sky.palette)}</div>
-    <div class="sheet-actions">
+    <div class="sheet-actions even">
+      <button type="button" class="btn" id="putBack" disabled>${t.putBack}</button>
       <button type="button" class="btn primary" id="shareOne">${t.shareStory}</button>
-      <button type="button" class="btn-text danger" id="askDelete">${t.deleteSky}</button>
     </div>
+    <div class="sheet-delete"><button type="button" class="btn-text danger" id="askDelete">${t.deleteSky}</button></div>
     <div id="confirmBox"></div>`;
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
 
   const stage = foldStage(photoUrl(sky, 'photo'), Math.min(160, innerWidth * 0.42), 'kept');
   $('#detailStage').append(stage.el);
-  requestAnimationFrame(() => stage.foldOut());
+  // Put it back only once the photo is fully out, so the two animations never overlap.
+  requestAnimationFrame(async () => {
+    await stage.foldOut();
+    const btn = $('#putBack');
+    if (btn) btn.disabled = false;
+  });
+  $('#putBack').addEventListener('click', async (e) => {
+    e.currentTarget.disabled = true;
+    $('#shareOne').disabled = true;
+    await stage.foldIn();
+    navigator.vibrate?.(18);
+    closeSheet();
+  });
 
   $('#shareOne').addEventListener('click', () => openStory('single', { sky }));
   $('#askDelete').addEventListener('click', () => {

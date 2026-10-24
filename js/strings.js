@@ -121,6 +121,7 @@ export const t = {
   keptDone: 'Kept.',
   seeShelf: 'See shelf',
 
+  putBack: 'Put it back',
   deleteSky: 'Delete',
   deleteConfirm: 'Delete this sky? This can’t be undone.',
   keepIt: 'Keep it',
@@ -137,7 +138,7 @@ export const t = {
   sharedFallback: 'This device can’t share directly, so the image was saved.',
   storyFailed: 'Couldn’t make the image. Close this and try again.',
 
-  footer: 'kepfa · start your own shelf',
+  footer: 'kepfa · start your own collection',
   storyKept: (y, n) => `${y} · ${n} ${skies(n)} kept`,
   stripCaption: 'Every sky you kept, in order',
 };
