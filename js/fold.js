@@ -2,6 +2,7 @@
 // a flip on the way in with a light trail, a ripple at the mouth, then one twist of the lid.
 
 import { jarSvg, JAR_RATIO } from './jar.js';
+import { scrollSize } from './pile.js';
 import { whoosh, click } from './sound.js';
 
 export const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -232,10 +233,11 @@ const BOW = `<svg class="bow" viewBox="0 0 40 26" aria-hidden="true">
   <path d="${THREAD}" stroke="#e2584c" stroke-width=".32" stroke-dasharray="2 3"/>
   <circle cx="20" cy="12" r="1.8" fill="#b3261e" stroke="#7f1714" stroke-width=".5"/></svg>`;
 
-/** The rolled note lying on the bottom of a jar, tied with its bow. */
-export function noteScroll(paper) {
+/** The rolled note lying on the bottom of a jar, tied with its bow: longer for a longer note, as in the month jars. */
+export function noteScroll(paper, note = '') {
   const rest = document.createElement('div');
   rest.className = `note-roll is-resting ${paper}`;
+  rest.style.aspectRatio = `20 / ${Math.min(128, Math.round((112 * scrollSize(note).len) / 226))}`;
   rest.innerHTML = BOW;
   return rest;
 }
@@ -260,13 +262,14 @@ const go = (node, frames, opts) => (isSkipped() ? Promise.resolve()
  * @param slip   the note slip on screen (hidden once the roll starts)
  * @param jar    the jar element the scroll lands in
  * @param paper  the slip's paper class, so the scroll is the same colour
+ * @param note     the note's text, which sets how long the resting scroll is
  * @param quick    the shorter version, for putting a note back
  * @param skipped  the stage's isSkipped, when there is one
  */
-export async function rollNote(slip, jar, paper, { quick = false, skipped } = {}) {
+export async function rollNote(slip, jar, paper, { note = '', quick = false, skipped } = {}) {
   startNote(skipped);
   const k = quick ? 0.6 : 1;
-  const rest = noteScroll(paper);
+  const rest = noteScroll(paper, note);
   if (reduceMotion()) { slip.style.visibility = 'hidden'; jar.append(rest); return; }
 
   // A stand-in for the slip, laid exactly over it, rolls up from the right into a tube that thickens as it goes.

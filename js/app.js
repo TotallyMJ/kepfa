@@ -1,6 +1,7 @@
 import { store, newId } from './store.js';
 import { prepareImage, hexToRgb, dominant, hex, mix } from './sky.js';
-import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
+import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, photoPoint, JAR_RATIO } from './jar.js';
+import { livePile, loadThumbs, forgetThumb, paperIndex } from './pile.js';
 import { foldStage, rollNote, unrollNote, noteScroll, skipNote, MOTION, reduceMotion } from './fold.js';
 import { sunTimes, guessPlace } from './sun.js';
 import { makeStory, shareImage, saveImage } from './story.js';
@@ -17,7 +18,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const view = $('#view');
 const cap = $('#capture');
 
-const state = { skies: [], year: new Date().getFullYear(), redraw: null, lastRoute: '', viaPrompt: false, unfolded: false, detail: null };
+const state = { skies: [], year: new Date().getFullYear(), redraw: null, lastRoute: '', viaPrompt: false, unfolded: false, detail: null, live: null };
 
 // ---------- helpers ----------
 
@@ -49,6 +50,7 @@ function photoUrl(sky, kind = 'thumb') {
   return urls.get(key);
 }
 function forgetUrls(id) {
+  forgetThumb(id);
   for (const kind of ['thumb', 'photo']) {
     const key = `${id}:${kind}`;
     if (urls.has(key)) { URL.revokeObjectURL(urls.get(key)); urls.delete(key); }
@@ -188,6 +190,8 @@ function parseRoute() {
 }
 
 function render() {
+  state.live?.stop();
+  state.live = null;
   const route = parseRoute();
   const tab = route.name === 'shelf' ? 'shelf' : 'months';
   document.querySelectorAll('.tab').forEach((el) => {
@@ -363,17 +367,20 @@ function renderMonths() {
   $('#prevYear').addEventListener('click', () => { state.year--; renderMonths(); });
   $('#nextYear').addEventListener('click', () => { state.year++; renderMonths(); });
 
-  state.redraw = () => {
+  const redraw = () => {
     const dark = isDark();
     view.querySelectorAll('.month-slot').forEach((el) => {
       const m = +el.dataset.month;
       const w = Math.min(el.clientWidth, 96);
       const h = Math.round(w * JAR_RATIO);
       const ctx = setupCanvas(el.querySelector('canvas'), w, h);
-      drawJar(ctx, { x: 0, y: 0, w, skies: skiesIn(y, m), capacity: daysIn(y, m), ghost: el.disabled, dark });
+      drawJar(ctx, { x: 0, y: 0, w, skies: skiesIn(y, m), ghost: el.disabled, dark });
     });
   };
-  state.redraw();
+  state.redraw = redraw;
+  redraw();
+  // The folded photos show once their thumbnails are in; until then each is the colour of its sky.
+  loadThumbs(all).then(() => { if (state.redraw === redraw) redraw(); });
 }
 
 // ---------- one month's jar ----------
@@ -395,7 +402,7 @@ function renderMonth(year, month) {
     <p class="subtitle">${year}</p>
     <div class="jar-stage" id="jarStage"><canvas id="bigJar" aria-label="${t.monthJar(MONTHS[month], list.length)}"></canvas></div>
     ${list.length
-      ? `<p class="hint">${t.tapLayer}</p>
+      ? `<p class="hint">${t.tapLayer}${!reduceMotion() && window.DeviceOrientationEvent?.requestPermission ? `<span id="tiltPlay"> · <button type="button" class="btn-text hint-link">${t.tiltToPlay}</button></span>` : ''}</p>
          <div class="actions">
            <button type="button" class="btn" id="shake">${t.shake}</button>
            <button type="button" class="btn primary" id="shareJar">${t.shareMonth(MONTHS[month])}</button>
@@ -414,19 +421,33 @@ function renderMonth(year, month) {
   $('#shake')?.addEventListener('click', () => shakeJar(list));
   bindJarSlots(view);
 
-  let layers = [];
+  // The big jar is live: the pile rolls when the phone tilts, Shake really shakes it, and a tap opens the sky under it.
   const cv = $('#bigJar');
-  state.redraw = () => {
-    const w = Math.min(view.clientWidth * 0.55, 200);
-    const h = Math.round(w * JAR_RATIO);
-    const ctx = setupCanvas(cv, w, h);
-    layers = drawJar(ctx, { x: 0, y: 0, w, skies: list, capacity: days, dark: isDark() });
+  let w = 0, ctx = null, last = null;
+  const paint = (pile) => {
+    last = pile;
+    ctx.clearRect(0, 0, w, Math.round(w * JAR_RATIO));
+    drawJar(ctx, { x: 0, y: 0, w, pile, skies: list, dark: isDark() });
   };
-  state.redraw();
+  const redraw = () => {
+    w = Math.min(view.clientWidth * 0.55, 200);
+    ctx = setupCanvas(cv, w, Math.round(w * JAR_RATIO));
+    if (last) paint(last);
+  };
+  redraw();
+  if (!list.length) { drawJar(ctx, { x: 0, y: 0, w, skies: list, dark: isDark() }); state.redraw = redraw; return; }
+  state.live = livePile(list, paint);
+  state.redraw = redraw;
+  loadThumbs(list).then(() => { if (state.redraw === redraw && last) paint(last); });
   cv.addEventListener('click', (e) => {
-    const py = e.clientY - cv.getBoundingClientRect().top;
-    const hit = layers.find((l) => py >= l.top - 2 && py <= l.bottom + 2);
-    if (hit) openDetail(list[hit.index]);
+    const r = cv.getBoundingClientRect();
+    const sky = state.live?.at(...photoPoint(e.clientX - r.left, e.clientY - r.top, 0, 0, w));
+    if (sky) openDetail(sky);
+  });
+  // iPhones ask before a page may read the tilt; others just start sending it.
+  $('#tiltPlay button')?.addEventListener('click', async () => {
+    try { await DeviceOrientationEvent.requestPermission(); } catch { /* stays still */ }
+    $('#tiltPlay')?.remove();
   });
 }
 
@@ -435,6 +456,7 @@ function shakeJar(list) {
   st.classList.remove('shaking');
   void st.offsetWidth;
   st.classList.add('shaking');
+  if (!reduceMotion()) state.live?.shake();
   chime([1568, 1175, 1760, 1318], 0.11);
   navigator.vibrate?.([20, 40, 20, 40, 20]);
   setTimeout(() => {
@@ -688,7 +710,7 @@ const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateStrin
 /** For a datetime-local input: 2026-10-25T18:25 in local time. */
 const localInput = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 /** Each sky's note paper (paper-0 to paper-4 in CSS), fixed by its id so it never changes colour. */
-const paperFor = (id) => `paper-${[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % 5}`;
+const paperFor = (id) => `paper-${paperIndex(id)}`;
 /** "September", or "September 2025" when it's another year. */
 const monthOf = (ms) => { const d = new Date(ms); return MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''); };
 
@@ -831,7 +853,7 @@ async function saveDraft() {
   }
   const fadeOut = (node) => node.animate({ opacity: [1, 0] }, { duration: MOTION.quick, easing: MOTION.in, fill: 'forwards' });
   fadeOut($('#reviewActions'));
-  const rolling = note || place ? rollNote($('#noteSlip'), stage.el.querySelector('.fold-jar'), paper) : null;
+  const rolling = note || place ? rollNote($('#noteSlip'), stage.el.querySelector('.fold-jar'), paper, { note }) : null;
   fadeOut($('#reviewForm'));
   await rolling;
   await stage.lidOn();
@@ -928,7 +950,7 @@ function openDetail(sky, { from = 0 } = {}) {
     }
     return;
   }
-  const rest = sky.note ? noteScroll(paperFor(sky.id)) : null;
+  const rest = sky.note ? noteScroll(paperFor(sky.id), sky.note) : null;
   if (rest) stage.el.querySelector('.fold-jar').append(rest);
   // The full unfold plays once per visit; after that a short one. A tap anywhere skips it.
   const quick = state.unfolded;
@@ -989,7 +1011,7 @@ async function closeJar() {
     // The note starts rolling while the photo is still folding, and lands just after it.
     const folding = stage.foldIn({ lid: false });
     if (!reduceMotion()) await new Promise((r) => setTimeout(r, 450));
-    await rollNote(slip, stage.el.querySelector('.fold-jar'), paperFor(state.detail.id), { quick: true, skipped: stage.isSkipped });
+    await rollNote(slip, stage.el.querySelector('.fold-jar'), paperFor(state.detail.id), { note: state.detail.note, quick: true, skipped: stage.isSkipped });
     await folding;
     await stage.lidOn();
   } else {
@@ -1338,6 +1360,10 @@ function bindGlobal() {
     }, 120);
   });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => state.redraw?.());
+  // The month jar's pile rolls the way the phone leans (portrait: gamma is left-right, beta is upright-flat).
+  window.addEventListener('deviceorientation', (e) => {
+    if (e.gamma != null && !reduceMotion()) state.live?.tilt(e.gamma, e.beta);
+  });
   window.addEventListener('hashchange', render);
   setInterval(() => { const el = $('#sunLine'); if (el) el.textContent = sunLine(); }, 60000);
 }

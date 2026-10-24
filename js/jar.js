@@ -2,6 +2,8 @@
 // the glass as see-through ink (dark ink for light paper, light ink for dark paper) and the brass lid on its own.
 // Skies sit under the glass, clipped to the measured inside of the jar. SVG on screen, canvas for exported images.
 
+import { drawPile, pileFor } from './pile.js';
+
 const SRC = { url: 'assets/jar.jpg', w: 1088, h: 1456 };   // the photo's coordinate space
 export const BOX = { x: 169, y: 150, w: 746, h: 1160 };    // the jar inside the photo
 // The lid ends where its brass skirt meets the glass rim, so neither keeps a sliver of the other.
@@ -71,23 +73,10 @@ export function jarPoint(px, py, w) {
   return [(px - BOX.x) * s, (py - BOX.y) * s];
 }
 
-/** Wavy sand-art layers, one per sky (oldest at the bottom), in photo coordinates. Top-most first. */
-export function layerShapes(skies, capacity) {
-  const x0 = INSIDE.x, w = INSIDE.w;
-  const fillTop = 470, fillBottom = INSIDE.y + INSIDE.h;
-  const n = skies.length;
-  const unit = (fillBottom - fillTop) / Math.max(capacity, n, 1);
-  const amp = Math.min(unit * 0.32, w * 0.022);
-  const out = [];
-  for (let i = n - 1; i >= 0; i--) {
-    const yb = fillBottom - i * unit;
-    const yt = yb - unit;
-    let d = `M${x0} ${yb + amp * 2 + 1} L${x0} ${yt}`;
-    for (let s = 0; s <= 28; s++) d += ` L${x0 + (w * s) / 28} ${yt + Math.sin((s / 28) * Math.PI * 3 + i * 1.7) * amp}`;
-    d += ` L${x0 + w} ${yb + amp * 2 + 1} Z`;
-    out.push({ index: i, d, top: yt - amp, bottom: yb, palette: skies[i].palette });
-  }
-  return out;
+/** From a point on a jar drawn `w` wide at x,y back to the photo's coordinates (for taps). */
+export function photoPoint(cx, cy, x, y, w) {
+  const s = w / BOX.w;
+  return [(cx - x) / s + BOX.x, (cy - y) / s + BOX.y];
 }
 
 let uid = 0;
@@ -133,12 +122,11 @@ export function setupCanvas(canvas, cssW, cssH) {
 }
 
 /**
- * Canvas jar `w` wide at x,y, filled with either a photo or one layer per sky.
- * @returns layer rects for hit-testing taps: [{index, top, bottom}] in the caller's coordinates
+ * Canvas jar `w` wide at x,y, filled with either one photo or a month's skies as a pile (js/pile.js).
+ * @param pile  a live pile to draw instead of the settled one for `skies`
  */
-export function drawJar(ctx, { x, y, w, image = null, skies = null, capacity = 31, ghost = false, dark = false }) {
+export function drawJar(ctx, { x, y, w, image = null, skies = null, pile = null, ghost = false, dark = false }) {
   const s = w / BOX.w;
-  let layerList = [];
   ctx.save();
   ctx.translate(x - BOX.x * s, y - BOX.y * s);
   ctx.scale(s, s);
@@ -154,14 +142,8 @@ export function drawJar(ctx, { x, y, w, image = null, skies = null, capacity = 3
     const ih = image.naturalHeight || image.height;
     const k = Math.max(INSIDE.w / iw, INSIDE.h / ih);
     ctx.drawImage(image, INSIDE.x + (INSIDE.w - iw * k) / 2, INSIDE.y + (INSIDE.h - ih * k) / 2, iw * k, ih * k);
-  } else if (skies) {
-    layerList = layerShapes(skies, capacity);
-    for (const l of layerList) {
-      const grad = ctx.createLinearGradient(0, l.top, 0, l.bottom);
-      l.palette.forEach((c, j) => grad.addColorStop(l.palette.length === 1 ? 0.5 : j / (l.palette.length - 1), c.hex));
-      ctx.fillStyle = grad;
-      ctx.fill(new Path2D(l.d));
-    }
+  } else if (pile || skies?.length) {
+    drawPile(ctx, pile || pileFor(skies));
   }
   ctx.restore();
 
@@ -170,6 +152,4 @@ export function drawJar(ctx, { x, y, w, image = null, skies = null, capacity = 3
     ctx.drawImage(layers.lid, 0, 0, SRC.w, SRC.h);
   }
   ctx.restore();
-
-  return layerList.map((l) => ({ index: l.index, top: y + (l.top - BOX.y) * s, bottom: y + (l.bottom - BOX.y) * s }));
 }

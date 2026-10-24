@@ -2,6 +2,7 @@
 // one jarred sky with its handwritten note, one month's jar, or the whole year's shelf.
 
 import { drawJar, jarPoint, JAR_RATIO } from './jar.js';
+import { loadThumbs } from './pile.js';
 import { loadImage } from './sky.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG } from './strings.js';
 
@@ -418,16 +419,14 @@ async function storyYear({ year, skies, quote }) {
 
   const bw = 160, bh = Math.round(160 * JAR_RATIO), gapX = 70, rowH = bh + 90, firstRow = top + 260;
   const left = (W - (4 * bw + 3 * gapX)) / 2;
-  const now = new Date();
+  await loadThumbs(skies);
   for (let m = 0; m < 12; m++) {
     const r = Math.floor(m / 4), col = m % 4;
     const x = left + col * (bw + gapX);
     const y = firstRow + r * rowH;
-    const future = year > now.getFullYear() || (year === now.getFullYear() && m > now.getMonth());
-    drawJar(ctx, {
-      x, y, w: bw, skies: skies.filter((s) => new Date(s.takenAt).getMonth() === m),
-      capacity: new Date(year, m + 1, 0).getDate(), ghost: future,
-    });
+    const inMonth = skies.filter((s) => new Date(s.takenAt).getMonth() === m);
+    // Months with nothing in them stay faint, so the jars that were filled stand out.
+    drawJar(ctx, { x, y, w: bw, skies: inMonth, ghost: !inMonth.length });
     if (col === 0) {
       ctx.fillStyle = INK;
       ctx.globalAlpha = 0.6;

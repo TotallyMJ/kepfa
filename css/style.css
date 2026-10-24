@@ -288,6 +288,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .section-title { margin: var(--s-6) 0 var(--s-3); font-family: var(--f-display); font-weight: 500; font-size: var(--t-lg); }
 .hint { margin: var(--s-2) 0 0; font-size: var(--t-cap); color: var(--ink-soft); text-align: center; }
 .hint.left { text-align: left; }
+.hint .hint-link { font-size: inherit; color: var(--ink); vertical-align: middle; }
 
 .page-head { display: flex; justify-content: space-between; align-items: center; min-height: 44px; }
 .back { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; }
