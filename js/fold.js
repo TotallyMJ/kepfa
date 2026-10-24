@@ -206,7 +206,7 @@ export function foldStage(href, size, state) {
     show('open');
   }
 
-  return { el, card: main, foldIn, foldOut, lidOn, skip };
+  return { el, card: main, foldIn, foldOut, lidOn, skip, isSkipped: () => skipped };
 }
 
 // Twine tied in a bow: dark edge, mid tone, and a dashed light twist on top; frayed ends and a wrapped knot.
@@ -218,19 +218,41 @@ const BOW = `<svg class="bow" viewBox="0 0 44 28" aria-hidden="true">
   <ellipse cx="22" cy="12" rx="2.3" ry="2.8" fill="#8a6a43" stroke="#5e4327" stroke-width=".8"/>
   <path d="M21.2 9.8C22.6 11 22.6 13 21.2 14.2" stroke="#d6bb8e" stroke-width=".6"/></svg>`;
 
+/** The rolled note lying on the bottom of a jar, tied with its bow. */
+export function noteScroll(paper) {
+  const rest = document.createElement('div');
+  rest.className = `note-roll is-resting ${paper}`;
+  rest.innerHTML = BOW;
+  return rest;
+}
+
+// A tap skips the note's animations the same way it skips the fold: every remaining step lands at once.
+// `skipped` comes from the jar's stage, so a tap made before the note starts still counts.
+let noteSkipped = false;
+let stageSkipped = () => false;
+const isSkipped = () => noteSkipped || stageSkipped();
+export function skipNote() {
+  noteSkipped = true;
+  document.querySelectorAll('.note-fly, .note-ghost, .view-note').forEach((n) => n.getAnimations({ subtree: true }).forEach((a) => a.finish()));
+}
+const startNote = (skipped) => { noteSkipped = false; stageSkipped = skipped || (() => false); };
+const wait = (ms) => (isSkipped() ? Promise.resolve() : new Promise((r) => setTimeout(r, ms)));
+const go = (node, frames, opts) => (isSkipped() ? Promise.resolve()
+  : node.animate(frames, { fill: 'forwards', ...opts }).finished.catch(() => {}));
+
 /**
  * The note slip rolls up into a little scroll, gets a twine bow, and is tossed into the open jar,
  * where it comes to rest on the bottom.
  * @param slip   the note slip on screen (hidden once the roll starts)
  * @param jar    the jar element the scroll lands in
  * @param paper  the slip's paper class, so the scroll is the same colour
+ * @param quick    the shorter version, for putting a note back
+ * @param skipped  the stage's isSkipped, when there is one
  */
-export async function rollNote(slip, jar, paper) {
-  const rest = document.createElement('div');
-  rest.className = `note-roll is-resting ${paper}`;
-  rest.innerHTML = BOW;
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const go = (node, frames, opts) => node.animate(frames, { fill: 'forwards', ...opts }).finished.catch(() => {});
+export async function rollNote(slip, jar, paper, { quick = false, skipped } = {}) {
+  startNote(skipped);
+  const k = quick ? 0.6 : 1;
+  const rest = noteScroll(paper);
   if (reduceMotion()) { slip.style.visibility = 'hidden'; jar.append(rest); return; }
 
   // A stand-in for the slip, laid exactly over it, rolls up from the right into a tube that thickens as it goes.
@@ -250,7 +272,7 @@ export async function rollNote(slip, jar, paper) {
   fly.className = 'note-fly';
   fly.append(tube);
   document.body.append(fly);
-  const travel = w - 18, roll = { duration: 560, easing: 'cubic-bezier(.45,0,.25,1)' };
+  const travel = w - 18, roll = { duration: 560 * k, easing: 'cubic-bezier(.45,0,.25,1)' };
   await Promise.all([
     go(ghost, [{ clipPath: 'inset(0 0 0 0)' }, { clipPath: `inset(0 ${travel + 6}px 0 0)` }], roll),
     go(tube, [{ transform: 'translateX(0)', width: '14px' }, { transform: `translateX(${-travel}px)`, width: '22px' }], roll),
@@ -261,16 +283,16 @@ export async function rollNote(slip, jar, paper) {
   const base = `translateX(${-travel}px)`;
   tube.insertAdjacentHTML('beforeend', BOW);
   go(tube.querySelector('.bow'), [{ transform: 'translate(-50%,-50%) rotate(90deg) scale(0)' }, { transform: 'translate(-50%,-50%) rotate(90deg) scale(1)' }], { duration: 300, easing: MOTION.spring });
-  await wait(140);
-  await go(tube, [{ transform: `${base} rotate(0)` }, { transform: `${base} rotate(-4deg)` }, { transform: `${base} rotate(2deg)` }, { transform: `${base} rotate(0)` }], { duration: 240, easing: 'ease-in-out' });
-  await wait(160);
+  await wait(140 * k);
+  if (!quick) await go(tube, [{ transform: `${base} rotate(0)` }, { transform: `${base} rotate(-4deg)` }, { transform: `${base} rotate(2deg)` }, { transform: `${base} rotate(0)` }], { duration: 240, easing: 'ease-in-out' });
+  await wait(160 * k);
 
   // Tossed with gravity: it drifts across at a steady speed while it rises, slows at the top, then falls faster and faster.
   const t = tube.getBoundingClientRect(), j = jar.getBoundingClientRect();
   const cx = t.left + t.width / 2, cy = t.top + t.height / 2;
   const mx = j.left + j.width / 2 - cx, my = j.top - 44 - cy, iy = j.top + j.height * 0.82 - cy;
   const up = (dy, r, s) => `${base} translateY(${dy}px) rotate(${r}deg) scale(${s})`;
-  const toss = { duration: 900 };
+  const toss = { duration: 900 * k };
   whoosh(false);
   await Promise.all([
     go(fly, [{ offset: 0, transform: 'translateX(0)' }, { offset: 0.1, transform: 'translateX(0)' }, { offset: 1, transform: `translateX(${mx}px)` }], toss),
@@ -286,6 +308,7 @@ export async function rollNote(slip, jar, paper) {
 
   // It hits the bottom, bounces twice (smaller each time) and settles in front of the sky.
   jar.append(rest);
+  if (isSkipped()) return;
   const at = (y, r) => `translate(-50%, calc(50% + ${y}px)) rotate(${r}deg)`;
   await rest.animate([
     { offset: 0, opacity: 0, transform: at(-10, 86), easing: GRAVITY },
@@ -295,6 +318,57 @@ export async function rollNote(slip, jar, paper) {
     { offset: 0.8, transform: at(-2, 82.5), easing: GRAVITY },
     { offset: 0.9, transform: at(0, 82) },
     { offset: 1, transform: at(0, 82) },
-  ], { duration: 640 }).finished.catch(() => {});
-  await wait(200);
+  ], { duration: 640 * k }).finished.catch(() => {});
+  await wait(200 * k);
+}
+
+/**
+ * The other way: the scroll resting in the jar hops out to where the slip goes, its bow comes undone,
+ * and it unrolls to the right into the note slip.
+ * @param rest   the scroll in the jar (noteScroll)
+ * @param slip   the slip it becomes; starts clipped away
+ * @param quick    no hop, just a short unroll in place, for every open after the first
+ * @param skipped  the stage's isSkipped
+ */
+export async function unrollNote(rest, slip, paper, { quick = false, skipped } = {}) {
+  startNote(skipped);
+  const done = () => { rest.remove(); slip.style.clipPath = 'none'; slip.getAnimations().forEach((a) => a.cancel()); };
+  if (reduceMotion() || isSkipped()) return done();
+  const s = slip.getBoundingClientRect();
+  const h = slip.offsetHeight;
+  const tube = document.createElement('div');
+  tube.className = `note-roll ${paper}`;
+  tube.style.cssText = `left:${s.left}px;top:${s.top + s.height / 2 - h / 2 - 2}px;width:22px;height:${h + 4}px`;
+  tube.innerHTML = BOW;
+  const fly = document.createElement('div');
+  fly.className = 'note-fly';
+  fly.append(tube);
+  document.body.append(fly);
+  rest.style.opacity = 0;
+
+  if (!quick) {
+    // Out of the jar in an arc, slowing as it rises and dropping onto its spot.
+    const r = rest.getBoundingClientRect(), t = tube.getBoundingClientRect();
+    const dx = r.left + r.width / 2 - (t.left + t.width / 2), dy = r.top + r.height / 2 - (t.top + t.height / 2);
+    const scale = Math.max(r.width, r.height) / t.height;
+    whoosh(true);
+    await go(tube, [
+      { offset: 0, transform: `translate(${dx}px, ${dy}px) rotate(82deg) scale(${scale})`, easing: RISE },
+      { offset: 0.5, transform: `translate(${dx * 0.4}px, ${Math.min(dy * 0.4, -40)}px) rotate(30deg) scale(1)`, easing: GRAVITY },
+      { offset: 1, transform: 'none' },
+    ], { duration: 620 });
+    await go(tube.querySelector('.bow'), [{ transform: 'translate(-50%,-50%) rotate(90deg) scale(1)', opacity: 1 }, { transform: 'translate(-50%,-50%) rotate(140deg) scale(0)', opacity: 0 }], { duration: 220, easing: 'ease-in' });
+  } else {
+    tube.querySelector('.bow').remove();
+  }
+
+  // Unrolls to the right; the tube thins out as the paper leaves it.
+  const travel = s.width - 14;
+  const unroll = { duration: quick ? 360 : 520, easing: 'cubic-bezier(.3,0,.2,1)' };
+  await Promise.all([
+    go(slip, [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], unroll),
+    go(tube, [{ transform: 'translateX(0)', width: '22px', opacity: 1 }, { transform: `translateX(${travel - 8}px)`, width: '14px', opacity: 1, offset: 0.9 }, { transform: `translateX(${travel}px)`, width: '8px', opacity: 0 }], unroll),
+  ]);
+  fly.remove();
+  done();
 }

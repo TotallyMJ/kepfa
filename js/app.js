@@ -1,7 +1,7 @@
 import { store, newId } from './store.js';
 import { prepareImage, hexToRgb, dominant, hex, mix } from './sky.js';
 import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
-import { foldStage, rollNote, MOTION, reduceMotion } from './fold.js';
+import { foldStage, rollNote, unrollNote, noteScroll, skipNote, MOTION, reduceMotion } from './fold.js';
 import { sunTimes, guessPlace } from './sun.js';
 import { makeStory, shareImage, saveImage } from './story.js';
 import { chime } from './sound.js';
@@ -861,21 +861,27 @@ function showKept(sky, stage) {
 const PEN = '<svg class="pen" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 const viewer = { stage: null, pol: null, busy: false, editing: false };
 
-/** Long notes write a little smaller so the polaroid's strip stays two or three lines. */
+/** Long notes write a little smaller so the slip stays two or three lines. */
 const noteClass = (note) => `${handClass(note)}${note.length > 40 ? ' is-long' : ''}`;
 
-function stripHtml(sky) {
-  const note = sky.note
-    ? `<span class="${noteClass(sky.note)}">${esc(sky.note)}</span>`
-    : `<span class="polaroid-empty">${t.writeOn}</span>`;
-  return `<button type="button" class="polaroid-note" id="editNote" aria-label="${t.editNote}">${note}${PEN}</button>
+/** The polaroid's own edge: when and where. A sky with no note offers to write one. */
+function stripHtml(sky, { editing = false } = {}) {
+  return `${sky.note || editing ? '' : `<button type="button" class="polaroid-note" id="editNote" aria-label="${t.editNote}"><span class="polaroid-empty">${t.writeOn}</span>${PEN}</button>`}
     <p class="polaroid-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.stamp(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>`;
+}
+
+/** The note comes out of the jar as its own slip, in the same paper it went in on. Tap it to edit. */
+function noteHtml(sky, { rolled = false } = {}) {
+  if (!sky.note) return '';
+  return `<button type="button" class="slip torn-top ${paperFor(sky.id)} view-note" id="viewNote" aria-label="${t.editNote}"${rolled ? ' style="clip-path:inset(0 100% 0 0)"' : ''}>
+    <span class="${noteClass(sky.note)}">${esc(sky.note)}</span>${PEN}</button>`;
 }
 
 const shareHtml = () => `<button type="button" class="btn light" id="shareOne">${t.shareSky}</button>`;
 
 function bindPolaroid(sky) {
-  $('#editNote').addEventListener('click', () => startEdit(sky));
+  $('#editNote')?.addEventListener('click', () => startEdit(sky));
+  $('#viewNote')?.addEventListener('click', () => startEdit(sky));
   $('#shareOne').addEventListener('click', () => openStory('single', { sky }));
 }
 
@@ -885,6 +891,8 @@ function openDetail(sky, { from = 0 } = {}) {
   const wrap = $('#sheet');
   const body = wrap.querySelector('.viewer-body');
   const swapping = !wrap.hidden && from !== 0;
+  // Opened from the shelf, the note waits in the jar as a scroll and unrolls once the photo is out.
+  const rolled = !swapping && !!sky.note && !reduceMotion();
   body.className = 'viewer-body';
   body.innerHTML = `
     <div class="viewer-stage" id="viewerStage"></div>
@@ -894,6 +902,7 @@ function openDetail(sky, { from = 0 } = {}) {
         <div class="polaroid-photo" style="background-image:url('${photoUrl(sky, 'photo')}')" role="img" aria-label="${t.openSky(fmt.long(sky.takenAt))}"></div>
         <div class="polaroid-strip" id="strip">${stripHtml(sky)}</div>
       </div>
+      <div class="viewer-note" id="noteSlot">${noteHtml(sky, { rolled })}</div>
       <div class="viewer-actions" id="viewerActions">${shareHtml()}</div>
     </div>`;
   wrap.hidden = false;
@@ -913,11 +922,14 @@ function openDetail(sky, { from = 0 } = {}) {
     stage.el.classList.add('is-behind');
     body.classList.add('is-out', 'is-swap');
     if (!reduceMotion()) {
-      viewer.pol.animate([{ transform: `translateX(${from * 60}px) rotate(-2deg)`, opacity: 0 }, { transform: 'rotate(-2deg)', opacity: 1 }],
-        { duration: MOTION.move, easing: MOTION.out });
+      [[viewer.pol, -2], [$('#viewNote'), -1.5]].filter(([n]) => n).forEach(([n, tilt]) => n.animate(
+        [{ transform: `translateX(${from * 60}px) rotate(${tilt}deg)`, opacity: 0 }, { transform: `rotate(${tilt}deg)`, opacity: 1 }],
+        { duration: MOTION.move, easing: MOTION.out }));
     }
     return;
   }
+  const rest = sky.note ? noteScroll(paperFor(sky.id)) : null;
+  if (rest) stage.el.querySelector('.fold-jar').append(rest);
   // The full unfold plays once per visit; after that a short one. A tap anywhere skips it.
   const quick = state.unfolded;
   state.unfolded = true;
@@ -926,7 +938,8 @@ function openDetail(sky, { from = 0 } = {}) {
     await stage.foldOut({ quick });
     if (viewer.stage !== stage) return;
     await popOut(stage, viewer.pol, body);
-    viewer.busy = false;
+    if (rest && viewer.stage === stage) await unrollNote(rest, $('#viewNote'), paperFor(sky.id), { quick, skipped: stage.isSkipped });
+    if (viewer.stage === stage) viewer.busy = false;
   });
 }
 
@@ -955,14 +968,15 @@ async function popOut(stage, pol, body) {
     { duration: MOTION.pop, easing: MOTION.spring }).finished.catch(() => {});
 }
 
-/** ✕: the polaroid shrinks back onto the card, which folds into the jar; then back to the shelf. */
+/** ✕: back in the order it went in: the polaroid folds into the jar, the note rolls up after it, then the lid. */
 async function closeJar() {
   const { stage, pol } = viewer;
   if (!stage) { closeSheet(); return; }
-  if (viewer.busy) { stage.skip(); return; }
+  if (viewer.busy) { stage.skip(); skipNote(); return; }
   if (viewer.editing) endEdit(state.detail);
   viewer.busy = true;
   const body = $('#sheet .viewer-body');
+  const slip = $('#viewNote');
   body.classList.add('is-closing');
   if (!reduceMotion()) {
     await pol.animate([{ transform: 'rotate(-2deg)' }, onTheCard(stage.card, pol)],
@@ -971,22 +985,31 @@ async function closeJar() {
   body.classList.remove('is-out');
   stage.card.style.opacity = 1;
   stage.el.classList.remove('is-behind');
-  await stage.foldIn();
+  if (slip) {
+    // The note starts rolling while the photo is still folding, and lands just after it.
+    const folding = stage.foldIn({ lid: false });
+    if (!reduceMotion()) await new Promise((r) => setTimeout(r, 450));
+    await rollNote(slip, stage.el.querySelector('.fold-jar'), paperFor(state.detail.id), { quick: true, skipped: stage.isSkipped });
+    await folding;
+    await stage.lidOn();
+  } else {
+    await stage.foldIn();
+  }
   viewer.busy = false;
   closeSheet();
   holdHintOnce();
 }
 
-/** The note and place are edited right on the polaroid's strip. */
+/** The note and place are edited right on the slip, like when the sky was kept. */
 function startEdit(sky) {
   if (viewer.busy) return;
   viewer.editing = true;
   $('#sheet .viewer-body').classList.add('is-editing');
-  $('#strip').innerHTML = `
-    <form class="polaroid-form" id="noteForm">
+  $('#strip').innerHTML = stripHtml(sky, { editing: true });
+  $('#noteSlot').innerHTML = `
+    <form class="slip torn-top ${paperFor(sky.id)} view-note polaroid-form" id="noteForm">
       <input id="noteInput" class="polaroid-input ${handClass(sky.note)}" maxlength="80" value="${esc(sky.note)}" placeholder="${t.note}" aria-label="${t.note}" autocomplete="off" enterkeyhint="next">
       <input id="placeInput" class="polaroid-input place" maxlength="24" value="${esc(sky.place)}" placeholder="${t.addPlace}" aria-label="${t.place}" autocomplete="off" enterkeyhint="done">
-      <p class="polaroid-meta">${fmt.stamp(sky.takenAt)}</p>
     </form>`;
   $('#viewerActions').innerHTML = `
     <button type="button" class="btn-text on-dark" id="cancelNote">${t.cancel}</button>
@@ -1019,6 +1042,7 @@ function endEdit(sky) {
   document.activeElement?.blur();
   $('#sheet .viewer-body').classList.remove('is-editing');
   $('#strip').innerHTML = stripHtml(sky);
+  $('#noteSlot').innerHTML = noteHtml(sky);
   $('#viewerActions').innerHTML = shareHtml();
   bindPolaroid(sky);
 }
@@ -1052,7 +1076,7 @@ function bindViewerGestures() {
   };
   body.addEventListener('click', (e) => {
     if (e.target.closest('button, input, form')) return;
-    if (viewer.busy) viewer.stage?.skip();
+    if (viewer.busy) { viewer.stage?.skip(); skipNote(); }
     else if (e.target === body && !viewer.editing) closeJar();
   });
   body.addEventListener('touchstart', (e) => {

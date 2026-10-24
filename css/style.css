@@ -801,8 +801,9 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   aspect-ratio: 20 / 112;
   transform: translate(-50%, 50%) rotate(82deg);
 }
-.note-fly { position: fixed; inset: 0; z-index: 46; pointer-events: none; }
-.slip.note-ghost { position: fixed; z-index: 45; margin: 0; transform: rotate(-1.5deg); pointer-events: none; }
+/* Above the keep screen and the viewer alike. */
+.note-fly { position: fixed; inset: 0; z-index: 56; pointer-events: none; }
+.slip.note-ghost { position: fixed; z-index: 55; margin: 0; transform: rotate(-1.5deg); pointer-events: none; }
 .drop-msg { text-align: center; animation: fade .4s ease both; }
 .drop-msg h2 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); }
 .drop-msg p { margin: 0; font-family: var(--f-mono); font-size: var(--t-sm); color: var(--ink-soft); }
@@ -870,9 +871,22 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .polaroid-photo { aspect-ratio: 1; border-radius: 3px; background: #CFC7BB center / cover no-repeat; }
 .polaroid-strip { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 64px; padding: var(--s-2) var(--s-2) var(--s-3); text-align: center; }
 .polaroid-note { display: inline; padding: 0; border: 0; background: none; color: inherit; text-align: center; line-height: 1.05; cursor: text; }
-.polaroid-note .hand { font-size: 27px; line-height: 1.05; overflow-wrap: anywhere; }
-.polaroid-note .hand.is-long { font-size: 22px; }
-.polaroid-note .hand.is-thai { font-size: var(--t-body); line-height: 1.5; }
+.polaroid-note .hand, .view-note .hand { font-size: 27px; line-height: 1.05; overflow-wrap: anywhere; }
+.polaroid-note .hand.is-long, .view-note .hand.is-long { font-size: 22px; }
+.polaroid-note .hand.is-thai, .view-note .hand.is-thai { font-size: var(--t-body); line-height: 1.5; }
+/* The note out of its jar: a slip of its own paper just under the polaroid. */
+.viewer-note { width: calc(var(--pw) * .96); margin-top: calc(var(--s-3) - var(--s-6)); }
+.viewer-note:empty { display: none; }
+.view-note {
+  display: block;
+  width: 100%;
+  padding: 20px var(--s-4) var(--s-3);
+  background: none;
+  text-align: center;
+  cursor: text;
+  transform: rotate(-1.5deg);
+}
+.is-closing .view-note { visibility: visible; }
 .polaroid-empty { font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: #8A8277; }
 .pen { width: 14px; height: 14px; margin-left: 6px; vertical-align: -1px; stroke: #8A8277; }
 .polaroid-meta { margin: 6px 0 0; font-family: var(--f-mono); font-size: 10px; color: #6B645B; }
