@@ -4,11 +4,13 @@
 
 const SRC = { url: 'assets/jar.jpg', w: 1088, h: 1456 };   // the photo's coordinate space
 export const BOX = { x: 169, y: 150, w: 746, h: 1160 };    // the jar inside the photo
-const LID = { y0: 150, y1: 312, x0: 206, x1: 878 };
+// The lid ends where its brass skirt meets the glass rim, so neither keeps a sliver of the other.
+const LID = { y0: 150, y1: 305, x0: 206, x1: 878 };
 export const INSIDE = { x: 183, y: 318, w: 718, h: 978 };   // bounds of the glass interior
 export const INTERIOR = 'M228 318 L860 318 L862 410 C880 430 901 455 901 520 L901 1200 C901 1260 870 1292 800 1296'
   + ' L288 1296 C218 1292 183 1260 183 1200 L183 520 C183 455 206 430 226 410 Z';
 export const MOUTH = { x: 544, y: 322, rx: 316, ry: 26 };
+const RIM = { x: 543, y: 305, rx: 332, ry: 15 };   // the opening on top of the glass rim, seen when the lid is off
 export const JAR_RATIO = BOX.h / BOX.w;
 
 let layers = null;
@@ -112,6 +114,7 @@ export function jarSvg({ href = '', lidded = true, label = '' } = {}) {
     <image class="j-body j-body-light" href="${layers.lightUrl}" x="0" y="0" width="${SRC.w}" height="${SRC.h}"/>`
       : `<path class="j-outline" d="${INTERIOR}"/>`}
     <ellipse class="j-ripple" cx="${MOUTH.x}" cy="${MOUTH.y}" rx="${MOUTH.rx}" ry="${MOUTH.ry}"/>
+    <ellipse class="j-mouth" cx="${RIM.x}" cy="${RIM.y}" rx="${RIM.rx}" ry="${RIM.ry}"${lidded ? ' style="opacity:0"' : ''}/>
     ${lidded ? lidSvg() : ''}
   </svg>`;
 }

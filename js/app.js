@@ -1,8 +1,8 @@
 import { store, newId } from './store.js';
 import { prepareImage, hexToRgb, dominant, hex, mix } from './sky.js';
 import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
-import { foldStage, MOTION, reduceMotion } from './fold.js';
-import { sunTimes } from './sun.js';
+import { foldStage, rollNote, MOTION, reduceMotion } from './fold.js';
+import { sunTimes, guessPlace } from './sun.js';
 import { makeStory, shareImage, saveImage } from './story.js';
 import { chime } from './sound.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, QUOTES, CHALLENGE_SIZE } from './strings.js';
@@ -10,13 +10,13 @@ import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, QUOTES, CHALLENGE_SIZE } from '.
 const ICON = {
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6l6 6-6 6"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>',
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const view = $('#view');
 const cap = $('#capture');
 
-const BANGKOK = { lat: 13.7563, lon: 100.5018 };
 const state = { skies: [], year: new Date().getFullYear(), redraw: null, lastRoute: '', viaPrompt: false, unfolded: false, detail: null };
 
 // ---------- helpers ----------
@@ -95,9 +95,12 @@ function nextQuote() {
 function savedPlace() {
   try { return JSON.parse(localStorage.getItem('kepfa.place')) || null; } catch { return null; }
 }
+/** Where sun times come from: the location you shared, else a city guessed from the phone's time zone. */
+const sunPlace = () => savedPlace() || guessPlace();
+const zoneCity = () => guessPlace().name || t.yourZone;
 
 function sunLine() {
-  const place = savedPlace() || BANGKOK;
+  const place = sunPlace();
   const now = new Date();
   const today = sunTimes(now, place.lat, place.lon);
   if (!today) return '';
@@ -111,13 +114,13 @@ function sunLine() {
 }
 
 function askLocation() {
-  if (!navigator.geolocation) { toast(t.locationDenied); return; }
+  if (!navigator.geolocation) { toast(t.locationDenied(zoneCity())); return; }
   navigator.geolocation.getCurrentPosition((pos) => {
     // Two decimals is about a kilometre: plenty for sun times, and it never leaves this device.
     const place = { lat: +pos.coords.latitude.toFixed(2), lon: +pos.coords.longitude.toFixed(2) };
     try { localStorage.setItem('kepfa.place', JSON.stringify(place)); } catch { /* keep the default */ }
     render();
-  }, () => toast(t.locationDenied), { maximumAge: 864e5, timeout: 10000 });
+  }, () => toast(t.locationDenied(zoneCity())), { maximumAge: 864e5, timeout: 10000 });
 }
 
 /** Today's prompt: the same for everyone, changes at local midnight. */
@@ -221,7 +224,7 @@ function shelfRowsHtml(list) {
 
 /** Which sky is out right now, so the prompt sits on a sheet of that colour. */
 function skyPhase(now = new Date()) {
-  const place = savedPlace() || BANGKOK;
+  const place = sunPlace();
   const sun = sunTimes(now, place.lat, place.lon);
   if (!sun) return 'day';
   if (now < sun.sunrise || now >= sun.sunset) return 'night';
@@ -241,13 +244,17 @@ function renderShelf() {
 
   view.innerHTML = `
     <header class="masthead">
-      <div class="masthead-meta"><span class="eyebrow">${t.issue(now.getMonth() + 1)}</span><span class="eyebrow">${fmt.issueDate(now)}</span></div>
+      <div class="masthead-meta"><span class="eyebrow">${fmt.issueDate(now)}</span></div>
       <h1 class="wordmark">Kepfa</h1>
     </header>
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
-      <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${savedPlace() ? t.herePlace : t.defaultPlace}</button></div>` : ''}
+      <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${ICON.pin}${savedPlace()
+        ? `<span>${t.nearYou}</span>` : `<span>${esc(zoneCity())} · <u>${t.notHere}</u></span>`}</button></div>` : ''}
     <section class="prompt is-${skyPhase(now)}">
-      <div class="prompt-sheet-head"><span class="prompt-badge">${t.challengeBadge}</span><span class="prompt-day">${fmt.dayShort(prompt.key)}</span></div>
+      <div class="prompt-print">
+        <div class="prompt-sky"></div>
+        <div class="prompt-sheet-head"><span class="prompt-badge">${t.challengeBadge}</span><span class="prompt-day">${fmt.dayShort(prompt.key)}</span></div>
+      </div>
       <div class="prompt-pin">
         ${tape('tape-top')}
         <div class="slip torn">
@@ -255,10 +262,10 @@ function renderShelf() {
           <h2 class="prompt-text">${prompt.text}</h2>
           <p class="prompt-line">${t.sameSky}</p>
           <button type="button" class="btn primary prompt-go" id="lookUp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>${t.lookUp}</button>
-          <a class="btn-text prompt-tag" href="${tagUrl(prompt.tag)}" target="_blank" rel="noopener">${t.seeTag(prompt.tag)}</a>
+          <a class="btn-text prompt-tag" href="${tagUrl(prompt.tag)}" target="_blank" rel="noopener">${t.seeWho}</a>
           <div class="prompt-progress">
-            <div class="prompt-head"><span class="eyebrow">${t.challenge(round)}</span><span class="prompt-count">${filled} / ${CHALLENGE_SIZE}</span></div>
-            <div class="dots" role="img" aria-label="${filled} of ${CHALLENGE_SIZE}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ` class="on${i === fresh ? ' is-new' : ''}"` : ''}></i>`).join('')}</div>
+            <div class="prompt-head"><span class="eyebrow">${t.challenge(round)}</span><span class="prompt-count">${t.challengeCount(filled)}</span></div>
+            <div class="dots" role="img" aria-label="${t.challengeCount(filled)}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ` class="on${i === fresh ? ' is-new' : ''}"` : ''}></i>`).join('')}</div>
           </div>
         </div>
       </div>
@@ -383,7 +390,6 @@ function renderMonth(year, month) {
   view.innerHTML = `
     <header class="page-head">
       <a class="eyebrow back" href="#/months">‹ ${t.backToMonths}</a>
-      <span class="eyebrow">${t.issue(month + 1)}</span>
     </header>
     <h1 class="title">${MONTHS[month]}</h1>
     <p class="subtitle">${year}</p>
@@ -447,8 +453,8 @@ function showStep(name) {
   cap.querySelectorAll('.cap-step').forEach((s) => { s.hidden = s.dataset.step !== name; });
 }
 
-/** Dim the viewfinder outside a jar-shaped window, so what you frame is what gets kept. */
-function layoutCameraFrame() {
+/** Dim the viewfinder (or a library photo) outside a jar-shaped window, so what you frame is what gets kept. */
+function layoutCameraFrame(svg = $('#camFrame'), maskId = 'camMask') {
   const W = innerWidth, H = innerHeight;
   const jh = Math.min(H * 0.58, Math.min(W * 0.78, 340) * JAR_RATIO);
   const jw = jh / JAR_RATIO;
@@ -457,10 +463,10 @@ function layoutCameraFrame() {
   const place = `translate(${x} ${y}) scale(${jw / BOX.w}) translate(${-BOX.x} ${-BOX.y})`;
   const k = jw / BOX.w;
   camWindow = { x: x + (INSIDE.x - BOX.x) * k, y: y + (INSIDE.y - BOX.y) * k, w: INSIDE.w * k, h: INSIDE.h * k };
-  $('#camFrame').setAttribute('viewBox', `0 0 ${W} ${H}`);
-  $('#camFrame').innerHTML = `
-    <defs><mask id="camMask"><rect width="${W}" height="${H}" fill="white"/><path d="${INTERIOR}" transform="${place}" fill="black"/></mask></defs>
-    <rect class="cam-scrim" width="${W}" height="${H}" mask="url(#camMask)"/>
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `
+    <defs><mask id="${maskId}"><rect width="${W}" height="${H}" fill="white"/><path d="${INTERIOR}" transform="${place}" fill="black"/></mask></defs>
+    <rect class="cam-scrim" width="${W}" height="${H}" mask="url(#${maskId})"/>
     <g transform="${place}">${jarSvg({ lidded: true }).replace(/^<svg[^>]*>|<\/svg>\s*$/g, '')}</g>`;
 }
 
@@ -510,6 +516,8 @@ function closeCapture() {
   stopCamera();
   if (draft?.url) URL.revokeObjectURL(draft.url);
   draft = null;
+  if (frame.url) { URL.revokeObjectURL(frame.url); frame.url = ''; }
+  document.querySelectorAll('.note-ghost, .note-fly').forEach((n) => n.remove());
   state.viaPrompt = false;
   cap.hidden = true;
   document.body.style.overflow = '';
@@ -531,25 +539,172 @@ async function snap() {
   chime([2093], 0);
   const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
   stopCamera();
-  review(blob, Date.now());
+  review(blob, { takenAt: Date.now(), source: 'camera' });
 }
 
-function picked(e) {
+// ---------- from the photo library: fit the sky in the jar ----------
+
+/** The library photo being framed: its size, and where it sits on screen (top-left x,y at scale s). */
+const frame = { url: '', takenAt: null, iw: 0, ih: 0, x: 0, y: 0, s: 1, min: 1, max: 4 };
+
+/** When a JPEG says it was taken (EXIF DateTimeOriginal, else DateTime), as local time; null if it doesn't say. */
+async function photoDate(file) {
+  try {
+    const v = new DataView(await file.slice(0, 256 * 1024).arrayBuffer());
+    if (v.getUint16(0) !== 0xFFD8) return null;
+    for (let p = 2; p + 10 < v.byteLength;) {
+      const marker = v.getUint16(p);
+      if ((marker & 0xFF00) !== 0xFF00 || marker === 0xFFDA) return null;
+      if (marker === 0xFFE1 && v.getUint32(p + 4) === 0x45786966) return exifDate(v, p + 10);
+      p += 2 + v.getUint16(p + 2);
+    }
+  } catch { /* unreadable: we'll ask */ }
+  return null;
+}
+function exifDate(v, tiff) {
+  const le = v.getUint16(tiff) === 0x4949;
+  const u16 = (o) => v.getUint16(tiff + o, le);
+  const u32 = (o) => v.getUint32(tiff + o, le);
+  const find = (ifd, tag) => {
+    for (let i = 0, n = u16(ifd); i < n; i++) if (u16(ifd + 2 + i * 12) === tag) return ifd + 2 + i * 12;
+    return 0;
+  };
+  const ifd0 = u32(4);
+  const exif = find(ifd0, 0x8769);
+  const entry = (exif && find(u32(exif + 8), 0x9003)) || find(ifd0, 0x0132);
+  if (!entry) return null;
+  const at = u32(entry + 8);
+  const text = Array.from({ length: 19 }, (_, i) => String.fromCharCode(v.getUint8(tiff + at + i))).join('');
+  const m = text.match(/^(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d):(\d\d)/);
+  if (!m) return null;
+  const ms = new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime();
+  return ms > 0 && ms <= Date.now() + 864e5 ? Math.min(ms, Date.now()) : null;
+}
+
+async function picked(e) {
   const f = e.target.files?.[0];
   e.target.value = '';
   if (!f) return;
   stopCamera();
-  // Only the camera app can hand a photo in (no library), so the sky was taken just now.
-  review(f, Date.now());
+  // The date is read first: the crop is redrawn on a canvas, which drops all EXIF, GPS included.
+  frame.takenAt = await photoDate(f);
+  if (frame.url) URL.revokeObjectURL(frame.url);
+  frame.url = URL.createObjectURL(f);
+  const img = $('#frameImg');
+  img.src = frame.url;
+  try { await img.decode(); } catch { toast(t.cantOpen); return; }
+  frame.iw = img.naturalWidth;
+  frame.ih = img.naturalHeight;
+  showStep('frame');
+  layoutFrame(true);
 }
 
-async function review(blob, takenAt) {
+/** Starts filling the screen, like the camera; it can zoom out until it just covers the jar, and in to 4x. */
+function layoutFrame(reset) {
+  layoutCameraFrame($('#frameMask'), 'frameMaskCut');
+  const w = camWindow;
+  const cover = Math.max(innerWidth / frame.iw, innerHeight / frame.ih);
+  frame.min = Math.max(w.w / frame.iw, w.h / frame.ih);
+  frame.max = Math.max(cover, frame.min) * 4;
+  if (reset) {
+    frame.s = Math.max(cover, frame.min);
+    frame.x = (innerWidth - frame.iw * frame.s) / 2;
+    frame.y = (innerHeight - frame.ih * frame.s) / 2;
+  }
+  placeFrame();
+}
+
+/** Keep the jar window covered by the photo, then draw it there. */
+function placeFrame() {
+  const w = camWindow;
+  frame.s = Math.min(frame.max, Math.max(frame.min, frame.s));
+  frame.x = Math.min(w.x, Math.max(w.x + w.w - frame.iw * frame.s, frame.x));
+  frame.y = Math.min(w.y, Math.max(w.y + w.h - frame.ih * frame.s, frame.y));
+  $('#frameImg').style.transform = `translate(${frame.x}px, ${frame.y}px) scale(${frame.s})`;
+}
+
+/** Zoom by k around a point on screen, so whatever is under the fingers stays put. */
+function zoomFrame(k, px, py) {
+  const s = Math.min(frame.max, Math.max(frame.min, frame.s * k));
+  frame.x = px - (px - frame.x) * (s / frame.s);
+  frame.y = py - (py - frame.y) * (s / frame.s);
+  frame.s = s;
+  placeFrame();
+}
+
+/** One finger drags, two pinch (and drag); a mouse wheel zooms. */
+function bindFrameGestures() {
+  const el = cap.querySelector('.frame');
+  const pts = new Map();
+  let last = null;
+  const read = () => {
+    const p = [...pts.values()];
+    return {
+      x: p.reduce((a, q) => a + q.x, 0) / p.length,
+      y: p.reduce((a, q) => a + q.y, 0) / p.length,
+      d: p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0,
+    };
+  };
+  el.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    el.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    last = read();
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const now = read();
+    frame.x += now.x - last.x;
+    frame.y += now.y - last.y;
+    if (now.d && last.d) zoomFrame(now.d / last.d, now.x, now.y); else placeFrame();
+    last = now;
+  });
+  const up = (e) => { pts.delete(e.pointerId); last = pts.size ? read() : null; };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('wheel', (e) => { e.preventDefault(); zoomFrame(Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY); }, { passive: false });
+}
+
+/** Crop to the jar window with the same maths as a camera shot. */
+async function useFrame() {
+  const w = camWindow;
+  const sw = w.w / frame.s, sh = w.h / frame.s;
+  const k = Math.min(1, 3000 / Math.max(sw, sh));   // stays under phone canvas limits
+  const c = document.createElement('canvas');
+  c.width = Math.round(sw * k);
+  c.height = Math.round(sh * k);
+  c.getContext('2d').drawImage($('#frameImg'), (w.x - frame.x) / frame.s, (w.y - frame.y) / frame.s, sw, sh, 0, 0, c.width, c.height);
+  const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
+  URL.revokeObjectURL(frame.url);
+  frame.url = '';
+  $('#frameImg').removeAttribute('src');
+  review(blob, { takenAt: frame.takenAt, source: 'library' });
+}
+
+// ---------- keep: the photo goes straight into the open jar, then the note, then the lid ----------
+
+const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+/** For a datetime-local input: 2026-10-25T18:25 in local time. */
+const localInput = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+/** Each sky's note paper (paper-0 to paper-4 in CSS), fixed by its id so it never changes colour. */
+const paperFor = (id) => `paper-${[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % 5}`;
+/** "September", or "September 2025" when it's another year. */
+const monthOf = (ms) => { const d = new Date(ms); return MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''); };
+
+/**
+ * @param from.takenAt  when the sky was taken; null for a library photo that didn't say
+ * @param from.source   'camera' or 'library'
+ */
+async function review(blob, { takenAt, source }) {
   showStep('review');
   const el = cap.querySelector('.review');
   el.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t.reading}</p></div>`;
+  if (draft?.url) URL.revokeObjectURL(draft.url);
   try {
-    draft = { ...(await prepareImage(blob)), takenAt };
+    draft = { ...(await prepareImage(blob)), id: newId(), takenAt, source };
   } catch {
+    draft = null;
     el.innerHTML = `<div class="loading"><p>${t.cantOpen}</p>
       <button type="button" class="btn primary" id="tryAgain">${t.tryAgain}</button></div>`;
     $('#tryAgain').addEventListener('click', openCapture);
@@ -557,6 +712,9 @@ async function review(blob, takenAt) {
   }
   draft.url = URL.createObjectURL(draft.photo);
   const prompt = todayPrompt();
+  // Only a sky taken today counts for today's challenge; an older photo goes into the month it was taken.
+  const counts = source === 'camera' || (takenAt != null && sameDay(takenAt, Date.now()));
+  const paper = paperFor(draft.id);
 
   el.innerHTML = `
     <div class="review-inner">
@@ -564,63 +722,96 @@ async function review(blob, takenAt) {
         <button type="button" class="eyebrow back" data-close-capture>${t.cancel}</button>
         <span class="eyebrow">${t.newSky}</span>
       </div>
-      <div id="foldSlot"></div>
-      ${skyFields({ takenAt })}
-      <label class="tick-row">
-        <input type="checkbox" id="forPrompt" ${state.viaPrompt ? 'checked' : ''}>
-        <span><span class="eyebrow">${t.keptForToday}</span><span class="tick-prompt">${prompt.text}</span></span>
-      </label>
-      <div class="review-actions">
-        <button type="button" class="btn" id="retake">${t.retake}</button>
-        <button type="button" class="btn primary" id="keepIt">${t.keep}</button>
+      <div id="foldSlot" class="review-jar"></div>
+      <div class="review-form" id="reviewForm">
+        ${skyFields({ takenAt, source, paper })}
+        ${counts ? `<label class="tick-row">
+          <input type="checkbox" id="forPrompt" ${state.viaPrompt ? 'checked' : ''}>
+          <span><span class="eyebrow">${t.keptForToday}</span><span class="tick-prompt">${prompt.text}</span></span>
+        </label>` : ''}
+        ${takenAt != null && !counts ? `<p class="review-note">${t.otherDay(monthOf(takenAt))}</p>` : ''}
+      </div>
+      <div class="review-actions" id="reviewActions">
+        <button type="button" class="btn" id="retake">${source === 'camera' ? t.retake : t.chooseAnother}</button>
+        <button type="button" class="btn primary" id="keepIt">${t.closeLid}</button>
       </div>
     </div>`;
 
   const stage = foldStage(draft.url, Math.min(150, innerWidth * 0.4), 'open');
   $('#foldSlot').append(stage.el);
-  draft.stage = stage;
-  draft.prompt = prompt;
+  Object.assign(draft, { stage, prompt, paper, counts });
+  // Straight into the open jar; the note follows when the lid is closed.
+  draft.filling = new Promise((r) => requestAnimationFrame(r))
+    .then(() => stage.foldIn({ lid: false }))
+    .then(() => settleJar(stage));
 
   $('#noteInput').addEventListener('input', (e) => { e.target.className = `field note ${handClass(e.target.value)}`; });
-  $('#retake').addEventListener('click', () => { URL.revokeObjectURL(draft.url); draft = null; openCapture(); });
+  $('#retake').addEventListener('click', () => {
+    if (source === 'library') { $('#fileLibrary').click(); return; }
+    URL.revokeObjectURL(draft.url);
+    draft = null;
+    openCapture();
+  });
   $('#keepIt').addEventListener('click', saveDraft);
 }
 
-/** Note and place; the time is the moment of the shot, shown as it is. */
-function skyFields({ takenAt }) {
+/** Once the photo is in, the space where it was folded closes up and the jar moves up. */
+function settleJar(stage) {
+  const jar = stage.el.querySelector('.fold-jar');
+  const top = jar.offsetTop, h = stage.el.offsetHeight;
+  stage.el.style.height = `${h - top}px`;
+  jar.style.top = '0px';
+  if (reduceMotion()) return;
+  const o = { duration: MOTION.move, easing: MOTION.out };
+  stage.el.animate([{ height: `${h}px` }, { height: `${h - top}px` }], o);
+  jar.animate([{ top: `${top}px` }, { top: '0px' }], o);
+}
+
+/** A torn slip of note paper holding the note, the place and the time. */
+function skyFields({ takenAt, source, paper }) {
   const placeholder = t.notePrompts[Math.floor(Math.random() * t.notePrompts.length)];
+  const now = localInput(Date.now());
+  const when = source === 'camera' ? `<p class="kept-at">${t.keptAt(fmt.stamp(takenAt))}</p>`
+    : takenAt != null ? `<p class="kept-at">${t.takenFrom(fmt.stamp(takenAt))}</p>`
+      : `<label class="field-label" for="whenInput">${t.whenTaken}</label>
+        <input id="whenInput" class="field when" type="datetime-local" value="${now}" max="${now}">
+        <p class="kept-at">${t.noDate}</p>`;
   return `
-    <div>
+    <div class="slip torn-top ${paper}" id="noteSlip">
       <label class="field-label" for="noteInput">${t.note}</label>
       <input id="noteInput" class="field note hand" maxlength="80" placeholder="${placeholder}" autocomplete="off" enterkeyhint="next">
-    </div>
-    <div>
       <label class="field-label" for="placeInput">${t.place}</label>
       <input id="placeInput" class="field" maxlength="24" placeholder="${t.placeHint}" autocomplete="off" enterkeyhint="done">
-      <p class="kept-at">${t.keptAt(fmt.stamp(takenAt))}</p>
+      ${when}
     </div>`;
 }
 
 async function saveDraft() {
-  const btn = $('#keepIt');
-  btn.disabled = true;
+  const buttons = [$('#keepIt'), $('#retake')];
+  buttons.forEach((b) => { b.disabled = true; });
+  await draft.filling;
+  const note = $('#noteInput').value.trim();
+  const place = $('#placeInput').value.trim();
+  const when = $('#whenInput');
+  const forPrompt = draft.counts && $('#forPrompt').checked;
   const sky = {
-    id: newId(),
-    takenAt: draft.takenAt,
-    note: $('#noteInput').value.trim(),
-    place: $('#placeInput').value.trim(),
-    prompt: $('#forPrompt').checked ? draft.prompt.key : '',
-    promptText: $('#forPrompt').checked ? draft.prompt.text : '',
+    id: draft.id,
+    takenAt: when ? Math.min(new Date(when.value).getTime(), Date.now()) || Date.now() : draft.takenAt,
+    note,
+    place,
+    prompt: forPrompt ? draft.prompt.key : '',
+    promptText: forPrompt ? draft.prompt.text : '',
     palette: draft.palette,
     photo: draft.photo,
     thumb: draft.thumb,
     sample: false,
     createdAt: Date.now(),
   };
+  // Saved before anything moves: if it fails, the lid stays open and nothing is lost.
   try {
     await store.put(sky);
   } catch {
-    btn.disabled = false;
+    buttons.forEach((b) => { b.disabled = false; });
     toast(t.saveFailed);
     return;
   }
@@ -628,20 +819,30 @@ async function saveDraft() {
   sortSkies();
   state.viaPrompt = false;
 
-  // Saved first; the fold is only the send-off.
-  const { stage, url } = draft;
-  cap.querySelector('.review').scrollTo({ top: 0, behavior: 'smooth' });
-  await stage.foldIn();
-  navigator.vibrate?.(18);
-  URL.revokeObjectURL(url);
-  draft = null;
-  showKept(sky);
+  // The send-off: the keyboard goes, the jar comes back into view, the note rolls in, the lid closes.
+  const { stage, paper } = draft;
+  const scroller = cap.querySelector('.review');
+  const typing = document.activeElement?.matches('input') && scroller.contains(document.activeElement);
+  document.activeElement?.blur();
+  if (typing) await new Promise((r) => setTimeout(r, 250));
+  if (scroller.scrollTop > 0) {
+    scroller.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' });
+    await new Promise((r) => setTimeout(r, reduceMotion() ? 0 : 350));
+  }
+  const fadeOut = (node) => node.animate({ opacity: [1, 0] }, { duration: MOTION.quick, easing: MOTION.in, fill: 'forwards' });
+  fadeOut($('#reviewActions'));
+  const rolling = note || place ? rollNote($('#noteSlip'), stage.el.querySelector('.fold-jar'), paper) : null;
+  fadeOut($('#reviewForm'));
+  await rolling;
+  await stage.lidOn();
+  showKept(sky, stage);
 }
 
-function showKept(sky) {
+/** The same jar, lid on, with what to do next. */
+function showKept(sky, stage) {
   showStep('drop');
   cap.querySelector('.drop').innerHTML = `
-    <div class="drop-jar">${jarSvg({ href: photoUrl(sky) })}</div>
+    <div class="drop-jar" id="dropJar"></div>
     <div class="drop-msg">
       <h2>${t.keptDone}</h2>
       <p>${fmt.long(sky.takenAt)}</p>
@@ -650,6 +851,7 @@ function showKept(sky) {
         <button type="button" class="btn primary" id="dropOpen">${t.seeMySkies}</button>
       </div>
     </div>`;
+  $('#dropJar').append(stage.el);
   $('#dropShare').addEventListener('click', () => openStory('single', { sky }));
   $('#dropOpen').addEventListener('click', () => { closeCapture(); go('#/'); });
 }
@@ -665,7 +867,7 @@ const noteClass = (note) => `${handClass(note)}${note.length > 40 ? ' is-long' :
 function stripHtml(sky) {
   const note = sky.note
     ? `<span class="${noteClass(sky.note)}">${esc(sky.note)}</span>`
-    : `<span class="polaroid-empty">${t.note}</span>`;
+    : `<span class="polaroid-empty">${t.writeOn}</span>`;
   return `<button type="button" class="polaroid-note" id="editNote" aria-label="${t.editNote}">${note}${PEN}</button>
     <p class="polaroid-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.stamp(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>`;
 }
@@ -770,7 +972,6 @@ async function closeJar() {
   stage.card.style.opacity = 1;
   stage.el.classList.remove('is-behind');
   await stage.foldIn();
-  navigator.vibrate?.(18);
   viewer.busy = false;
   closeSheet();
   holdHintOnce();
@@ -1080,7 +1281,10 @@ function markSeeded() {
 function bindGlobal() {
   $('#openCapture').addEventListener('click', () => { state.viaPrompt = false; openCapture(); });
   $('#shutter').addEventListener('click', snap);
-  $('#fileCamera').addEventListener('change', picked);
+  $('#fileLibrary').addEventListener('change', picked);
+  $('#frameAnother').addEventListener('click', () => $('#fileLibrary').click());
+  $('#frameUse').addEventListener('click', useFrame);
+  bindFrameGestures();
   cap.addEventListener('click', (e) => { if (e.target.closest('[data-close-capture]')) closeCapture(); });
   $('#storyModal').addEventListener('click', (e) => { if (e.target.closest('[data-close-story]')) closeStory(); });
   $('#jarX').setAttribute('aria-label', t.deleteSky);
@@ -1106,6 +1310,7 @@ function bindGlobal() {
     resizeTimer = setTimeout(() => {
       state.redraw?.();
       if (!cap.hidden) layoutCameraFrame();
+      if (frame.url && !cap.querySelector('.frame').hidden) layoutFrame(false);
     }, 120);
   });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => state.redraw?.());

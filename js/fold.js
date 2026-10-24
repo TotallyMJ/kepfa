@@ -6,6 +6,9 @@ import { whoosh, click } from './sound.js';
 
 export const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const EASE = 'cubic-bezier(.55,0,.35,1)';
+// Falling speeds up, rising slows down: together they read as gravity.
+const GRAVITY = 'cubic-bezier(.55,.085,.68,.53)';
+const RISE = 'cubic-bezier(.25,.46,.45,.94)';
 // The same motion tokens as css/style.css (--ease-*, --t-*), for animations driven from JS.
 export const MOTION = {
   out: 'cubic-bezier(.22,1,.36,1)',
@@ -57,6 +60,7 @@ export function foldStage(href, size, state) {
   const shine = $('.j-shine');
   const ripple = $('.j-ripple');
   const glow = $('.j-glow');
+  const mouth = $('.j-mouth');
   const shineTravel = +shine.dataset.travel;
 
   // The last triangle's centre sits at (1/6, 1/3) of the card; that point flies to the jar's mouth.
@@ -70,9 +74,10 @@ export function foldStage(href, size, state) {
   const skip = () => { skipped = true; el.getAnimations({ subtree: true }).forEach((a) => a.finish()); };
   const asPaper = (node, on) => node.classList.toggle('is-paper', on);
 
+  /** 'open' = photo out, jar empty; 'filled' = photo in the jar, lid still off; 'kept' = lid on. */
   const show = (st) => {
     el.getAnimations({ subtree: true }).forEach((a) => a.cancel());
-    const kept = st === 'kept';
+    const kept = st !== 'open';
     main.style.opacity = kept ? 0 : 1;
     main.style.transform = kept ? inJar : '';
     asPaper(base, kept);
@@ -85,7 +90,8 @@ export function foldStage(href, size, state) {
     f1.style.transform = '';
     f3.style.transform = kept ? 'rotateX(180deg)' : '';
     sky.style.opacity = kept ? 1 : 0;
-    lid.style.opacity = kept ? 1 : 0;
+    lid.style.opacity = st === 'kept' ? 1 : 0;
+    mouth.style.opacity = st === 'kept' ? 0 : 1;
   };
   show(state);
 
@@ -104,9 +110,32 @@ export function foldStage(href, size, state) {
     return run(lid, [{ transform: 'rotate(0)' }, { transform: `rotate(${dir * 1.5}deg)`, offset: 0.6 }, { transform: 'rotate(0)' }], { duration: 180 });
   };
 
-  async function foldIn() {
+  /** Drops on with gravity, bounces once, then screws down in one twist: light sweeps the brass, a click and a tiny buzz. */
+  async function lidOn() {
+    if (reduceMotion() || skipped) return show('kept');
+    lid.style.opacity = 1;
+    await run(lid, [
+      { offset: 0, opacity: 0, transform: 'translateY(-420px) rotate(-6deg)', easing: GRAVITY },
+      { offset: 0.1, opacity: 1 },
+      { offset: 0.7, transform: 'translateY(-5px) rotate(-1deg)', easing: RISE },
+      { offset: 0.85, transform: 'translateY(-25px) rotate(-1.5deg)', easing: GRAVITY },
+      { offset: 1, opacity: 1, transform: 'translateY(-10px) rotate(0)' },
+    ], { duration: 420 });
+    mouth.style.opacity = 0;
+    if (!skipped) shine.animate([{ opacity: 0, transform: 'translateX(0)' }, { opacity: 1, offset: 0.3 }, { opacity: 0, transform: `translateX(${shineTravel}px)` }], { duration: 340, easing: 'ease-in-out' });
+    setTimeout(() => { if (!skipped) { click(); navigator.vibrate?.(15); } }, 120);
+    await run(lid, [
+      { transform: 'translateY(-10px) rotate(0)' },
+      { transform: 'translateY(-10px) rotate(-4deg)', offset: 0.45, easing: 'cubic-bezier(.2,.9,.3,1.3)' },
+      { transform: 'translateY(0) rotate(0)' },
+    ], { duration: 260 });
+    show('kept');
+  }
+
+  /** @param lid  false leaves the jar open (the keep screen closes it later with lidOn) */
+  async function foldIn({ lid: withLid = true } = {}) {
     skipped = false;
-    if (reduceMotion()) return show('kept');
+    if (reduceMotion()) return show(withLid ? 'kept' : 'filled');
     // Fold 1: top-right half over the diagonal; its back is paper.
     base.style.clipPath = SQUARE;
     await run(f1, [{ transform: 'rotate3d(1,1,0,0deg)' }, { transform: 'rotate3d(1,1,0,90deg)' }], { duration: 140, easing: 'cubic-bezier(.6,0,1,1)' });
@@ -130,12 +159,8 @@ export function foldStage(href, size, state) {
     await run(main, flight.map((f, i) => ({ ...f, opacity: i === 2 ? 0 : 1 })), { duration: 440, easing: 'cubic-bezier(.45,0,.75,.5)' });
     energy();
     await run(sky, [{ opacity: 0, transform: 'scale(.7)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 220, easing: 'cubic-bezier(.2,.8,.3,1)' });
-    // Lid settles, then one twist and a click.
-    lid.style.opacity = 1;
-    await run(lid, [{ transform: 'translateY(-220px) rotate(-6deg)', opacity: 0 }, { transform: 'translateY(0) rotate(0)', opacity: 1 }], { duration: 200, easing: 'cubic-bezier(.3,0,.2,1)' });
-    await twist(-1);
-    click();
-    show('kept');
+    if (withLid) await lidOn();
+    else show('filled');
   }
 
   /** @param quick  the short version (~0.55s) for every open after the first: lid off, photo out already flat */
@@ -145,6 +170,7 @@ export function foldStage(href, size, state) {
     show('kept');
     if (quick) {
       await run(lid, [{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(-200px) rotate(-6deg)', opacity: 0 }], { duration: 160, easing: 'cubic-bezier(.2,.7,.3,1)' });
+      mouth.style.opacity = 1;
       sky.style.opacity = 0;
       f3.hidden = true;
       base.style.clipPath = 'none';
@@ -157,6 +183,7 @@ export function foldStage(href, size, state) {
     click();
     await twist(1);
     await run(lid, [{ transform: 'translateY(0) rotate(0)', opacity: 1 }, { transform: 'translateY(-260px) rotate(-6deg)', opacity: 0 }], { duration: 220, easing: 'cubic-bezier(.2,.7,.3,1)' });
+    mouth.style.opacity = 1;
     energy();
     await run(sky, [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(.7)' }], { duration: 170 });
     const flight = [{ transform: inJar }, { transform: midAir, offset: 0.55 }, { transform: 'none' }];
@@ -179,5 +206,95 @@ export function foldStage(href, size, state) {
     show('open');
   }
 
-  return { el, card: main, foldIn, foldOut, skip };
+  return { el, card: main, foldIn, foldOut, lidOn, skip };
+}
+
+// Twine tied in a bow: dark edge, mid tone, and a dashed light twist on top; frayed ends and a wrapped knot.
+const TWINE = 'M22 12C16 2 3 3 4.5 10.5 6 16.5 16 15 22 12ZM22 12C27.5 4 39 5 38 11.5 37 16 28 15 22 12ZM22 12C19 17 15.5 21.5 10 26.5M22 12C25 17 27.5 21 32.5 25';
+const BOW = `<svg class="bow" viewBox="0 0 44 28" aria-hidden="true">
+  <path d="${TWINE}" stroke="#5e4327" stroke-width="2.8"/><path d="${TWINE}" stroke="#a07c4c" stroke-width="1.9"/>
+  <path d="${TWINE}" stroke="#d6bb8e" stroke-width="1.2" stroke-dasharray=".7 1.6"/>
+  <path d="M10 26.5 8.3 27.6M10 26.5 9.4 28.2M32.5 25 34.3 25.8M32.5 25 33.2 26.9" stroke="#a07c4c" stroke-width=".7"/>
+  <ellipse cx="22" cy="12" rx="2.3" ry="2.8" fill="#8a6a43" stroke="#5e4327" stroke-width=".8"/>
+  <path d="M21.2 9.8C22.6 11 22.6 13 21.2 14.2" stroke="#d6bb8e" stroke-width=".6"/></svg>`;
+
+/**
+ * The note slip rolls up into a little scroll, gets a twine bow, and is tossed into the open jar,
+ * where it comes to rest on the bottom.
+ * @param slip   the note slip on screen (hidden once the roll starts)
+ * @param jar    the jar element the scroll lands in
+ * @param paper  the slip's paper class, so the scroll is the same colour
+ */
+export async function rollNote(slip, jar, paper) {
+  const rest = document.createElement('div');
+  rest.className = `note-roll is-resting ${paper}`;
+  rest.innerHTML = BOW;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const go = (node, frames, opts) => node.animate(frames, { fill: 'forwards', ...opts }).finished.catch(() => {});
+  if (reduceMotion()) { slip.style.visibility = 'hidden'; jar.append(rest); return; }
+
+  // A stand-in for the slip, laid exactly over it, rolls up from the right into a tube that thickens as it goes.
+  const b = slip.getBoundingClientRect();
+  const w = slip.offsetWidth, h = slip.offsetHeight;
+  const cx0 = b.left + b.width / 2, cy0 = b.top + b.height / 2;
+  const ghost = slip.cloneNode(true);
+  ghost.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+  ghost.classList.add('note-ghost');
+  ghost.style.cssText = `left:${cx0 - w / 2}px;top:${cy0 - h / 2}px;width:${w}px;height:${h}px`;
+  document.body.append(ghost);
+  slip.style.visibility = 'hidden';
+  const tube = document.createElement('div');
+  tube.className = `note-roll ${paper}`;
+  tube.style.cssText = `left:${cx0 + w / 2 - 12}px;top:${cy0 - h / 2 - 2}px;width:14px;height:${h + 4}px`;
+  const fly = document.createElement('div');
+  fly.className = 'note-fly';
+  fly.append(tube);
+  document.body.append(fly);
+  const travel = w - 18, roll = { duration: 560, easing: 'cubic-bezier(.45,0,.25,1)' };
+  await Promise.all([
+    go(ghost, [{ clipPath: 'inset(0 0 0 0)' }, { clipPath: `inset(0 ${travel + 6}px 0 0)` }], roll),
+    go(tube, [{ transform: 'translateX(0)', width: '14px' }, { transform: `translateX(${-travel}px)`, width: '22px' }], roll),
+  ]);
+  ghost.remove();
+
+  // Tied with a bow, and the knot pulled tight.
+  const base = `translateX(${-travel}px)`;
+  tube.insertAdjacentHTML('beforeend', BOW);
+  go(tube.querySelector('.bow'), [{ transform: 'translate(-50%,-50%) rotate(90deg) scale(0)' }, { transform: 'translate(-50%,-50%) rotate(90deg) scale(1)' }], { duration: 300, easing: MOTION.spring });
+  await wait(140);
+  await go(tube, [{ transform: `${base} rotate(0)` }, { transform: `${base} rotate(-4deg)` }, { transform: `${base} rotate(2deg)` }, { transform: `${base} rotate(0)` }], { duration: 240, easing: 'ease-in-out' });
+  await wait(160);
+
+  // Tossed with gravity: it drifts across at a steady speed while it rises, slows at the top, then falls faster and faster.
+  const t = tube.getBoundingClientRect(), j = jar.getBoundingClientRect();
+  const cx = t.left + t.width / 2, cy = t.top + t.height / 2;
+  const mx = j.left + j.width / 2 - cx, my = j.top - 44 - cy, iy = j.top + j.height * 0.82 - cy;
+  const up = (dy, r, s) => `${base} translateY(${dy}px) rotate(${r}deg) scale(${s})`;
+  const toss = { duration: 900 };
+  whoosh(false);
+  await Promise.all([
+    go(fly, [{ offset: 0, transform: 'translateX(0)' }, { offset: 0.1, transform: 'translateX(0)' }, { offset: 1, transform: `translateX(${mx}px)` }], toss),
+    go(tube, [
+      { offset: 0, transform: up(0, 0, 1), easing: 'ease-out' },
+      { offset: 0.1, transform: up(6, -5, 0.97), easing: RISE },
+      { offset: 0.46, transform: up(my, 70, 0.84), easing: GRAVITY },
+      { offset: 0.92, transform: up(iy - 8, 158, 0.6), opacity: 1 },
+      { offset: 1, transform: up(iy, 168, 0.56), opacity: 0 },
+    ], toss),
+  ]);
+  fly.remove();
+
+  // It hits the bottom, bounces twice (smaller each time) and settles in front of the sky.
+  jar.append(rest);
+  const at = (y, r) => `translate(-50%, calc(50% + ${y}px)) rotate(${r}deg)`;
+  await rest.animate([
+    { offset: 0, opacity: 0, transform: at(-10, 86), easing: GRAVITY },
+    { offset: 0.22, opacity: 1, transform: at(0, 80), easing: RISE },
+    { offset: 0.45, transform: at(-7, 84), easing: GRAVITY },
+    { offset: 0.66, transform: at(0, 81), easing: RISE },
+    { offset: 0.8, transform: at(-2, 82.5), easing: GRAVITY },
+    { offset: 0.9, transform: at(0, 82) },
+    { offset: 1, transform: at(0, 82) },
+  ], { duration: 640 }).finished.catch(() => {});
+  await wait(200);
 }
