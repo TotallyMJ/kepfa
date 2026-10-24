@@ -1,34 +1,29 @@
-// One corked apothecary bottle, drawn the same everywhere: SVG on the app's screens,
-// canvas for exported images. Both read their outline from bottleShape().
+// One screw-top jam jar, drawn the same everywhere: SVG on the app's screens,
+// canvas for exported images. Both read their outline from jarShape().
 
-const CORK = '#D8BF96';
-const CORK_DOT = '#A98756';
+export const JAR_RATIO = 1.35;
 
-/** Bottle geometry in local coordinates (0,0 top-left), as SVG path strings so Path2D can reuse them. */
-export function bottleShape(w, h, inset = 1) {
+/** Jar geometry in local coordinates (0,0 top-left), as SVG path strings so Path2D can reuse them. */
+export function jarShape(w, h, inset = 1) {
   const s = inset;
-  const cx = w / 2;
-  const nw = w * 0.34;
-  const lipY = h * 0.125;
-  const lipH = h * 0.035;
-  const lipW = nw * 1.36;
-  const nt = lipY + lipH / 2;
-  const ss = h * 0.27;
-  const bt = h * 0.42;
-  const r = w * 0.13;
-  const k = h * 0.07;
-  const body = `M${cx - nw / 2} ${nt} L${cx - nw / 2} ${ss} C${cx - nw / 2} ${ss + k} ${s} ${bt - k} ${s} ${bt}`
+  const lidH = h * 0.11;
+  const mx = w * 0.1;
+  const neckY = lidH;
+  const sy = neckY + h * 0.05;
+  const by = sy + h * 0.07;
+  const r = w * 0.12;
+  const body = `M${mx} ${neckY} L${mx} ${sy} Q${mx} ${by - h * 0.02} ${s} ${by}`
     + ` L${s} ${h - r - s} Q${s} ${h - s} ${r + s} ${h - s} L${w - r - s} ${h - s} Q${w - s} ${h - s} ${w - s} ${h - r - s}`
-    + ` L${w - s} ${bt} C${w - s} ${bt - k} ${cx + nw / 2} ${ss + k} ${cx + nw / 2} ${ss} L${cx + nw / 2} ${nt} Z`;
-  const corkBottom = nt + h * 0.05;
-  const cork = `M${cx - nw * 0.5} ${s} L${cx + nw * 0.5} ${s} L${cx + nw * 0.4} ${corkBottom} L${cx - nw * 0.4} ${corkBottom} Z`;
-  const dots = [[-0.2, 0.045], [0.18, 0.09], [0.02, 0.14], [-0.12, 0.11]].map(([dx, dy]) => [cx + nw * dx, h * dy, w * 0.011]);
+    + ` L${w - s} ${by} Q${w - mx} ${by - h * 0.02} ${w - mx} ${sy} L${w - mx} ${neckY} Z`;
+  const lidW = w - 2 * mx + w * 0.06;
+  const lid = { x: (w - lidW) / 2, y: s, w: lidW, h: lidH - s, r: Math.max(1, w * 0.015) };
+  const ridges = Array.from({ length: 14 }, (_, i) => lid.x + lid.w * (0.04 + (0.92 * i) / 13));
   return {
-    w, h, cx, nw, nt, ss, bt, body, cork, dots,
-    lip: { x: cx - lipW / 2, y: lipY, w: lipW, h: lipH, r: lipH / 2 },
-    glare: { x: w * 0.11, y: bt + h * 0.03, w: w * 0.065, h: h * 0.3 },
-    photo: { y: nt, h: h - nt },
-    fillTop: bt - (bt - ss) * 0.35,
+    w, h, mx, lid, ridges, body,
+    threads: [neckY + h * 0.018, neckY + h * 0.034],
+    glare: { x: w * 0.09, y: by + h * 0.04, w: w * 0.06, h: h * 0.4 },
+    photo: { y: neckY, h: h - neckY },
+    fillTop: sy + h * 0.02,
     fillBottom: h - s,
   };
 }
@@ -54,26 +49,28 @@ export function layerShapes(shape, skies, capacity, grow = 1) {
 
 let uid = 0;
 
-/** Bottle for the app's screens. Colors come from CSS classes so it follows the theme. */
-export function bottleSvg({ w = 100, h = 190, href = '', corked = true, label = '' } = {}) {
-  const g = bottleShape(w, h);
-  const id = `bottle${uid++}`;
-  const { lip, glare } = g;
-  return `<svg class="bottle" viewBox="0 0 ${w} ${h}" ${label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"'}>
-    <defs><clipPath id="${id}"><path d="${g.body}"/></clipPath></defs>
-    <path class="b-glass" d="${g.body}"/>
-    <g clip-path="url(#${id})">
-      ${href ? `<image href="${href}" x="0" y="${g.photo.y}" width="${w}" height="${g.photo.h}" preserveAspectRatio="xMidYMid slice"/>` : ''}
-      <rect class="b-glare" x="${glare.x}" y="${glare.y}" width="${glare.w}" height="${glare.h}" rx="${glare.w / 2}"/>
-    </g>
-    <path class="b-line" d="${g.body}"/>
-    <rect class="b-line b-lip" x="${lip.x}" y="${lip.y}" width="${lip.w}" height="${lip.h}" rx="${lip.r}"/>
-    ${corked ? corkSvg(g) : ''}
-  </svg>`;
+export function lidSvg(g) {
+  const { lid } = g;
+  return `<g class="j-lid"><rect class="j-lid-cap" x="${lid.x}" y="${lid.y}" width="${lid.w}" height="${lid.h}" rx="${lid.r}"/>`
+    + `<g class="j-ridges">${g.ridges.map((x) => `<line x1="${x}" x2="${x}" y1="${lid.y + lid.h * 0.18}" y2="${lid.y + lid.h * 0.82}"/>`).join('')}</g></g>`;
 }
 
-export function corkSvg(g) {
-  return `<g class="b-cork"><path d="${g.cork}"/>${g.dots.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>`;
+/** Jar for the app's screens. Colors come from CSS classes so it follows the theme. */
+export function jarSvg({ w = 100, h = 135, href = '', lidded = true, label = '' } = {}) {
+  const g = jarShape(w, h);
+  const id = `jar${uid++}`;
+  const { glare } = g;
+  return `<svg class="jar" viewBox="0 0 ${w} ${h}" ${label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"'}>
+    <defs><clipPath id="${id}"><path d="${g.body}"/></clipPath></defs>
+    <path class="j-glass" d="${g.body}"/>
+    <g clip-path="url(#${id})">
+      <g class="j-sky">${href ? `<image href="${href}" x="0" y="${g.photo.y}" width="${w}" height="${g.photo.h}" preserveAspectRatio="xMidYMid slice"/>` : ''}</g>
+      <rect class="j-glare" x="${glare.x}" y="${glare.y}" width="${glare.w}" height="${glare.h}" rx="${glare.w / 2}"/>
+    </g>
+    <path class="j-line" d="${g.body}"/>
+    ${g.threads.map((y) => `<line class="j-thread" x1="${g.mx}" x2="${w - g.mx}" y1="${y}" y2="${y}"/>`).join('')}
+    ${lidded ? lidSvg(g) : ''}
+  </svg>`;
 }
 
 /** Size a canvas for crisp drawing at devicePixelRatio and return a context in CSS pixels. */
@@ -90,12 +87,12 @@ export function setupCanvas(canvas, cssW, cssH) {
 }
 
 /**
- * Canvas bottle, filled with either a photo or one layer per sky.
+ * Canvas jar, filled with either a photo or one layer per sky.
  * @returns layer rects for hit-testing taps: [{index, top, bottom}] in the caller's coordinates
  */
-export function drawBottle(ctx, { x, y, w, h, image = null, skies = null, capacity = 31, grow = 1, ghost = false, ink = '#2A2723', glass = 'rgba(255,255,255,.4)' }) {
+export function drawJar(ctx, { x, y, w, h, image = null, skies = null, capacity = 31, ghost = false, ink = '#1E1C19', paper = '#F1EDE6', glass = 'rgba(255,255,255,.4)' }) {
   const line = Math.max(1, w * 0.008);
-  const g = bottleShape(w, h, line);
+  const g = jarShape(w, h, line);
   const body = new Path2D(g.body);
   let layers = [];
 
@@ -113,7 +110,7 @@ export function drawBottle(ctx, { x, y, w, h, image = null, skies = null, capaci
     const s = Math.max(w / iw, g.photo.h / ih);
     ctx.drawImage(image, (w - iw * s) / 2, g.photo.y + (g.photo.h - ih * s) / 2, iw * s, ih * s);
   } else if (skies) {
-    layers = layerShapes(g, skies, capacity, grow);
+    layers = layerShapes(g, skies, capacity);
     for (const l of layers) {
       const grad = ctx.createLinearGradient(0, l.top, 0, l.bottom);
       l.palette.forEach((c, j) => grad.addColorStop(l.palette.length === 1 ? 0.5 : j / (l.palette.length - 1), c.hex));
@@ -128,23 +125,36 @@ export function drawBottle(ctx, { x, y, w, h, image = null, skies = null, capaci
   ctx.restore();
 
   ctx.save();
-  ctx.globalAlpha *= 0.38;
   ctx.strokeStyle = ink;
   ctx.lineWidth = line;
+  ctx.globalAlpha *= 0.45;
   ctx.stroke(body);
-  ctx.beginPath();
-  ctx.roundRect(g.lip.x, g.lip.y, g.lip.w, g.lip.h, g.lip.r);
-  ctx.stroke();
+  ctx.globalAlpha /= 0.45;
+  ctx.globalAlpha *= 0.3;
+  for (const ty of g.threads) {
+    ctx.beginPath();
+    ctx.moveTo(g.mx, ty);
+    ctx.lineTo(w - g.mx, ty);
+    ctx.stroke();
+  }
   ctx.restore();
 
-  ctx.fillStyle = CORK;
-  ctx.fill(new Path2D(g.cork));
-  ctx.fillStyle = CORK_DOT;
-  for (const [cx, cy, r] of g.dots) {
+  const { lid } = g;
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.roundRect(lid.x, lid.y, lid.w, lid.h, lid.r);
+  ctx.fill();
+  ctx.save();
+  ctx.strokeStyle = paper;
+  ctx.globalAlpha *= 0.2;
+  ctx.lineWidth = line;
+  for (const rx of g.ridges) {
     ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(rx, lid.y + lid.h * 0.18);
+    ctx.lineTo(rx, lid.y + lid.h * 0.82);
+    ctx.stroke();
   }
+  ctx.restore();
   ctx.restore();
 
   return layers.map((l) => ({ index: l.index, top: y + l.top, bottom: y + l.bottom }));

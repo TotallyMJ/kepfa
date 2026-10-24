@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kepfa</title>
-<meta name="description" content="Keep the sky. Photograph the sky and cork it in a bottle on your shelf.">
+<meta name="description" content="Keep the sky. Photograph the sky and keep it in a jar on your shelf.">
 <meta name="theme-color" content="#F1EDE6" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1B1916" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
@@ -23,8 +23,8 @@
 <nav class="tabbar" aria-label="Main">
   <div class="tabbar-inner">
     <a href="#/" class="tab" data-tab="shelf">Shelf</a>
+    <button class="keep-btn" id="openCapture" type="button" aria-label="Keep a sky">Keep</button>
     <a href="#/months" class="tab" data-tab="months">Months</a>
-    <button class="btn capture-btn" id="openCapture" type="button">Keep a sky</button>
   </div>
 </nav>
 
@@ -33,7 +33,7 @@
     <video id="camVideo" playsinline muted></video>
     <svg id="camFrame" class="cam-frame" aria-hidden="true"></svg>
     <div class="cam-fallback" id="camFallback" hidden>
-      <div class="fallback-bottle" id="fallbackBottle"></div>
+      <div class="fallback-jar" id="fallbackJar"></div>
       <p class="cam-fallback-title">The camera can’t open here</p>
       <p>Take the photo with your camera app, or pick a sky from your library.</p>
       <label class="btn primary on-dark" for="fileCamera">Take a photo</label>
@@ -41,7 +41,7 @@
     </div>
     <div class="cam-top">
       <button class="btn-text on-dark" type="button" data-close-capture>Cancel</button>
-      <p class="cam-hint">Hold the bottle up to the sky</p>
+      <p class="cam-hint">Frame the sky in the jar</p>
       <span class="cam-spacer"></span>
     </div>
     <div class="cam-bottom">

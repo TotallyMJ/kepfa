@@ -1,11 +1,12 @@
 import { store, newId } from './store.js';
 import { prepareImage, makeSampleSky, hexToRgb, luminance, dominant, hex, mix } from './sky.js';
-import { bottleShape, bottleSvg, corkSvg, drawBottle, setupCanvas } from './jar.js';
+import { jarShape, jarSvg, lidSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
+import { foldStage } from './fold.js';
+import { sunTimes } from './sun.js';
 import { makeStory, shareImage, saveImage } from './story.js';
-import { t, fmt, MONTHS, MONTHS_SHORT } from './strings.js';
+import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS } from './strings.js';
 
 const ICON = {
-  share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4l4 4"/><path d="M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"/></svg>',
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6l6 6-6 6"/></svg>',
 };
@@ -14,14 +15,14 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const view = $('#view');
 const cap = $('#capture');
 
-const state = { skies: [], year: new Date().getFullYear(), redraw: null, lastRoute: '' };
+const BANGKOK = { lat: 13.7563, lon: 100.5018 };
+const state = { skies: [], year: new Date().getFullYear(), redraw: null, lastRoute: '', viaPrompt: false };
 
 // ---------- helpers ----------
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad2 = (n) => String(n).padStart(2, '0');
 const daysIn = (y, m) => new Date(y, m + 1, 0).getDate();
-const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function skiesIn(year, month) {
   return state.skies.filter((s) => {
@@ -58,10 +59,11 @@ function toLocalInput(ms) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-/** Canvas bottles can't read CSS, so hand them the theme's ink and glass. */
+/** Canvas jars can't read CSS, so hand them the theme's colors. */
 function themeInk() {
   const cs = getComputedStyle(document.documentElement);
-  return { ink: cs.getPropertyValue('--ink').trim(), glass: cs.getPropertyValue('--glass').trim() };
+  const v = (name) => cs.getPropertyValue(name).trim();
+  return { ink: v('--ink'), paper: v('--paper'), glass: v('--glass') };
 }
 
 let toastTimer;
@@ -77,7 +79,7 @@ function toast(msg) {
 }
 
 let actx;
-/** Glassy "tink" made with WebAudio, so there are no sound files to ship. */
+/** Soft glass "tink" made with WebAudio, so there are no sound files to ship. */
 function chime(freqs = [1318, 1976], gap = 0.07) {
   try {
     actx ||= new (window.AudioContext || window.webkitAudioContext)();
@@ -100,9 +102,67 @@ function chime(freqs = [1318, 1976], gap = 0.07) {
 
 function paletteHtml(palette) {
   return palette.map((p) => {
-    const fg = luminance(hexToRgb(p.hex)) > 0.55 ? '#2A2723' : '#FBF9F5';
+    const fg = luminance(hexToRgb(p.hex)) > 0.55 ? '#1E1C19' : '#FBF9F5';
     return `<button type="button" data-hex="${p.hex}" style="background:${p.hex};color:${fg}" aria-label="Copy ${p.hex}">${p.hex.slice(1).toUpperCase()}</button>`;
   }).join('');
+}
+
+// ---------- sun, prompt, memory ----------
+
+function savedPlace() {
+  try { return JSON.parse(localStorage.getItem('kepfa.place')) || null; } catch { return null; }
+}
+
+function sunLine() {
+  const place = savedPlace() || BANGKOK;
+  const now = new Date();
+  const today = sunTimes(now, place.lat, place.lon);
+  if (!today) return '';
+  const { sunrise, goldenMorningEnd, goldenEveningStart, sunset } = today;
+  if (now < sunrise) return t.sunriseIn(fmt.time(sunrise), fmt.duration(sunrise - now));
+  if (now < goldenMorningEnd) return t.goldenNowUntil(fmt.time(goldenMorningEnd));
+  if (now < goldenEveningStart) return t.goldenIn(fmt.time(goldenEveningStart), fmt.duration(goldenEveningStart - now));
+  if (now < sunset) return t.goldenNowSunset(fmt.time(sunset));
+  const tomorrow = sunTimes(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), place.lat, place.lon);
+  return tomorrow ? t.sunriseTomorrow(fmt.time(tomorrow.sunrise)) : '';
+}
+
+function askLocation() {
+  if (!navigator.geolocation) { toast(t.locationDenied); return; }
+  navigator.geolocation.getCurrentPosition((pos) => {
+    // Two decimals is about a kilometre: plenty for sun times, and it never leaves this device.
+    const place = { lat: +pos.coords.latitude.toFixed(2), lon: +pos.coords.longitude.toFixed(2) };
+    try { localStorage.setItem('kepfa.place', JSON.stringify(place)); } catch { /* keep the default */ }
+    render();
+  }, () => toast(t.locationDenied), { maximumAge: 864e5, timeout: 10000 });
+}
+
+/** This week's prompt: the same for everyone, picked from the ISO week number. */
+function weekPrompt(d = new Date()) {
+  const day = (d.getDay() + 6) % 7;
+  const thursday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day + 3);
+  const jan4 = new Date(thursday.getFullYear(), 0, 4);
+  const week = 1 + Math.round(((thursday - jan4) / 864e5 - 3 + ((jan4.getDay() + 6) % 7)) / 7);
+  return {
+    key: `${thursday.getFullYear()}-W${week}`,
+    text: PROMPTS[(thursday.getFullYear() * 53 + week) % PROMPTS.length],
+    daysLeft: 7 - day,
+  };
+}
+
+function onThisDay() {
+  const now = new Date();
+  const same = (s, d) => { const x = new Date(s.takenAt); return x.getFullYear() === d.getFullYear() && x.getMonth() === d.getMonth() && x.getDate() === d.getDate(); };
+  const tries = [
+    [t.yearAgo, new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())],
+    [t.monthAgo, new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())],
+    [t.weekAgo, new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)],
+  ];
+  for (const [label, d] of tries) {
+    const hits = state.skies.filter((s) => same(s, d));
+    if (hits.length) return { label, sky: hits[hits.length - 1] };
+  }
+  return null;
 }
 
 // ---------- routing ----------
@@ -133,23 +193,30 @@ function go(hash) {
   if (location.hash === hash) render(); else location.hash = hash;
 }
 
-// ---------- shelf (home): one bottle per sky ----------
+// ---------- shelf (home): one jar per sky ----------
 
 function bannerHtml() {
   if (!state.skies.some((s) => s.sample)) return '';
   return `<div class="banner"><p>${t.sampleBanner}</p><button type="button" class="btn-text" id="clearSamples">${t.clearSamples}</button></div>`;
 }
 
+function slotButton(s) {
+  return `<button type="button" class="jar-slot" data-id="${s.id}" aria-label="${t.openSky(fmt.long(s.takenAt))}">${jarSvg({ href: photoUrl(s) })}</button>`;
+}
+
 function shelfRowsHtml(list) {
   return chunk(list, 3).map((row) => `
     <div class="shelf-row">
-      <div class="shelf-bottles">${row.map((s) => `<button type="button" class="bottle-slot" data-id="${s.id}" aria-label="${t.openSky(fmt.long(s.takenAt))}">${bottleSvg({ href: photoUrl(s) })}</button>`).join('')}</div>
+      <div class="shelf-jars">${row.map(slotButton).join('')}</div>
       <div class="shelf-labels">${row.map((s) => { const [day, time] = fmt.shelf(s.takenAt); return `<p><span>${day}</span><span>${time}</span></p>`; }).join('')}</div>
     </div>`).join('');
 }
 
 function renderShelf() {
   const now = new Date();
+  const prompt = weekPrompt(now);
+  const forPrompt = state.skies.filter((s) => s.prompt === prompt.key).length;
+  const memory = onThisDay();
   const groups = [];
   for (const s of state.skies.slice().reverse()) {
     const d = new Date(s.takenAt);
@@ -157,30 +224,47 @@ function renderShelf() {
     if (last && last.y === d.getFullYear() && last.m === d.getMonth()) last.items.push(s);
     else groups.push({ y: d.getFullYear(), m: d.getMonth(), items: [s] });
   }
+  const sun = sunLine();
 
   view.innerHTML = `
     <header class="masthead">
-      <div class="masthead-row"><h1 class="wordmark">Kepfa</h1><span class="eyebrow">${t.vol(now.getFullYear())}</span></div>
-      <p class="tagline">${t.tagline}</p>
+      <div class="masthead-meta"><span class="eyebrow">${t.issue(now.getMonth() + 1)}</span><span class="eyebrow">${fmt.issueDate(now)}</span></div>
+      <h1 class="wordmark">Kepfa</h1>
     </header>
+    ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
+      <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${savedPlace() ? t.herePlace : t.defaultPlace}</button></div>` : ''}
     ${bannerHtml()}
-    <p class="kept"><span class="kept-n">${state.skies.length}</span> ${t.kept(state.skies.length)}</p>
+    <div class="modules${memory ? '' : ' single'}">
+      <section class="module">
+        <p class="eyebrow">${t.thisWeek}</p>
+        <h2 class="module-title">${prompt.text}</h2>
+        <p class="module-meta">${t.keptForPrompt(forPrompt)} · ${t.daysLeft(prompt.daysLeft)}</p>
+        <button type="button" class="btn-text" id="keepOne">${t.keepOne}</button>
+      </section>
+      ${memory ? `<section class="module">
+        <p class="eyebrow">${memory.label}</p>
+        <div class="memory">${slotButton(memory.sky)}
+          <p>${memory.sky.note ? `<span class="memory-note">${esc(memory.sky.note)}</span>` : ''}<span class="memory-date">${fmt.shelf(memory.sky.takenAt)[0]}, ${new Date(memory.sky.takenAt).getFullYear()}<br>${fmt.shelf(memory.sky.takenAt)[1]}</span></p>
+        </div>
+      </section>` : ''}
+    </div>
+    <div class="section-head"><h2 class="section-title">${t.shelf}</h2><span class="eyebrow">${state.skies.length} ${t.kept(state.skies.length)}</span></div>
     ${groups.length
-      ? groups.map((g) => `<section class="shelf-group"><h2 class="group-title">${MONTHS[g.m]} <span>${g.y}</span></h2>${shelfRowsHtml(g.items)}</section>`).join('')
+      ? groups.map((g) => `<section class="shelf-group"><h3 class="group-title">${MONTHS[g.m]} <span>${g.y}</span></h3>${shelfRowsHtml(g.items)}</section>`).join('')
       : `<div class="empty">
-           <div class="empty-bottle">${bottleSvg()}</div>
+           <div class="empty-jar">${jarSvg()}</div>
            <h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>
-           <button type="button" class="btn primary" id="firstSky">${t.keepFirst}</button>
          </div>`}`;
 
-  bindBottleSlots(view);
+  bindJarSlots(view);
   $('#clearSamples')?.addEventListener('click', clearSamples);
-  $('#firstSky')?.addEventListener('click', openCapture);
+  $('#setPlace')?.addEventListener('click', askLocation);
+  $('#keepOne').addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
   state.redraw = null;
 }
 
-function bindBottleSlots(root) {
-  root.querySelectorAll('.bottle-slot').forEach((el) => {
+function bindJarSlots(root) {
+  root.querySelectorAll('.jar-slot').forEach((el) => {
     el.addEventListener('click', () => openDetail(state.skies.find((s) => s.id === el.dataset.id)));
   });
 }
@@ -193,7 +277,7 @@ async function clearSamples() {
   toast(t.samplesCleared);
 }
 
-// ---------- months: one layered bottle per month ----------
+// ---------- months: one layered jar per month ----------
 
 function renderMonths() {
   const y = state.year;
@@ -202,26 +286,24 @@ function renderMonths() {
   const minYear = Math.min(now.getFullYear(), ...state.skies.map((s) => new Date(s.takenAt).getFullYear()));
   const isFuture = (m) => y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth());
 
-  // Newest shelf on top so the bottles you're filling now are the first thing you see.
+  // Newest shelf on top so the jars you're filling now are the first thing you see.
   view.innerHTML = `
     <header class="masthead">
-      <div class="masthead-row"><h1 class="wordmark">${t.months}</h1>
+      <div class="masthead-meta"><span class="eyebrow">${all.length} ${t.kept(all.length)}</span>
         <div class="year-switch">
           <button type="button" id="prevYear" aria-label="${t.prevYear}" ${y <= minYear ? 'disabled' : ''}>${ICON.left}</button>
           <span>${y}</span>
           <button type="button" id="nextYear" aria-label="${t.nextYear}" ${y >= now.getFullYear() ? 'disabled' : ''}>${ICON.right}</button>
         </div>
       </div>
+      <h1 class="wordmark">${t.months}</h1>
     </header>
-    <div class="kept-row">
-      <p class="kept"><span class="kept-n">${all.length}</span> ${t.kept(all.length)}</p>
-      ${all.length ? `<button type="button" class="btn-text" id="shareYear">${t.shareStory}</button>` : ''}
-    </div>
+    ${all.length ? `<div class="section-head"><span></span><button type="button" class="btn-text" id="shareYear">${t.shareStory}</button></div>` : ''}
     ${[3, 2, 1, 0].map((r) => {
       const ms = [0, 1, 2].map((c) => r * 3 + c);
       return `<div class="shelf-row">
-        <div class="shelf-bottles">${ms.map((m) => `<button type="button" class="month-slot" data-month="${m}" ${isFuture(m) ? 'disabled' : ''}
-          aria-label="${t.monthBottle(MONTHS[m], skiesIn(y, m).length)}"><canvas></canvas></button>`).join('')}</div>
+        <div class="shelf-jars">${ms.map((m) => `<button type="button" class="month-slot" data-month="${m}" ${isFuture(m) ? 'disabled' : ''}
+          aria-label="${t.monthJar(MONTHS[m], skiesIn(y, m).length)}"><canvas></canvas></button>`).join('')}</div>
         <div class="shelf-labels">${ms.map((m) => `<p><span>${MONTHS_SHORT[m]}</span><span>${isFuture(m) ? '–' : skiesIn(y, m).length}</span></p>`).join('')}</div>
       </div>`;
     }).join('')}`;
@@ -237,16 +319,16 @@ function renderMonths() {
     const theme = themeInk();
     view.querySelectorAll('.month-slot').forEach((el) => {
       const m = +el.dataset.month;
-      const w = Math.min(el.clientWidth, 92);
-      const h = Math.round(w * 1.9);
+      const w = Math.min(el.clientWidth, 96);
+      const h = Math.round(w * JAR_RATIO);
       const ctx = setupCanvas(el.querySelector('canvas'), w, h);
-      drawBottle(ctx, { x: 0, y: 0, w, h, skies: skiesIn(y, m), capacity: daysIn(y, m), ghost: el.disabled, ...theme });
+      drawJar(ctx, { x: 0, y: 0, w, h, skies: skiesIn(y, m), capacity: daysIn(y, m), ghost: el.disabled, ...theme });
     });
   };
   state.redraw();
 }
 
-// ---------- one month's bottle ----------
+// ---------- one month's jar ----------
 
 function renderMonth(year, month) {
   const list = skiesIn(year, month);
@@ -264,7 +346,7 @@ function renderMonth(year, month) {
     </header>
     <h1 class="title">${MONTHS[month]}</h1>
     <p class="subtitle">${year}</p>
-    <div class="jar-stage" id="jarStage"><canvas id="bigJar" aria-label="${t.monthBottle(MONTHS[month], list.length)}"></canvas></div>
+    <div class="jar-stage" id="jarStage"><canvas id="bigJar" aria-label="${t.monthJar(MONTHS[month], list.length)}"></canvas></div>
     ${list.length
       ? `<p class="hint">${t.tapLayer}</p>
          <div class="actions">
@@ -278,23 +360,20 @@ function renderMonth(year, month) {
          </div>
          <h2 class="section-title">${t.thisMonth}</h2>
          <div class="mini-grid">${list.slice().reverse().map((s) => { const [day, time] = fmt.shelf(s.takenAt); return `<div class="mini">
-           <button type="button" class="bottle-slot" data-id="${s.id}" aria-label="${t.openSky(fmt.long(s.takenAt))}">${bottleSvg({ href: photoUrl(s) })}</button>
-           <p><span>${day}</span><span>${time}</span></p></div>`; }).join('')}</div>`
-      : `<div class="empty"><h2>${t.emptyMonthTitle}</h2><p>${t.emptyMonthBody}</p>
-         <button type="button" class="btn primary" id="firstSky">${t.keepFirst}</button></div>`}`;
+           ${slotButton(s)}<p><span>${day}</span><span>${time}</span></p></div>`; }).join('')}</div>`
+      : `<div class="empty"><h2>${t.emptyMonthTitle}</h2><p>${t.emptyMonthBody}</p></div>`}`;
 
   $('#shareJar')?.addEventListener('click', () => openStory('jar', { year, month, skies: list }));
   $('#shake')?.addEventListener('click', () => shakeJar(list));
-  $('#firstSky')?.addEventListener('click', openCapture);
-  bindBottleSlots(view);
+  bindJarSlots(view);
 
   let layers = [];
   const cv = $('#bigJar');
   state.redraw = () => {
-    const w = Math.min(view.clientWidth * 0.5, 160);
-    const h = Math.round(w * 1.9);
+    const w = Math.min(view.clientWidth * 0.55, 200);
+    const h = Math.round(w * JAR_RATIO);
     const ctx = setupCanvas(cv, w, h);
-    layers = drawBottle(ctx, { x: 0, y: 0, w, h, skies: list, capacity: days, ...themeInk() });
+    layers = drawJar(ctx, { x: 0, y: 0, w, h, skies: list, capacity: days, ...themeInk() });
   };
   state.redraw();
   cv.addEventListener('click', (e) => {
@@ -313,8 +392,8 @@ function shakeJar(list) {
   navigator.vibrate?.([20, 40, 20, 40, 20]);
   setTimeout(() => {
     st.classList.remove('shaking');
-    openDetail(list[Math.floor(Math.random() * list.length)], { pop: true });
-  }, reduceMotion() ? 0 : 750);
+    openDetail(list[Math.floor(Math.random() * list.length)]);
+  }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 750);
 }
 
 // ---------- capture ----------
@@ -326,22 +405,21 @@ function showStep(name) {
   cap.querySelectorAll('.cap-step').forEach((s) => { s.hidden = s.dataset.step !== name; });
 }
 
-/** Dim the viewfinder outside a bottle-shaped window, so what you frame is what gets corked. */
+/** Dim the viewfinder outside a jar-shaped window, so what you frame is what gets kept. */
 function layoutCameraFrame() {
   const W = innerWidth, H = innerHeight;
-  const bh = Math.min(H * 0.6, Math.min(W * 0.7, 300) * 1.9);
-  const bw = bh / 1.9;
-  const x = (W - bw) / 2, y = (H - bh) / 2 - H * 0.02;
-  const g = bottleShape(bw, bh, 1.5);
-  const { lip } = g;
+  const jh = Math.min(H * 0.58, Math.min(W * 0.78, 340) * JAR_RATIO);
+  const jw = jh / JAR_RATIO;
+  const x = (W - jw) / 2, y = (H - jh) / 2 - H * 0.02;
+  const g = jarShape(jw, jh, 1.5);
   $('#camFrame').setAttribute('viewBox', `0 0 ${W} ${H}`);
   $('#camFrame').innerHTML = `
-    <defs><mask id="camMask"><rect width="${W}" height="${H}" fill="#fff"/><path d="${g.body}" transform="translate(${x} ${y})" fill="black"/></mask></defs>
+    <defs><mask id="camMask"><rect width="${W}" height="${H}" fill="white"/><path d="${g.body}" transform="translate(${x} ${y})" fill="black"/></mask></defs>
     <rect class="cam-scrim" width="${W}" height="${H}" mask="url(#camMask)"/>
     <g transform="translate(${x} ${y})">
       <path class="cam-line" d="${g.body}"/>
-      <rect class="cam-line" x="${lip.x}" y="${lip.y}" width="${lip.w}" height="${lip.h}" rx="${lip.r}"/>
-      ${corkSvg(g)}
+      ${g.threads.map((ty) => `<line class="cam-line" x1="${g.mx}" x2="${jw - g.mx}" y1="${ty}" y2="${ty}"/>`).join('')}
+      ${lidSvg(g)}
     </g>`;
 }
 
@@ -374,7 +452,7 @@ async function openCapture() {
 
 function showFallback() {
   $('#camFallback').hidden = false;
-  $('#fallbackBottle').innerHTML = bottleSvg();
+  $('#fallbackJar').innerHTML = jarSvg();
   cap.querySelector('.cam').classList.add('no-camera');
   $('#shutter').hidden = true;
   cap.querySelector('.cam-hint').hidden = true;
@@ -390,6 +468,7 @@ function closeCapture() {
   stopCamera();
   if (draft?.url) URL.revokeObjectURL(draft.url);
   draft = null;
+  state.viaPrompt = false;
   cap.hidden = true;
   document.body.style.overflow = '';
 }
@@ -429,7 +508,8 @@ async function review(blob, takenAt) {
     return;
   }
   draft.url = URL.createObjectURL(draft.photo);
-  const prompt = t.notePrompts[Math.floor(Math.random() * t.notePrompts.length)];
+  const prompt = weekPrompt();
+  const placeholder = t.notePrompts[Math.floor(Math.random() * t.notePrompts.length)];
 
   el.innerHTML = `
     <div class="review-inner">
@@ -437,42 +517,49 @@ async function review(blob, takenAt) {
         <button type="button" class="eyebrow back" data-close-capture>${t.cancel}</button>
         <span class="eyebrow">${t.newSky}</span>
       </div>
-      <div class="review-bottle">${bottleSvg({ href: draft.url, corked: false })}</div>
+      <div id="foldSlot"></div>
       <div><p class="field-label">${t.colors}</p><div class="palette">${paletteHtml(draft.palette)}</div></div>
       <div>
         <label class="field-label" for="noteInput">${t.note} <span>${t.optional}</span></label>
-        <input id="noteInput" class="field note" maxlength="80" placeholder="${prompt}" autocomplete="off">
+        <input id="noteInput" class="field note" maxlength="80" placeholder="${placeholder}" autocomplete="off">
       </div>
       <div>
         <label class="field-label" for="placeInput">${t.place} <span>${t.optional}</span></label>
         <input id="placeInput" class="field" maxlength="24" placeholder="${t.placeHint}" autocomplete="off">
       </div>
+      <label class="switch"><span>${t.countForPrompt(prompt.text)}</span><input type="checkbox" id="forPrompt" ${state.viaPrompt ? 'checked' : ''}></label>
       <div>
         <label class="field-label" for="whenInput">${t.taken}</label>
         <input id="whenInput" class="field mono" type="datetime-local" value="${toLocalInput(takenAt)}" max="${toLocalInput(Date.now())}">
       </div>
       <div class="review-actions">
         <button type="button" class="btn" id="retake">${t.retake}</button>
-        <button type="button" class="btn primary" id="corkIt">${t.corkIt}</button>
+        <button type="button" class="btn primary" id="keepIt">${t.keep}</button>
       </div>
     </div>`;
+
+  const stage = foldStage(draft.url, Math.min(160, innerWidth * 0.42), 'open');
+  $('#foldSlot').append(stage.el);
+  draft.stage = stage;
+  draft.promptKey = prompt.key;
 
   $('#whenInput').addEventListener('change', (e) => {
     const ms = new Date(e.target.value).getTime();
     if (Number.isFinite(ms)) draft.takenAt = Math.min(ms, Date.now());
   });
   $('#retake').addEventListener('click', () => { URL.revokeObjectURL(draft.url); draft = null; openCapture(); });
-  $('#corkIt').addEventListener('click', saveDraft);
+  $('#keepIt').addEventListener('click', saveDraft);
 }
 
 async function saveDraft() {
-  const btn = $('#corkIt');
+  const btn = $('#keepIt');
   btn.disabled = true;
   const sky = {
     id: newId(),
     takenAt: draft.takenAt,
     note: $('#noteInput').value.trim(),
     place: $('#placeInput').value.trim(),
+    prompt: $('#forPrompt').checked ? draft.promptKey : '',
     palette: draft.palette,
     photo: draft.photo,
     thumb: draft.thumb,
@@ -486,53 +573,46 @@ async function saveDraft() {
     toast(t.saveFailed);
     return;
   }
-  URL.revokeObjectURL(draft.url);
-  draft = null;
   state.skies.push(sky);
   sortSkies();
-  await playCork(sky);
+  state.viaPrompt = false;
+
+  // Saved first; the fold is only the send-off.
+  const { stage, url } = draft;
+  cap.querySelector('.review').scrollTo({ top: 0, behavior: 'smooth' });
+  await stage.foldIn();
+  chime();
+  navigator.vibrate?.(18);
+  URL.revokeObjectURL(url);
+  draft = null;
+  showKept(sky);
 }
 
-/** The cork drops into the bottle's neck, the glass tinks, and the sky is kept. */
-async function playCork(sky) {
+function showKept(sky) {
   showStep('drop');
-  const el = cap.querySelector('.drop');
-  el.innerHTML = `
-    <div class="drop-stage">${bottleSvg({ href: photoUrl(sky) })}</div>
-    <div class="drop-msg" id="dropMsg">
-      <h2>${t.corked}</h2>
+  cap.querySelector('.drop').innerHTML = `
+    <div class="drop-jar">${jarSvg({ href: photoUrl(sky) })}</div>
+    <div class="drop-msg">
+      <h2>${t.keptDone}</h2>
       <p>${fmt.long(sky.takenAt)}</p>
       <div class="actions">
         <button type="button" class="btn" id="dropShare">${t.shareStory}</button>
         <button type="button" class="btn primary" id="dropOpen">${t.seeShelf}</button>
       </div>
     </div>`;
-
-  const cork = el.querySelector('.b-cork');
-  if (!reduceMotion()) {
-    await cork.animate([
-      { transform: 'translateY(-70px)', opacity: 0 },
-      { transform: 'translateY(4px)', opacity: 1, offset: 0.8 },
-      { transform: 'translateY(0)', opacity: 1 },
-    ], { duration: 700, easing: 'cubic-bezier(.5,0,.6,1)' }).finished;
-  }
-  chime();
-  navigator.vibrate?.(18);
-  $('#dropMsg').classList.add('show');
   $('#dropShare').addEventListener('click', () => openStory('single', { sky }));
   $('#dropOpen').addEventListener('click', () => { closeCapture(); go('#/'); });
 }
 
 // ---------- detail sheet ----------
 
-function openDetail(sky, { pop = false } = {}) {
+function openDetail(sky) {
   if (!sky) return;
   const wrap = $('#sheet');
   const art = wrap.querySelector('.sheet');
-  art.className = `sheet${pop ? ' pop' : ''}`;
   art.innerHTML = `
     <div class="grabber"></div>
-    <div class="detail-bottle">${bottleSvg({ href: photoUrl(sky, 'photo'), label: t.openSky(fmt.long(sky.takenAt)) })}</div>
+    <div id="detailStage" role="img" aria-label="${t.openSky(fmt.long(sky.takenAt))}"></div>
     ${sky.note ? `<p class="detail-note">${esc(sky.note)}</p>` : ''}
     <p class="detail-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.long(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>
     <div class="palette">${paletteHtml(sky.palette)}</div>
@@ -543,6 +623,10 @@ function openDetail(sky, { pop = false } = {}) {
     <div id="confirmBox"></div>`;
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
+
+  const stage = foldStage(photoUrl(sky, 'photo'), Math.min(170, innerWidth * 0.46), 'kept');
+  $('#detailStage').append(stage.el);
+  requestAnimationFrame(() => stage.foldOut());
 
   $('#shareOne').addEventListener('click', () => openStory('single', { sky }));
   $('#askDelete').addEventListener('click', () => {
@@ -674,7 +758,7 @@ async function seedSamples(onProgress) {
     const p = plan[i];
     const prep = await prepareImage(await makeSampleSky(p.kind, p.seed));
     const sky = {
-      id: newId(), takenAt: p.takenAt, note: p.note, place: p.place,
+      id: newId(), takenAt: p.takenAt, note: p.note, place: p.place, prompt: '',
       palette: prep.palette, photo: prep.photo, thumb: prep.thumb, sample: true, createdAt: Date.now(),
     };
     await store.put(sky);
@@ -694,7 +778,7 @@ function markSeeded() {
 // ---------- boot ----------
 
 function bindGlobal() {
-  $('#openCapture').addEventListener('click', openCapture);
+  $('#openCapture').addEventListener('click', () => { state.viaPrompt = false; openCapture(); });
   $('#shutter').addEventListener('click', snap);
   $('#fileCamera').addEventListener('change', picked);
   $('#fileGallery').addEventListener('change', picked);
@@ -731,6 +815,7 @@ function bindGlobal() {
   });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => state.redraw?.());
   window.addEventListener('hashchange', render);
+  setInterval(() => { const el = $('#sunLine'); if (el) el.textContent = sunLine(); }, 60000);
 }
 
 async function init() {

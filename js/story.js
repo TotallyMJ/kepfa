@@ -1,14 +1,14 @@
 // 1080×1920 images sized for an Instagram story, printed on paper:
-// one corked sky with its postmark, one month's bottle, or the whole year's shelf.
+// one jarred sky with its postmark, one month's jar, or the whole year's shelf.
 
-import { drawBottle, bottleShape } from './jar.js';
+import { drawJar, jarShape, JAR_RATIO } from './jar.js';
 import { dominant, loadImage } from './sky.js';
 import { t, fmt, MONTHS, MONTHS_SHORT } from './strings.js';
 
 const W = 1080, H = 1920;
 const PAPER = '#F1EDE6';
 const TAG = '#FBF9F5';
-const INK = '#2A2723';
+const INK = '#1E1C19';
 const SOFT = '#6B645B';
 const RULE = '#CFC7BB';
 const STAMP = '#2C3D6B';
@@ -116,7 +116,7 @@ function postmark(ctx, cx, cy, top, bottom, scale = 1) {
   ctx.restore();
 }
 
-/** Wavy cancellation lines that run off the bottle's edge. */
+/** Wavy cancellation lines that run off the jar's edge. */
 function cancellation(ctx, x, y) {
   ctx.save();
   ctx.strokeStyle = STAMP;
@@ -133,23 +133,23 @@ function cancellation(ctx, x, y) {
   ctx.restore();
 }
 
-/** Paper tag tied to the bottle's neck. */
+/** Paper tag tied around the jar's neck. */
 function tag(ctx, nx, ny, label) {
-  const tx = nx + 120, ty = ny - 30;
   ctx.save();
+  let size = 34;
+  ctx.font = `500 ${size}px ${SANS}`;
+  const str = label.toUpperCase();
+  while (size > 22 && ctx.measureText(str).width + str.length * 2 > 220) { size -= 2; ctx.font = `500 ${size}px ${SANS}`; }
+  const tw = Math.max(180, ctx.measureText(str).width + str.length * 2 + 90);
+  const tx = Math.min(nx + 50, W - tw - 50), ty = ny + 40;
   ctx.strokeStyle = SOFT;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(nx, ny);
-  ctx.quadraticCurveTo(nx + 60, ny + 30, tx + 22, ty + 46);
+  ctx.quadraticCurveTo(nx + 30, ny + 30, tx + 22, ty + 46);
   ctx.stroke();
   ctx.translate(tx, ty);
   ctx.rotate(0.14);
-  let size = 34;
-  ctx.font = `500 ${size}px ${SANS}`;
-  const str = label.toUpperCase();
-  while (size > 22 && ctx.measureText(str).width + str.length * 2 > 260) { size -= 2; ctx.font = `500 ${size}px ${SANS}`; }
-  const tw = Math.max(200, ctx.measureText(str).width + str.length * 2 + 90);
   ctx.fillStyle = TAG;
   ctx.strokeStyle = RULE;
   ctx.beginPath();
@@ -178,15 +178,15 @@ async function storySingle(sky, showPlace) {
   const [c, ctx] = page();
   masthead(ctx);
 
-  const bw = 480, bh = 912, bx = (W - bw) / 2, by = 240;
+  const bw = 660, bh = Math.round(660 * JAR_RATIO), bx = (W - bw) / 2, by = 250;
   const { img, release } = await loadImage(sky.photo);
-  drawBottle(ctx, { x: bx, y: by, w: bw, h: bh, image: img, ink: INK, glass: GLASS });
+  drawJar(ctx, { x: bx, y: by, w: bw, h: bh, image: img, ink: INK, paper: PAPER, glass: GLASS });
   release();
-  const g = bottleShape(bw, bh);
-  if (showPlace && sky.place) tag(ctx, bx + g.cx + g.nw / 2, by + g.nt + 30, sky.place);
-  cancellation(ctx, bx + bw - 150, by + bh - 300);
+  const g = jarShape(bw, bh);
+  if (showPlace && sky.place) tag(ctx, bx + bw - g.mx, by + g.threads[1], sky.place);
+  cancellation(ctx, bx + bw - 170, by + bh - 280);
   const d = new Date(sky.takenAt);
-  postmark(ctx, bx - 10, by + bh - 240, MONTHS_SHORT[d.getMonth()].toUpperCase(), String(d.getDate()));
+  postmark(ctx, bx - 10, by + bh - 200, MONTHS_SHORT[d.getMonth()].toUpperCase(), String(d.getDate()));
 
   let y = by + bh + 110;
   if (sky.note) {
@@ -208,9 +208,9 @@ async function storyJar({ year, month, skies }) {
   text(ctx, MONTHS[month], W / 2, 340, { font: `500 128px ${SERIF}` });
   text(ctx, t.storyKept(year, skies.length), W / 2, 410, { font: `36px ${SANS}`, color: SOFT });
 
-  const bw = 480, bh = 912, bx = (W - bw) / 2, by = 470;
-  drawBottle(ctx, { x: bx, y: by, w: bw, h: bh, skies, capacity: new Date(year, month + 1, 0).getDate(), ink: INK, glass: GLASS });
-  postmark(ctx, bx - 10, by + bh - 240, MONTHS_SHORT[month].toUpperCase(), String(year), 0.95);
+  const bw = 560, bh = Math.round(560 * JAR_RATIO), bx = (W - bw) / 2, by = 480;
+  drawJar(ctx, { x: bx, y: by, w: bw, h: bh, skies, capacity: new Date(year, month + 1, 0).getDate(), ink: INK, paper: PAPER, glass: GLASS });
+  postmark(ctx, bx - 10, by + bh - 200, MONTHS_SHORT[month].toUpperCase(), String(year), 0.95);
 
   // One square per sky: the month as a row of colors.
   const size = 34, gap = 10, perRow = 16;
@@ -220,7 +220,7 @@ async function storyJar({ year, month, skies }) {
     const inRow = Math.min(perRow, skies.length - r * perRow);
     const x = (W - (inRow * size + (inRow - 1) * gap)) / 2 + col * (size + gap);
     ctx.fillStyle = dominant(s.palette).hex;
-    ctx.fillRect(x, 1470 + r * (size + gap) + (rows === 1 ? 20 : 0), size, size);
+    ctx.fillRect(x, by + bh + 90 + r * (size + gap) + (rows === 1 ? 20 : 0), size, size);
   });
   footer(ctx);
   return toBlob(c);
@@ -232,7 +232,7 @@ async function storyYear({ year, skies }) {
   text(ctx, String(year), W / 2, 340, { font: `500 140px ${SERIF}` });
   text(ctx, `${skies.length} ${t.kept(skies.length)}`, W / 2, 410, { font: `36px ${SANS}`, color: SOFT });
 
-  const bw = 150, bh = 285, gapX = 70, rowH = 385;
+  const bw = 176, bh = Math.round(176 * JAR_RATIO), gapX = 52, rowH = bh + 110;
   const left = (W - (4 * bw + 3 * gapX)) / 2;
   const now = new Date();
   for (let m = 0; m < 12; m++) {
@@ -240,9 +240,9 @@ async function storyYear({ year, skies }) {
     const x = left + col * (bw + gapX);
     const y = 470 + r * rowH;
     const future = year > now.getFullYear() || (year === now.getFullYear() && m > now.getMonth());
-    drawBottle(ctx, {
+    drawJar(ctx, {
       x, y, w: bw, h: bh, skies: skies.filter((s) => new Date(s.takenAt).getMonth() === m),
-      capacity: new Date(year, m + 1, 0).getDate(), ghost: future, ink: INK, glass: GLASS,
+      capacity: new Date(year, m + 1, 0).getDate(), ghost: future, ink: INK, paper: PAPER, glass: GLASS,
     });
     if (col === 0) {
       ctx.fillStyle = INK;
@@ -254,7 +254,7 @@ async function storyYear({ year, skies }) {
   }
 
   // The year as a strip of colors, one sliver per sky.
-  const sx = 90, sy = 1640, sw = W - 180, sh = 90;
+  const sx = 90, sy = 470 + 3 * rowH + 20, sw = W - 180, sh = 90;
   ctx.fillStyle = TAG;
   ctx.fillRect(sx, sy, sw, sh);
   if (skies.length) {
