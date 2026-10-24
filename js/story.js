@@ -82,8 +82,11 @@ function footer(ctx) {
 }
 
 function wrap(ctx, str, maxW, maxLines) {
-  // Wrap by words, falling back to characters for scripts without spaces (Thai).
-  const tokens = str.includes(' ') ? str.split(/(\s+)/) : Array.from(str);
+  // Wrap by words. Thai has no spaces between words, so it's split into words by the browser where it can,
+  // and by characters only as a last resort.
+  const tokens = !isThai(str) ? str.split(/(\s+)/)
+    : 'Segmenter' in Intl ? Array.from(new Intl.Segmenter('th', { granularity: 'word' }).segment(str), (s) => s.segment)
+      : Array.from(str);
   const lines = [];
   let line = '';
   for (const tok of tokens) {
@@ -103,33 +106,138 @@ function wrap(ctx, str, maxW, maxLines) {
   return lines;
 }
 
-/** Paper tag tied around the jar's neck. */
-function tag(ctx, nx, ny, label) {
+// The place tag: manila card with tiny clouds and a stitched edge, hung on the same red thread as the note,
+// which goes round the jar's neck. The strand behind the neck is drawn before the jar, the rest after.
+const THREAD = '#B3261E', THREAD_DARK = '#7F1714';
+const at = (bx, by, bw, px, py) => { const [x, y] = jarPoint(px, py, bw); return [bx + x, by + y]; };
+
+function strand(ctx, from, ctl, to, k, color = THREAD) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.6 * k;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(...from);
+  ctx.quadraticCurveTo(...ctl, ...to);
+  ctx.stroke();
+}
+
+/** The turn of thread that passes behind the neck. */
+function tagThreadBack(ctx, bx, by, bw) {
+  const k = bw / 540;
   ctx.save();
-  let size = 34;
-  ctx.font = `500 ${size}px ${SANS}`;
-  const str = label.toUpperCase();
-  while (size > 22 && ctx.measureText(str).width + str.length * 2 > 220) { size -= 2; ctx.font = `500 ${size}px ${SANS}`; }
-  const tw = Math.max(180, ctx.measureText(str).width + str.length * 2 + 90);
-  const tx = Math.min(nx + 50, W - tw - 50), ty = ny + 40;
-  ctx.strokeStyle = SOFT;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(nx, ny);
-  ctx.quadraticCurveTo(nx + 30, ny + 30, tx + 22, ty + 46);
-  ctx.stroke();
-  ctx.translate(tx, ty);
-  ctx.rotate(0.14);
-  ctx.fillStyle = TAG;
-  ctx.strokeStyle = RULE;
-  ctx.beginPath();
-  ctx.roundRect(0, 0, tw, 92, 10);
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = SOFT;
-  ctx.beginPath(); ctx.arc(24, 46, 8, 0, Math.PI * 2); ctx.stroke();
-  text(ctx, str, 48 + (tw - 48) / 2, 58, { font: `500 ${size}px ${SANS}`, spacing: 2 });
+  ctx.globalAlpha = 0.6;
+  strand(ctx, at(bx, by, bw, 214, 330), at(bx, by, bw, 545, 300), at(bx, by, bw, 874, 330), k, THREAD_DARK);
   ctx.restore();
+}
+
+/** The card's outline: top corners clipped and softened, bottom corners rounded. `i` insets it (for the stitching). */
+function tagPath(ctx, w, h, k, i = 0) {
+  const c = 44 * k, r = 9 * k;
+  ctx.beginPath();
+  ctx.moveTo(c + i * 0.4, i);
+  ctx.lineTo(w - c - i * 0.4, i);
+  ctx.quadraticCurveTo(w - c + r * 0.6, i, w - c + r, i + r * 0.6);
+  ctx.lineTo(w - i, c - r + i * 0.4);
+  ctx.quadraticCurveTo(w - i, c, w - i, c + r);
+  ctx.lineTo(w - i, h - r - i);
+  ctx.quadraticCurveTo(w - i, h - i, w - r - i, h - i);
+  ctx.lineTo(r + i, h - i);
+  ctx.quadraticCurveTo(i, h - i, i, h - r - i);
+  ctx.lineTo(i, c + r);
+  ctx.quadraticCurveTo(i, c, i, c - r + i * 0.4);
+  ctx.lineTo(c - r, i + r * 0.6);
+  ctx.quadraticCurveTo(c - r * 0.6, i, c + i * 0.4, i);
+  ctx.closePath();
+}
+
+/** A small cloud: three puffs on a flat base. */
+function cloud(ctx, x, y, s) {
+  ctx.beginPath();
+  ctx.arc(x, y, 5 * s, Math.PI * 0.5, Math.PI * 1.5);
+  ctx.arc(x + 7 * s, y - 4 * s, 7 * s, Math.PI, Math.PI * 1.9);
+  ctx.arc(x + 15 * s, y - 1 * s, 5 * s, Math.PI * 1.3, Math.PI * 0.5);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** The tag itself, hanging from the knot on the right of the neck, with the place written on it by hand. */
+function tag(ctx, bx, by, bw, label) {
+  const k = bw / 540;
+  const thai = isThai(label);
+  const stitch = 12 * k;
+  const pad = stitch + 18 * k;   // the writing keeps clear of the stitched line on both sides
+  let size = (thai ? 40 : 60) * k, w = 190 * k, lines;
+  const font = () => (thai ? `${size}px ${SANS}` : `${size}px ${HAND}`);
+  // Wider for longer names, then smaller writing, until it fits in three lines.
+  for (;;) {
+    ctx.font = font();
+    lines = wrap(ctx, label, w - pad * 2, 3);
+    const fits = lines.join(' ').length >= label.trim().length - 1 && lines.every((ln) => ctx.measureText(ln).width <= w - pad * 2);
+    if (fits || (w >= 300 * k && size <= (thai ? 30 : 44) * k)) break;
+    if (w < 300 * k) w += 10 * k; else size -= 2 * k;
+  }
+  const lh = size * (thai ? 1.35 : 0.95);
+  const h = Math.max(320 * k, 120 * k + lines.length * lh);
+  const eye = 30 * k;   // eyelet centre, down from the top
+
+  // Front turns of thread over the neck, the knot, then down to the eyelet.
+  const knot = at(bx, by, bw, 872, 340);
+  strand(ctx, at(bx, by, bw, 214, 332), at(bx, by, bw, 545, 362), knot, k);
+  strand(ctx, at(bx, by, bw, 214, 338), at(bx, by, bw, 545, 372), knot, k);
+  const [ex, ey] = at(bx, by, bw, 925, 540);
+
+  ctx.save();
+  ctx.translate(ex, ey);
+  ctx.rotate((6 * Math.PI) / 180);
+  ctx.translate(-w / 2, -eye);
+  // Card, with a soft shadow on whatever is behind it.
+  ctx.shadowColor = 'rgba(40, 25, 10, .22)';
+  ctx.shadowBlur = 26 * k;
+  ctx.shadowOffsetY = 10 * k;
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  g.addColorStop(0, '#F6EAD0');
+  g.addColorStop(1, '#E8D6AB');
+  ctx.fillStyle = g;
+  tagPath(ctx, w, h, k);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.save();
+  tagPath(ctx, w, h, k);
+  ctx.clip();
+  // Paper grain.
+  for (let n = 0; n < (w * h) / 60; n++) {
+    ctx.fillStyle = Math.random() < 0.5 ? 'rgba(120, 95, 50, .07)' : 'rgba(255, 250, 235, .12)';
+    ctx.fillRect(Math.random() * w, Math.random() * h, 1.5 * k, 1.5 * k);
+  }
+  // Tiny pale-blue clouds, scattered on a loose grid.
+  ctx.fillStyle = 'rgba(148, 174, 203, .22)';
+  for (let y = 22 * k; y < h; y += 46 * k) {
+    for (let x = ((y / (46 * k)) % 2) * 26 * k; x < w; x += 52 * k) cloud(ctx, x + 6 * k, y + 8 * k, k * (0.8 + ((x + y) % 3) * 0.12));
+  }
+  ctx.restore();
+  // Stitched edge, then the reinforced eyelet with its hole.
+  ctx.strokeStyle = '#B39A6A';
+  ctx.lineWidth = 1.6 * k;
+  ctx.setLineDash([5 * k, 5 * k]);
+  tagPath(ctx, w, h, k, stitch);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#D9C08A';
+  ctx.beginPath(); ctx.arc(w / 2, eye, 20 * k, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#FBF3DC';
+  ctx.beginPath(); ctx.arc(w / 2, eye, 15 * k, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#CFC4B0';
+  ctx.beginPath(); ctx.arc(w / 2, eye, 9 * k, 0, Math.PI * 2); ctx.fill();
+  // The place, by hand.
+  const top = eye + 40 * k + (h - eye - 40 * k - 24 * k - lines.length * lh) / 2;
+  lines.forEach((ln, i) => text(ctx, ln, w / 2, top + lh * (i + 0.78), { font: font(), color: '#3A2F28' }));
+  ctx.restore();
+
+  // The thread goes down over the card and loops through the hole.
+  strand(ctx, knot, [knot[0] + 26 * k, knot[1] + 60 * k], [ex, ey], k);
+  strand(ctx, knot, [knot[0] + 6 * k, knot[1] + 80 * k], [ex + 2 * k, ey], k);
+  ctx.fillStyle = THREAD;
+  ctx.beginPath(); ctx.arc(...knot, 4.5 * k, 0, Math.PI * 2); ctx.fill();
 }
 
 // Real paper and tape (photos cut out of their backgrounds). A missing file falls back to a flat card.
@@ -216,12 +324,11 @@ async function storySingle(sky, showPlace, quote, challenge) {
   // A challenge sky makes room for the prompt slip and hashtags; the palette steps aside.
   const bw = challenge ? 430 : 540, bh = Math.round(bw * JAR_RATIO), bx = (W - bw) / 2, by = top + 50;
   const { img, release } = await loadImage(sky.photo);
+  const placed = showPlace && sky.place;
+  if (placed) tagThreadBack(ctx, bx, by, bw);
   drawJar(ctx, { x: bx, y: by, w: bw, image: img });
   release();
-  if (showPlace && sky.place) {
-    const [nx, ny] = jarPoint(860, 360, bw);
-    tag(ctx, bx + nx, by + ny, sky.place);
-  }
+  if (placed) tag(ctx, bx, by, bw, sky.place);
 
   let y = by + bh + 60;
   if (sky.note) {
