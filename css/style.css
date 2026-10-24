@@ -168,18 +168,46 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   .tape { filter: brightness(.9); }
 }
 
-.prompt { position: relative; margin-top: var(--s-5); }
+/* Today's prompt: a torn slip taped onto a sheet the colour of the sky outside right now.
+   It's the only colour on the page besides the skies themselves, so it reads as the invitation. */
+.prompt {
+  position: relative;
+  margin-top: var(--s-5);
+  padding: var(--s-4) var(--s-3) var(--s-4);
+  border-radius: 6px;
+  color: #FBF9F5;
+  box-shadow: 0 12px 26px -14px rgba(40, 36, 70, .55);
+}
+.prompt.is-day { background: linear-gradient(165deg, #4a78b8 0%, #8fb6e2 55%, #d6e5f2 100%); }
+.prompt.is-day .prompt-badge { background: rgba(18, 32, 64, .28); }
+.prompt.is-golden { background: linear-gradient(160deg, #5b6aa8 0%, #9c8fc4 40%, #e9a08a 75%, #f6cf98 100%); }
+.prompt.is-night { background: linear-gradient(165deg, #141a33 0%, #27305a 55%, #4a4f7d 100%); }
+.prompt-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-4); }
+.prompt-badge {
+  padding: 4px var(--s-2);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, .22);
+  font-size: var(--t-cap);
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.prompt-sheet-head .prompt-day { font-family: var(--f-mono); font-size: var(--t-cap); }
+.prompt-pin { position: relative; }
 .prompt .tape-top { left: calc(50% - 37px); top: -10px; }
 .prompt .slip { transform: rotate(-1deg); padding: var(--s-4) var(--s-3) var(--s-1); }
-.prompt-head, .prompt-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
-.prompt-head .eyebrow { color: var(--ink); }
-.prompt-day { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
+.prompt-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+.prompt .slip .eyebrow { color: var(--ink); }
+.prompt-count { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
 .prompt-text { margin: var(--s-2) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); line-height: 1.12; }
 .prompt-line { margin: var(--s-2) 0 0; font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); line-height: 1.3; color: var(--ink-soft); }
-.prompt-foot { margin-top: var(--s-3); }
-.prompt-foot .btn-text { font-size: var(--t-cap); }
-.prompt-foot .btn { min-height: 40px; padding: 0 var(--s-4); }
-.prompt-progress { margin-top: var(--s-3); padding-top: var(--s-2); border-top: 1px solid var(--rule); }
+.prompt-go { width: 100%; gap: var(--s-2); margin-top: var(--s-4); border-radius: 5px; font-size: var(--t-body); }
+.prompt-go svg { width: 18px; height: 18px; }
+.prompt-tag { display: flex; justify-content: center; min-height: 40px; font-size: var(--t-cap); }
+.prompt-progress { margin-top: var(--s-1); padding-top: var(--s-2); border-top: 1px solid var(--rule); }
+.section-title span, .see-months { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
+.see-months { display: flex; justify-content: center; margin: var(--s-5) 0 0; }
+.see-months .btn-text { color: var(--ink); font-family: var(--f-body); font-size: var(--t-sm); }
 /* Always one row of 30, however narrow the phone. */
 .dots { display: grid; grid-template-columns: repeat(30, minmax(0, 6px)); justify-content: space-between; gap: 2px; margin-top: var(--s-2); }
 .dots i { aspect-ratio: 1; border: 1px solid var(--ink); }
@@ -321,11 +349,18 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   background: none;
   min-width: 0;
 }
-/* No browser "save image" menu on a long press: holding a jar is ours (it opens the delete menu). */
+/* No browser "save image" menu on a long press: holding a jar is ours (it brings up the delete ✕). */
 .jar-slot { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; position: relative; }
 .jar-slot .jar { max-width: 96px; transition: transform var(--t-move) var(--ease-spring), opacity var(--t-quick) var(--ease-out); }
 .jar-slot:active .jar { transform: translateY(-3px); }
-.jar-slot.is-held .jar { transform: translateY(-8px) scale(1.06); filter: drop-shadow(0 10px 10px rgba(30, 28, 25, .3)); }
+/* Held: lifted a little and wiggling on the spot, like an app about to be deleted. */
+.jar-slot.is-held .jar {
+  transform: translateY(-6px);
+  transform-origin: 50% 85%;
+  filter: drop-shadow(0 10px 10px rgba(30, 28, 25, .3));
+  animation: wiggle 260ms ease-in-out infinite alternate;
+}
+@keyframes wiggle { from { transform: translateY(-6px) rotate(-2.2deg); } to { transform: translateY(-6px) rotate(2.2deg); } }
 .is-holding .jar-slot:not(.is-held) .jar { opacity: .35; }
 /* A ring grows while the finger stays down, so a hold feels counted; plain taps end before it shows. */
 .jar-slot::after {
@@ -344,18 +379,31 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .jar-slot.is-pressing::after { animation: hold-ring 380ms linear 120ms both; }
 @keyframes hold-ring { from { opacity: .5; transform: scale(.4); } to { opacity: 0; transform: scale(1.4); } }
 
-.jar-menu {
+/* The round ✕ on the held jar's corner: 28px to see, 44px to tap. */
+.jar-x {
   position: fixed;
   z-index: 45;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--danger);
+  animation: jar-x-in var(--t-move) var(--ease-spring) both;
+}
+.jar-x::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
   background: var(--paper-raised);
   border: 1px solid var(--rule);
-  border-radius: 5px;
-  box-shadow: 0 10px 24px -8px rgba(30, 28, 25, .35);
-  transform-origin: 50% 100%;
-  animation: menu-in var(--t-move) var(--ease-spring) both;
+  box-shadow: 0 4px 10px -2px rgba(30, 28, 25, .35);
 }
-.jar-menu button { min-height: 44px; padding: 0 var(--s-4); border: 0; background: none; color: var(--danger); font-size: var(--t-sm); }
-@keyframes menu-in { from { opacity: 0; transform: scale(.85) translateY(6px); } }
+.jar-x svg { position: relative; width: 14px; height: 14px; stroke-width: 2; }
+@keyframes jar-x-in { from { opacity: 0; transform: scale(.3); } }
 .month-slot canvas { display: block; }
 .month-slot:disabled { cursor: default; }
 

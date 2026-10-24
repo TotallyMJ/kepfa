@@ -2,7 +2,7 @@
 // one jarred sky with its handwritten note, one month's jar, or the whole year's shelf.
 
 import { drawJar, jarPoint, JAR_RATIO } from './jar.js';
-import { dominant, loadImage } from './sky.js';
+import { loadImage } from './sky.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG } from './strings.js';
 
 const isThai = (s) => /[฀-๿]/.test(s);
@@ -267,19 +267,38 @@ async function storyJar({ year, month, skies, quote }) {
   text(ctx, MONTHS[month], W / 2, top + 130, { font: `500 128px ${SERIF}` });
   text(ctx, t.storyKept(year, skies.length), W / 2, top + 195, { font: `36px ${SANS}`, color: SOFT });
 
-  const bw = 540, bh = Math.round(540 * JAR_RATIO), bx = (W - bw) / 2, by = top + 250;
-  drawJar(ctx, { x: bx, y: by, w: bw, skies, capacity: new Date(year, month + 1, 0).getDate() });
-
-  // One square per sky: the month as a row of colors.
-  const size = 34, gap = 10, perRow = 16;
-  const rows = Math.ceil(skies.length / perRow);
-  skies.forEach((s, i) => {
-    const r = Math.floor(i / perRow), col = i % perRow;
-    const inRow = Math.min(perRow, skies.length - r * perRow);
-    const x = (W - (inRow * size + (inRow - 1) * gap)) / 2 + col * (size + gap);
-    ctx.fillStyle = dominant(s.palette).hex;
-    ctx.fillRect(x, by + bh + 90 + r * (size + gap) + (rows === 1 ? 20 : 0), size, size);
-  });
+  // The month's shelf: every sky in its own jar, newest first, the day under each.
+  // Try each column count and keep the one that gives the biggest jars in the space left.
+  const list = skies.slice().reverse();
+  const n = Math.max(list.length, 1);
+  const gridTop = top + 260, gridBottom = 1760, gap = 24, label = 56;
+  const fit = (cols) => {
+    const rows = Math.ceil(n / cols);
+    return Math.min((W - 200 - gap * (cols - 1)) / cols, ((gridBottom - gridTop) / rows - label) / JAR_RATIO, 300);
+  };
+  let cols = 1;
+  for (let k = 2; k <= 7; k++) if (fit(k) > fit(cols)) cols = k;
+  const jw = Math.floor(fit(cols)), jh = Math.round(jw * JAR_RATIO);
+  const rows = Math.ceil(n / cols);
+  let y = gridTop + Math.max(0, (gridBottom - gridTop - rows * (jh + label)) / 2);
+  for (let r = 0; r < rows; r++) {
+    const row = list.slice(r * cols, r * cols + cols);
+    const rowW = row.length * jw + (row.length - 1) * gap;
+    let x = (W - rowW) / 2;
+    for (const s of row) {
+      // Thumbnails, one at a time, so a full month doesn't hold 31 photos in memory at once.
+      const { img, release } = await loadImage(s.thumb);
+      drawJar(ctx, { x, y, w: jw, image: img });
+      release();
+      text(ctx, String(new Date(s.takenAt).getDate()).padStart(2, '0'), x + jw / 2, y + jh + 44, { font: `26px ${MONO}`, color: SOFT });
+      x += jw + gap;
+    }
+    ctx.fillStyle = INK;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(Math.min(90, (W - rowW) / 2 - 20), y + jh + 2, Math.max(W - 180, rowW + 40), 4);
+    ctx.globalAlpha = 1;
+    y += jh + label;
+  }
   footer(ctx);
   return toBlob(c);
 }

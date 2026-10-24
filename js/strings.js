@@ -63,7 +63,9 @@ export const QUOTES = [
 
 export const t = {
   kept: (n) => `${skies(n)} kept`,
-  shelf: 'Shelf',
+  mySkies: 'My Skies',
+  seeMonths: 'See every month ›',
+  monthEmpty: (month) => `Your first ${month} sky is still out there.`,
 
   sunriseIn: (time, dur) => `Sunrise ${time} · in ${dur}`,
   goldenNowUntil: (time) => `Golden hour now · until ${time}`,
@@ -78,7 +80,8 @@ export const t = {
   lookFor: 'Today, look for',
   sameSky: 'Wherever you are today, we’re all under the same sky.',
   seeTag: (tag) => `See #${tag} ↗`,
-  lookUp: 'Look up',
+  lookUp: 'Look up and keep it',
+  challengeBadge: 'Today’s sky challenge',
   challenge: (round) => (round > 1 ? `${CHALLENGE_SIZE} skies · round ${round}` : `${CHALLENGE_SIZE} skies`),
   keptForToday: 'Kept for today',
   keepSky: 'Keep a sky',
@@ -92,7 +95,7 @@ export const t = {
   sampleBanner: 'These are sample skies. Clear them when you’re ready to keep your own.',
   clearSamples: 'Clear samples',
   samplesCleared: 'Samples cleared. Go keep your first sky.',
-  emptyTitle: 'Your shelf is empty',
+  emptyTitle: 'No skies yet',
   emptyBody: 'Look up, frame it in the jar and keep what you see.',
   keepFirst: 'Keep your first sky',
   openSky: (when) => `Open the sky from ${when}`,
@@ -107,7 +110,8 @@ export const t = {
   emptyMonthTitle: 'This jar is empty',
   emptyMonthBody: 'The first sky of the month is still out there.',
   shake: 'Shake',
-  shareStory: 'Share to story',
+  shareYear: 'Share my year in skies',
+  shareMonth: (month) => `Share ${month}’s jar`,
   daysOf: (days) => `of ${days} days`,
   favoriteTime: 'favorite time',
   monthColor: 'color of the month',
@@ -127,7 +131,7 @@ export const t = {
   tryAgain: 'Try again',
   saveFailed: 'Couldn’t save. Try again.',
   keptDone: 'Kept.',
-  seeShelf: 'See shelf',
+  seeMySkies: 'See my skies',
 
   closeJar: 'Close the jar',
   shareSky: 'Share this sky',
@@ -143,7 +147,7 @@ export const t = {
   deleted: 'Sky deleted',
   holdHint: 'Hold a jar to delete it',
 
-  shareTitle: { single: 'Share this sky', jar: (m) => `Share ${m}`, year: (y) => `Share ${y}` },
+  shareTitle: { single: 'Share this sky', jar: (m) => `Share ${m}’s jar`, year: () => 'Share my year in skies' },
   showPlace: 'Show place',
   showPlaceHint: 'Off by default. Shared images never carry GPS data.',
   storyTip: 'On your phone, tap Share and pick Instagram, then Stories. Not in the list? Save the image and post it from your photos.',
@@ -157,7 +161,7 @@ export const t = {
   caption: ({ text, day, kept, tag }) =>
     `${text}\n${day} · ${kept} of ${CHALLENGE_SIZE} skies kept.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #${tag}`,
 
-  footer: 'kepfa · start your own collection',
+  footer: 'kepfa · start your own sky collection',
   storyKept: (y, n) => `${y} · ${n} ${skies(n)} kept`,
   stripCaption: 'Every sky you kept, in order',
 };

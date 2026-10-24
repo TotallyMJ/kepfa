@@ -219,19 +219,24 @@ function shelfRowsHtml(list) {
     </div>`).join('');
 }
 
+/** Which sky is out right now, so the prompt sits on a sheet of that colour. */
+function skyPhase(now = new Date()) {
+  const place = savedPlace() || BANGKOK;
+  const sun = sunTimes(now, place.lat, place.lon);
+  if (!sun) return 'day';
+  if (now < sun.sunrise || now >= sun.sunset) return 'night';
+  if (now < sun.goldenMorningEnd || now >= sun.goldenEveningStart) return 'golden';
+  return 'day';
+}
+
 function renderShelf() {
   const now = new Date();
   const prompt = todayPrompt(now);
   const { filled, round } = challengeProgress();
   const fresh = newDot(filled);
   const memory = onThisDay();
-  const groups = [];
-  for (const s of state.skies.slice().reverse()) {
-    const d = new Date(s.takenAt);
-    const last = groups[groups.length - 1];
-    if (last && last.y === d.getFullYear() && last.m === d.getMonth()) last.items.push(s);
-    else groups.push({ y: d.getFullYear(), m: d.getMonth(), items: [s] });
-  }
+  // The home screen holds this month only; the rest live on Months.
+  const thisMonth = skiesIn(now.getFullYear(), now.getMonth()).reverse();
   const sun = sunLine();
 
   view.innerHTML = `
@@ -241,36 +246,38 @@ function renderShelf() {
     </header>
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
       <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${savedPlace() ? t.herePlace : t.defaultPlace}</button></div>` : ''}
-    ${bannerHtml()}
-    <section class="prompt">
-      ${tape('tape-top')}
-      <div class="slip torn">
-        <div class="prompt-head"><span class="eyebrow">${t.lookFor}</span><span class="prompt-day">${fmt.dayShort(prompt.key)}</span></div>
-        <h2 class="prompt-text">${prompt.text}</h2>
-        <p class="prompt-line">${t.sameSky}</p>
-        <div class="prompt-foot">
-          <a class="btn-text" href="${tagUrl(prompt.tag)}" target="_blank" rel="noopener">${t.seeTag(prompt.tag)}</a>
-          <button type="button" class="btn primary" id="lookUp">${t.lookUp}</button>
-        </div>
-        <div class="prompt-progress">
-          <div class="prompt-head"><span class="eyebrow">${t.challenge(round)}</span><span class="prompt-day">${filled} / ${CHALLENGE_SIZE}</span></div>
-          <div class="dots" role="img" aria-label="${filled} of ${CHALLENGE_SIZE}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ` class="on${i === fresh ? ' is-new' : ''}"` : ''}></i>`).join('')}</div>
+    <section class="prompt is-${skyPhase(now)}">
+      <div class="prompt-sheet-head"><span class="prompt-badge">${t.challengeBadge}</span><span class="prompt-day">${fmt.dayShort(prompt.key)}</span></div>
+      <div class="prompt-pin">
+        ${tape('tape-top')}
+        <div class="slip torn">
+          <span class="eyebrow">${t.lookFor}</span>
+          <h2 class="prompt-text">${prompt.text}</h2>
+          <p class="prompt-line">${t.sameSky}</p>
+          <button type="button" class="btn primary prompt-go" id="lookUp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>${t.lookUp}</button>
+          <a class="btn-text prompt-tag" href="${tagUrl(prompt.tag)}" target="_blank" rel="noopener">${t.seeTag(prompt.tag)}</a>
+          <div class="prompt-progress">
+            <div class="prompt-head"><span class="eyebrow">${t.challenge(round)}</span><span class="prompt-count">${filled} / ${CHALLENGE_SIZE}</span></div>
+            <div class="dots" role="img" aria-label="${filled} of ${CHALLENGE_SIZE}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ` class="on${i === fresh ? ' is-new' : ''}"` : ''}></i>`).join('')}</div>
+          </div>
         </div>
       </div>
     </section>
+    ${bannerHtml()}
     ${memory ? `<section class="memory-block">
       <p class="eyebrow">${memory.label}</p>
       <div class="memory">${slotButton(memory.sky)}
         <p>${memory.sky.note ? `<span class="memory-note ${handClass(memory.sky.note)}">${esc(memory.sky.note)}</span>` : ''}<span class="memory-date">${fmt.shelf(memory.sky.takenAt)[0]}, ${new Date(memory.sky.takenAt).getFullYear()} · ${fmt.shelf(memory.sky.takenAt)[1]}</span></p>
       </div>
     </section>` : ''}
-    <div class="section-head"><h2 class="section-title">${t.shelf}</h2><span class="eyebrow">${state.skies.length} ${t.kept(state.skies.length)}</span></div>
-    ${groups.length
-      ? groups.map((g) => `<section class="shelf-group"><h3 class="group-title">${MONTHS[g.m]} <span>${g.y}</span></h3>${shelfRowsHtml(g.items)}</section>`).join('')
+    <div class="section-head"><h2 class="section-title">${MONTHS[now.getMonth()]} <span>${now.getFullYear()}</span></h2><span class="eyebrow">${thisMonth.length} ${t.kept(thisMonth.length)}</span></div>
+    ${thisMonth.length
+      ? shelfRowsHtml(thisMonth)
       : `<div class="empty">
            <div class="empty-jar">${jarSvg()}</div>
-           <h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>
-         </div>`}`;
+           ${state.skies.length ? `<p>${t.monthEmpty(MONTHS[now.getMonth()])}</p>` : `<h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>`}
+         </div>`}
+    ${state.skies.length > thisMonth.length ? `<p class="see-months"><a class="btn-text" href="#/months">${t.seeMonths}</a></p>` : ''}`;
 
   bindJarSlots(view);
   $('#clearSamples')?.addEventListener('click', clearSamples);
@@ -332,7 +339,7 @@ function renderMonths() {
       </div>
       <h1 class="wordmark">${t.months}</h1>
     </header>
-    ${all.length ? `<div class="section-head"><span></span><button type="button" class="btn-text" id="shareYear">${t.shareStory}</button></div>` : ''}
+    ${all.length ? `<div class="section-head"><span></span><button type="button" class="btn-text" id="shareYear">${t.shareYear}</button></div>` : ''}
     ${[3, 2, 1, 0].map((r) => {
       const ms = [0, 1, 2].map((c) => r * 3 + c);
       return `<div class="shelf-row">
@@ -385,7 +392,7 @@ function renderMonth(year, month) {
       ? `<p class="hint">${t.tapLayer}</p>
          <div class="actions">
            <button type="button" class="btn" id="shake">${t.shake}</button>
-           <button type="button" class="btn primary" id="shareJar">${t.shareStory}</button>
+           <button type="button" class="btn primary" id="shareJar">${t.shareMonth(MONTHS[month])}</button>
          </div>
          <div class="stats">
            <div class="stat"><b class="num">${list.length}</b><span>${t.daysOf(days)}</span></div>
@@ -640,7 +647,7 @@ function showKept(sky) {
       <p>${fmt.long(sky.takenAt)}</p>
       <div class="actions">
         <button type="button" class="btn" id="dropShare">${t.shareSky}</button>
-        <button type="button" class="btn primary" id="dropOpen">${t.seeShelf}</button>
+        <button type="button" class="btn primary" id="dropOpen">${t.seeMySkies}</button>
       </div>
     </div>`;
   $('#dropShare').addEventListener('click', () => openStory('single', { sky }));
@@ -910,28 +917,28 @@ async function deleteSky(sky) {
   toast(t.deleted);
 }
 
+/** The held jar wiggles with a round ✕ on its corner, like deleting an app on a phone. */
 function openJarMenu(slot, sky) {
   if (!sky) return;
   navigator.vibrate?.(12);
-  const menu = $('#jarMenu');
+  const x = $('#jarX');
   view.classList.add('is-holding');
   slot.classList.add('is-held');
-  menu.hidden = false;
   const r = slot.querySelector('.jar').getBoundingClientRect();
-  const m = menu.getBoundingClientRect();
-  menu.style.left = `${Math.min(Math.max(12, r.left + r.width / 2 - m.width / 2), innerWidth - m.width - 12)}px`;
-  menu.style.top = `${Math.max(12, r.top - m.height - 10)}px`;
+  x.style.left = `${Math.min(r.right - 22 - 6, innerWidth - 44 - 4)}px`;
+  x.style.top = `${r.top - 22 + 10}px`;
+  x.hidden = false;
   const close = () => {
-    menu.hidden = true;
+    x.hidden = true;
     view.classList.remove('is-holding');
     slot.classList.remove('is-held');
     document.removeEventListener('pointerdown', outside, true);
     window.removeEventListener('scroll', close);
   };
-  const outside = (e) => { if (!menu.contains(e.target)) close(); };
+  const outside = (e) => { if (!x.contains(e.target)) close(); };
   setTimeout(() => document.addEventListener('pointerdown', outside, true));
   window.addEventListener('scroll', close, { once: true });
-  menu.querySelector('button').onclick = () => { close(); deleteSky(sky); };
+  x.onclick = () => { close(); deleteSky(sky); };
 }
 
 /** Holding to delete can't be seen, so say it once, the first time a sky goes back on the shelf. */
@@ -1089,7 +1096,7 @@ function bindGlobal() {
   $('#fileCamera').addEventListener('change', picked);
   cap.addEventListener('click', (e) => { if (e.target.closest('[data-close-capture]')) closeCapture(); });
   $('#storyModal').addEventListener('click', (e) => { if (e.target.closest('[data-close-story]')) closeStory(); });
-  $('#jarMenu button').textContent = t.deleteSky;
+  $('#jarX').setAttribute('aria-label', t.deleteSky);
 
   bindViewerGestures();
   document.addEventListener('keydown', (e) => {
