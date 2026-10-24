@@ -4,7 +4,8 @@ import { jarShape, jarSvg, lidSvg, drawJar, setupCanvas, JAR_RATIO } from './jar
 import { foldStage } from './fold.js';
 import { sunTimes } from './sun.js';
 import { makeStory, shareImage, saveImage } from './story.js';
-import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS } from './strings.js';
+import { chime } from './sound.js';
+import { t, fmt, MONTHS, MONTHS_SHORT, DARES, QUOTES } from './strings.js';
 
 const ICON = {
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>',
@@ -78,26 +79,23 @@ function toast(msg) {
   toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
 }
 
-let actx;
-/** Soft glass "tink" made with WebAudio, so there are no sound files to ship. */
-function chime(freqs = [1318, 1976], gap = 0.07) {
-  try {
-    actx ||= new (window.AudioContext || window.webkitAudioContext)();
-    const t0 = actx.currentTime;
-    freqs.forEach((f, i) => {
-      const at = t0 + i * gap;
-      const o = actx.createOscillator();
-      const g = actx.createGain();
-      o.type = 'sine';
-      o.frequency.setValueAtTime(f, at);
-      g.gain.setValueAtTime(0.0001, at);
-      g.gain.exponentialRampToValueAtTime(0.18, at + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.6);
-      o.connect(g).connect(actx.destination);
-      o.start(at);
-      o.stop(at + 0.65);
-    });
-  } catch { /* sound is optional */ }
+/** Handwriting suits short English lines; Thai stays in the regular face at its regular size. */
+function handClass(text) {
+  return /[฀-๿]/.test(text) ? 'hand is-thai' : 'hand';
+}
+
+/** Shuffle-bag quotes: every quote is used once before any comes back. */
+function nextQuote() {
+  let bag = [];
+  try { bag = JSON.parse(localStorage.getItem('kepfa.quotes')) || []; } catch { /* start fresh */ }
+  bag = bag.filter((i) => i < QUOTES.length);
+  if (!bag.length) {
+    bag = QUOTES.map((_, i) => i);
+    for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+  }
+  const pick = bag.shift();
+  try { localStorage.setItem('kepfa.quotes', JSON.stringify(bag)); } catch { /* fine without */ }
+  return QUOTES[pick];
 }
 
 function paletteHtml(palette) {
@@ -137,17 +135,10 @@ function askLocation() {
   }, () => toast(t.locationDenied), { maximumAge: 864e5, timeout: 10000 });
 }
 
-/** This week's prompt: the same for everyone, picked from the ISO week number. */
-function weekPrompt(d = new Date()) {
-  const day = (d.getDay() + 6) % 7;
-  const thursday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day + 3);
-  const jan4 = new Date(thursday.getFullYear(), 0, 4);
-  const week = 1 + Math.round(((thursday - jan4) / 864e5 - 3 + ((jan4.getDay() + 6) % 7)) / 7);
-  return {
-    key: `${thursday.getFullYear()}-W${week}`,
-    text: PROMPTS[(thursday.getFullYear() * 53 + week) % PROMPTS.length],
-    daysLeft: 7 - day,
-  };
+/** Today's dare: the same for everyone, changes at local midnight. */
+function todayDare(d = new Date()) {
+  const day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
+  return { key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, text: DARES[day % DARES.length] };
 }
 
 function onThisDay() {
@@ -214,8 +205,8 @@ function shelfRowsHtml(list) {
 
 function renderShelf() {
   const now = new Date();
-  const prompt = weekPrompt(now);
-  const forPrompt = state.skies.filter((s) => s.prompt === prompt.key).length;
+  const dare = todayDare(now);
+  const taken = state.skies.filter((s) => s.prompt === dare.key).length;
   const memory = onThisDay();
   const groups = [];
   for (const s of state.skies.slice().reverse()) {
@@ -234,20 +225,17 @@ function renderShelf() {
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
       <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${savedPlace() ? t.herePlace : t.defaultPlace}</button></div>` : ''}
     ${bannerHtml()}
-    <div class="modules${memory ? '' : ' single'}">
-      <section class="module">
-        <p class="eyebrow">${t.thisWeek}</p>
-        <h2 class="module-title">${prompt.text}</h2>
-        <p class="module-meta">${t.keptForPrompt(forPrompt)} · ${t.daysLeft(prompt.daysLeft)}</p>
-        <button type="button" class="btn-text" id="keepOne">${t.keepOne}</button>
-      </section>
-      ${memory ? `<section class="module">
-        <p class="eyebrow">${memory.label}</p>
-        <div class="memory">${slotButton(memory.sky)}
-          <p>${memory.sky.note ? `<span class="memory-note">${esc(memory.sky.note)}</span>` : ''}<span class="memory-date">${fmt.shelf(memory.sky.takenAt)[0]}, ${new Date(memory.sky.takenAt).getFullYear()}<br>${fmt.shelf(memory.sky.takenAt)[1]}</span></p>
-        </div>
-      </section>` : ''}
-    </div>
+    <section class="dare">
+      <div class="dare-head"><span class="eyebrow">${t.skyDare}</span><span class="dare-when">${t.newDare}</span></div>
+      <h2 class="dare-text hand">${dare.text}</h2>
+      <div class="dare-foot"><span>${t.takenToday(taken)}</span><button type="button" class="btn-text" id="takeDare">${t.takeDare}</button></div>
+    </section>
+    ${memory ? `<section class="memory-block">
+      <p class="eyebrow">${memory.label}</p>
+      <div class="memory">${slotButton(memory.sky)}
+        <p>${memory.sky.note ? `<span class="memory-note ${handClass(memory.sky.note)}">${esc(memory.sky.note)}</span>` : ''}<span class="memory-date">${fmt.shelf(memory.sky.takenAt)[0]}, ${new Date(memory.sky.takenAt).getFullYear()} · ${fmt.shelf(memory.sky.takenAt)[1]}</span></p>
+      </div>
+    </section>` : ''}
     <div class="section-head"><h2 class="section-title">${t.shelf}</h2><span class="eyebrow">${state.skies.length} ${t.kept(state.skies.length)}</span></div>
     ${groups.length
       ? groups.map((g) => `<section class="shelf-group"><h3 class="group-title">${MONTHS[g.m]} <span>${g.y}</span></h3>${shelfRowsHtml(g.items)}</section>`).join('')
@@ -259,7 +247,7 @@ function renderShelf() {
   bindJarSlots(view);
   $('#clearSamples')?.addEventListener('click', clearSamples);
   $('#setPlace')?.addEventListener('click', askLocation);
-  $('#keepOne').addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
+  $('#takeDare').addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
   state.redraw = null;
 }
 
@@ -508,7 +496,7 @@ async function review(blob, takenAt) {
     return;
   }
   draft.url = URL.createObjectURL(draft.photo);
-  const prompt = weekPrompt();
+  const dare = todayDare();
   const placeholder = t.notePrompts[Math.floor(Math.random() * t.notePrompts.length)];
 
   el.innerHTML = `
@@ -521,13 +509,13 @@ async function review(blob, takenAt) {
       <div><p class="field-label">${t.colors}</p><div class="palette">${paletteHtml(draft.palette)}</div></div>
       <div>
         <label class="field-label" for="noteInput">${t.note} <span>${t.optional}</span></label>
-        <input id="noteInput" class="field note" maxlength="80" placeholder="${placeholder}" autocomplete="off">
+        <input id="noteInput" class="field note hand" maxlength="80" placeholder="${placeholder}" autocomplete="off">
       </div>
       <div>
         <label class="field-label" for="placeInput">${t.place} <span>${t.optional}</span></label>
         <input id="placeInput" class="field" maxlength="24" placeholder="${t.placeHint}" autocomplete="off">
       </div>
-      <label class="switch"><span>${t.countForPrompt(prompt.text)}</span><input type="checkbox" id="forPrompt" ${state.viaPrompt ? 'checked' : ''}></label>
+      <label class="switch"><span>${t.countForDare}</span><input type="checkbox" id="forPrompt" ${state.viaPrompt ? 'checked' : ''}></label>
       <div>
         <label class="field-label" for="whenInput">${t.taken}</label>
         <input id="whenInput" class="field mono" type="datetime-local" value="${toLocalInput(takenAt)}" max="${toLocalInput(Date.now())}">
@@ -538,11 +526,12 @@ async function review(blob, takenAt) {
       </div>
     </div>`;
 
-  const stage = foldStage(draft.url, Math.min(160, innerWidth * 0.42), 'open');
+  const stage = foldStage(draft.url, Math.min(150, innerWidth * 0.4), 'open');
   $('#foldSlot').append(stage.el);
   draft.stage = stage;
-  draft.promptKey = prompt.key;
+  draft.promptKey = dare.key;
 
+  $('#noteInput').addEventListener('input', (e) => { e.target.className = `field note ${handClass(e.target.value)}`; });
   $('#whenInput').addEventListener('change', (e) => {
     const ms = new Date(e.target.value).getTime();
     if (Number.isFinite(ms)) draft.takenAt = Math.min(ms, Date.now());
@@ -581,7 +570,6 @@ async function saveDraft() {
   const { stage, url } = draft;
   cap.querySelector('.review').scrollTo({ top: 0, behavior: 'smooth' });
   await stage.foldIn();
-  chime();
   navigator.vibrate?.(18);
   URL.revokeObjectURL(url);
   draft = null;
@@ -613,7 +601,7 @@ function openDetail(sky) {
   art.innerHTML = `
     <div class="grabber"></div>
     <div id="detailStage" role="img" aria-label="${t.openSky(fmt.long(sky.takenAt))}"></div>
-    ${sky.note ? `<p class="detail-note">${esc(sky.note)}</p>` : ''}
+    ${sky.note ? `<p class="detail-note ${handClass(sky.note)}">${esc(sky.note)}</p>` : ''}
     <p class="detail-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.long(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>
     <div class="palette">${paletteHtml(sky.palette)}</div>
     <div class="sheet-actions">
@@ -624,7 +612,7 @@ function openDetail(sky) {
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
 
-  const stage = foldStage(photoUrl(sky, 'photo'), Math.min(170, innerWidth * 0.46), 'kept');
+  const stage = foldStage(photoUrl(sky, 'photo'), Math.min(160, innerWidth * 0.42), 'kept');
   $('#detailStage').append(stage.el);
   requestAnimationFrame(() => stage.foldOut());
 
@@ -675,6 +663,7 @@ async function openStory(kind, payload) {
   document.body.style.overflow = 'hidden';
 
   const filename = `kepfa-${kind}-${new Date().toISOString().slice(0, 10)}.jpg`;
+  const quote = nextQuote();
   let blob = null;
   let build = 0;
   const make = async (showPlace) => {
@@ -683,7 +672,7 @@ async function openStory(kind, payload) {
     $('#shareStory').disabled = true;
     let out;
     try {
-      out = await makeStory(kind, { ...payload, showPlace });
+      out = await makeStory(kind, { ...payload, showPlace, quote });
     } catch {
       $('#storyPreview').innerHTML = `<p class="hint">${t.storyFailed}</p>`;
       return;

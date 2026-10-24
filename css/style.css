@@ -9,6 +9,7 @@
   --glass: rgba(255, 255, 255, .42);
   --glare: rgba(255, 255, 255, .38);
   --fold-paper: #E9E3D9;
+  --flash: #FFFFFF;
   --danger: #9B3B2E;
   --scrim: rgba(27, 25, 22, .45);
   --camera: #15130F;
@@ -17,6 +18,9 @@
   --f-display: "Cormorant Garamond", "IBM Plex Sans Thai", "Leelawadee UI", Georgia, serif;
   --f-body: "IBM Plex Sans", "IBM Plex Sans Thai", "Leelawadee UI", "Thonburi", system-ui, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --f-hand: "Reenie Beanie", "IBM Plex Sans Thai", "Leelawadee UI", sans-serif;
+  --t-hand: 21px;
+  --t-hand-lg: 24px;
 
   --t-cap: 11px;
   --t-sm: 13px;
@@ -124,17 +128,17 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   text-underline-offset: 4px;
 }
 
-.modules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); margin-top: var(--s-4); }
-.modules.single { grid-template-columns: minmax(0, 1fr); }
-.module { min-width: 0; }
-.module + .module { border-left: 1px solid var(--rule); padding-left: var(--s-4); }
-.module .eyebrow { margin: 0; }
-.module-title { margin: var(--s-1) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-lg); line-height: 1.2; }
-.module-meta { margin: var(--s-1) 0 0; font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
-.memory { display: flex; align-items: flex-end; gap: var(--s-2); margin-top: var(--s-2); }
+.dare { margin-top: var(--s-4); padding: var(--s-3) var(--s-4); border: 1px solid var(--ink); background: var(--paper-raised); }
+.dare-head, .dare-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+.dare-head .eyebrow { color: var(--ink); }
+.dare-when, .dare-foot span { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
+.dare-text { margin: var(--s-2) 0 0; font-weight: 400; }
+.memory-block { margin-top: var(--s-5); }
+.memory-block .eyebrow { margin: 0; }
+.memory { display: flex; align-items: flex-end; gap: var(--s-3); margin-top: var(--s-2); }
 .memory .jar-slot { flex: none; width: 44px; }
 .memory p { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--s-1); }
-.memory-note { font-family: var(--f-display); font-size: var(--t-body); line-height: 1.3; overflow-wrap: anywhere; }
+.memory-note { overflow-wrap: anywhere; }
 .memory-date { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); line-height: 1.5; }
 
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-6); }
@@ -196,7 +200,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .j-thread { stroke: var(--ink); stroke-opacity: .3; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .j-lid-cap { fill: var(--ink); }
 .j-ridges line { stroke: var(--paper); stroke-opacity: .22; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.j-sky, .j-lid { transform-box: fill-box; transform-origin: 50% 50%; }
+.j-sky, .j-lid, .j-ripple { transform-box: fill-box; transform-origin: 50% 50%; }
+.j-shine { fill: var(--flash); fill-opacity: .22; opacity: 0; }
+.j-glow { fill: var(--flash); opacity: 0; }
+.j-ripple { fill: none; stroke: var(--flash); stroke-width: 2; vector-effect: non-scaling-stroke; opacity: 0; }
 
 /* ---------- shelf ---------- */
 .banner {
@@ -323,15 +330,15 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   width: 72px;
   height: 72px;
   margin-top: -32px;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
   border: 4px solid var(--paper);
   box-shadow: 0 0 0 1px var(--ink);
   background: var(--ink);
   color: var(--paper);
-  font-size: var(--t-cap);
-  letter-spacing: .18em;
-  text-transform: uppercase;
 }
+.keep-btn svg { width: 28px; height: 28px; }
 .keep-btn:active { transform: scale(.96); }
 
 /* ---------- capture ---------- */
@@ -397,22 +404,17 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 /* ---------- fold: photo into jar and back out ---------- */
 .fold-stage { position: relative; perspective: 800px; }
 .fold-jar { position: absolute; left: 50%; transform: translateX(-50%); }
-.fold-card { position: absolute; top: 0; transform-style: preserve-3d; transform-origin: 25% 75%; }
-.fold-top, .fold-bottom { position: absolute; left: 0; right: 0; height: 50%; transform-style: preserve-3d; }
-.fold-top { top: 0; transform-origin: 50% 100%; }
-.fold-bottom { top: 50%; }
-.fold-right { position: absolute; top: 0; bottom: 0; left: 50%; right: 0; transform-origin: 0 50%; transform-style: preserve-3d; }
-.fold-face { position: absolute; inset: 0; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-.fold-img { position: absolute; left: 0; right: 0; background-size: cover; background-position: center; }
-.fold-paper { background: var(--fold-paper); box-shadow: inset 0 0 0 1px var(--rule); }
-.fold-under { transform: rotateX(180deg); }
-.fold-back { transform: rotateY(180deg); }
-.fold-front { visibility: hidden; }
-/* After the first fold only paper shows; the right half then folds over the left. */
-.is-folded .fold-top { visibility: hidden; }
-.is-folded .fold-bottom > .fold-face { right: 50%; background: var(--fold-paper); box-shadow: inset 0 0 0 1px var(--rule); }
-.is-folded .fold-bottom > .fold-face .fold-img { display: none; }
-.is-folded .fold-front { visibility: visible; }
+.fold-card { position: absolute; top: 0; transform-style: preserve-3d; transform-origin: 16.667% 33.333%; }
+.fold-piece { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.fold-f1 { clip-path: polygon(0 0, 100% 0, 100% 100%); transform-origin: 0 0; }
+.fold-f2 { clip-path: polygon(0 100%, 100% 100%, 50% 50%); transform-origin: 0 100%; background: var(--fold-paper); }
+.fold-f3 { clip-path: polygon(0 50%, 50% 50%, 0 100%); transform-origin: 0 50%; background: var(--fold-paper); }
+.fold-piece.is-paper { background: var(--fold-paper); }
+.fold-ghost { opacity: 0; pointer-events: none; }
+.fold-ghost .fold-piece { background: var(--flash); clip-path: polygon(0 0, 0 50%, 50% 50%); }
+.fold-ghost-1 .fold-piece { filter: blur(1px); }
+.fold-ghost-2 .fold-piece { filter: blur(2px); }
+.fold-ghost-3 .fold-piece { filter: blur(3px); }
 .field-label {
   display: block;
   margin: 0 0 var(--s-1);
@@ -551,6 +553,11 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   font-size: var(--t-sm);
   animation: rise .25s ease both;
 }
+
+/* ---------- handwriting: the dare and people's own notes ---------- */
+.hand, .field.note.hand { font-family: var(--f-hand); font-size: var(--t-hand); line-height: 1.3; letter-spacing: 0; }
+.dare-text.hand { font-size: var(--t-hand-lg); line-height: 1.15; }
+.hand.is-thai, .field.note.hand.is-thai { font-family: var(--f-body); font-size: var(--t-body); line-height: 1.6; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

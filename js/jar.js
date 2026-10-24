@@ -49,10 +49,15 @@ export function layerShapes(shape, skies, capacity, grow = 1) {
 
 let uid = 0;
 
-export function lidSvg(g) {
+/** Lid with ridges that run past both edges (clipped), so they can slide to show a twist. */
+export function lidSvg(g, id = `lid${uid++}`) {
   const { lid } = g;
-  return `<g class="j-lid"><rect class="j-lid-cap" x="${lid.x}" y="${lid.y}" width="${lid.w}" height="${lid.h}" rx="${lid.r}"/>`
-    + `<g class="j-ridges">${g.ridges.map((x) => `<line x1="${x}" x2="${x}" y1="${lid.y + lid.h * 0.18}" y2="${lid.y + lid.h * 0.82}"/>`).join('')}</g></g>`;
+  const step = g.ridges[1] - g.ridges[0];
+  const ridges = Array.from({ length: g.ridges.length + 8 }, (_, i) => g.ridges[0] + (i - 4) * step);
+  return `<g class="j-lid"><defs><clipPath id="${id}"><rect x="${lid.x}" y="${lid.y}" width="${lid.w}" height="${lid.h}" rx="${lid.r}"/></clipPath></defs>`
+    + `<rect class="j-lid-cap" x="${lid.x}" y="${lid.y}" width="${lid.w}" height="${lid.h}" rx="${lid.r}"/>`
+    + `<g clip-path="url(#${id})"><g class="j-ridges" data-step="${step}">${ridges.map((x) => `<line x1="${x}" x2="${x}" y1="${lid.y + lid.h * 0.18}" y2="${lid.y + lid.h * 0.82}"/>`).join('')}</g>`
+    + `<rect class="j-shine" x="${lid.x - lid.w * 0.2}" y="${lid.y}" width="${lid.w * 0.2}" height="${lid.h}" data-travel="${lid.w * 1.2}"/></g></g>`;
 }
 
 /** Jar for the app's screens. Colors come from CSS classes so it follows the theme. */
@@ -66,10 +71,12 @@ export function jarSvg({ w = 100, h = 135, href = '', lidded = true, label = '' 
     <g clip-path="url(#${id})">
       <g class="j-sky">${href ? `<image href="${href}" x="0" y="${g.photo.y}" width="${w}" height="${g.photo.h}" preserveAspectRatio="xMidYMid slice"/>` : ''}</g>
       <rect class="j-glare" x="${glare.x}" y="${glare.y}" width="${glare.w}" height="${glare.h}" rx="${glare.w / 2}"/>
+      <rect class="j-glow" width="${w}" height="${h}"/>
     </g>
     <path class="j-line" d="${g.body}"/>
     ${g.threads.map((y) => `<line class="j-thread" x1="${g.mx}" x2="${w - g.mx}" y1="${y}" y2="${y}"/>`).join('')}
-    ${lidded ? lidSvg(g) : ''}
+    <ellipse class="j-ripple" cx="${w / 2}" cy="${g.photo.y + 2}" rx="${w / 2 - g.mx}" ry="${h * 0.03}"/>
+    ${lidded ? lidSvg(g, `${id}l`) : ''}
   </svg>`;
 }
 

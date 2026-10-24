@@ -19,12 +19,37 @@ export const fmt = {
 
 const skies = (n) => (n === 1 ? 'sky' : 'skies');
 
-export const PROMPTS = [
-  'The sky after rain', 'From your window', 'The first sky of the day', 'Above your commute',
-  'The sky over lunch', 'A sky with birds in it', 'Through the trees', 'The sky behind your home',
-  'A sky with the moon out', 'The bluest sky this week', 'The sky at your favorite café', 'Clouds that look like something',
-  'The last light', 'A sky reflected in something', 'The sky from somewhere new', 'Straight up, no buildings',
-  'The sky with someone you love', 'A grey sky worth keeping', 'The sky before a storm', 'The sky right after sunset',
+// One dare a day, the same for everyone; 30 lines so a month goes by before one comes back.
+export const DARES = [
+  'Catch the sky right after rain.', 'Find the sky from your window.', 'Keep the first sky you see today.',
+  'Look up on your way somewhere.', 'Take the sky over lunch.', 'Frame one with a bird in it.',
+  'Find the sky through the trees.', 'Keep the sky behind your home.', 'Catch the moon still out.',
+  'Find the bluest sky you can.', 'Keep the sky outside your favorite café.', 'Spot a cloud that looks like something.',
+  'Catch the very last light.', 'Find the sky reflected in something.', 'Keep a sky from somewhere new.',
+  'Look straight up. No buildings.', 'Share the sky with someone you love.', 'Find a grey sky worth keeping.',
+  'Catch the sky before a storm.', 'Keep the sky right after sunset.', 'Find the sky between two buildings.',
+  'Catch a plane crossing the sky.', 'Keep the sky at exactly noon.', 'Find the pinkest sky today.',
+  'Look up from the bus or train.', 'Keep a sky with no clouds at all.', 'Catch the sky through a window frame.',
+  'Find the sky over water.', 'Keep the sky that made you stop.', 'Catch the sky just before you sleep.',
+];
+
+// Written for Kepfa; one is drawn at random per share, without repeats until all 30 are used.
+export const QUOTES = [
+  'Some people collect stamps. We collect skies.', 'The sky is free. Keep a little.',
+  'Be the kind of person who looks up.', 'Everyone gets the sky. Collectors keep it.',
+  'One sky a day keeps the scroll away.', 'Today’s sky won’t happen twice.',
+  'Look up. It’s still there.', 'A jar of sky, no lid on the wonder.',
+  'Proof I looked up today.', 'The ceiling of the world, kept.',
+  'Collected, not scrolled.', 'This one was too good to scroll past.',
+  'Skies, kept like letters.', 'Same sky, different day, kept.',
+  'Notes from above.', 'Five seconds of looking up, kept for good.',
+  'Pocket-sized sky.', 'The sky did something today.',
+  'Come collect skies with me.', 'Small sky, big feeling.',
+  'Weather report: worth keeping.', 'I stopped walking for this one.',
+  'Sky collectors know where to look.', 'Kept before it changed its mind.',
+  'Every jar is a different day.', 'Proof the sky shows off.',
+  'Slow down. Look up. Keep it.', 'Today, in one jar.',
+  'The view was free. The memory is mine.', 'Start a shelf of skies.',
 ];
 
 export const t = {
@@ -41,11 +66,12 @@ export const t = {
   useLocation: 'Use my location for sun times',
   locationDenied: 'Location is off. Sun times stay set to Bangkok.',
 
-  thisWeek: 'This week',
-  daysLeft: (n) => (n <= 1 ? 'last day' : `${n} days left`),
-  keptForPrompt: (n) => `${n} kept`,
-  keepOne: 'Keep one',
-  countForPrompt: (p) => `Count it for “${p}”`,
+  skyDare: 'Sky dare · today',
+  newDare: 'new at midnight',
+  takenToday: (n) => `${n} taken today`,
+  takeDare: 'Take the dare',
+  countForDare: 'Count it for today’s dare',
+  keepSky: 'Keep a sky',
   yearAgo: 'A year ago',
   monthAgo: 'A month ago',
   weekAgo: 'A week ago',
@@ -111,8 +137,7 @@ export const t = {
   sharedFallback: 'This device can’t share directly, so the image was saved.',
   storyFailed: 'Couldn’t make the image. Close this and try again.',
 
-  skyCollection: 'Sky collection',
-  footer: 'kepfa · keep the sky',
+  footer: 'kepfa · start your own shelf',
   storyKept: (y, n) => `${y} · ${n} ${skies(n)} kept`,
   stripCaption: 'Every sky you kept, in order',
 };

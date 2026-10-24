@@ -105,10 +105,13 @@ export function dominant(palette) {
 export async function loadImage(blob) {
   const url = URL.createObjectURL(blob);
   const img = new Image();
-  img.decoding = 'async';
-  img.src = url;
+  // onload rather than img.decode(): decode() can stall while the page isn't being painted.
   try {
-    await img.decode();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () => reject(new Error('Image could not be decoded'));
+      img.src = url;
+    });
   } catch (e) {
     URL.revokeObjectURL(url);
     throw e;

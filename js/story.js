@@ -1,9 +1,11 @@
-// 1080×1920 images sized for an Instagram story, printed on paper:
-// one jarred sky with its postmark, one month's jar, or the whole year's shelf.
+// 1080×1920 images sized for an Instagram story, printed on paper under a Kepfa quote:
+// one jarred sky with its handwritten note, one month's jar, or the whole year's shelf.
 
 import { drawJar, jarShape, JAR_RATIO } from './jar.js';
 import { dominant, loadImage } from './sky.js';
 import { t, fmt, MONTHS, MONTHS_SHORT } from './strings.js';
+
+const isThai = (s) => /[฀-๿]/.test(s);
 
 const W = 1080, H = 1920;
 const PAPER = '#F1EDE6';
@@ -11,10 +13,10 @@ const TAG = '#FBF9F5';
 const INK = '#1E1C19';
 const SOFT = '#6B645B';
 const RULE = '#CFC7BB';
-const STAMP = '#2C3D6B';
 const GLASS = 'rgba(255,255,255,.45)';
 
 const SERIF = '"Cormorant Garamond", "IBM Plex Sans Thai", Georgia, serif';
+const HAND = '"Reenie Beanie", "IBM Plex Sans Thai", sans-serif';
 const SANS = '"IBM Plex Sans", "IBM Plex Sans Thai", system-ui, sans-serif';
 const MONO = '"IBM Plex Mono", ui-monospace, monospace';
 
@@ -22,7 +24,8 @@ async function fontsReady() {
   try {
     await Promise.all([
       document.fonts.load('500 64px "Cormorant Garamond"'),
-      document.fonts.load('64px "Cormorant Garamond"'),
+      document.fonts.load('italic 40px "Cormorant Garamond"'),
+      document.fonts.load('64px "Reenie Beanie"'),
       document.fonts.load('40px "IBM Plex Sans"'),
       document.fonts.load('500 40px "IBM Plex Sans"'),
       document.fonts.load('40px "IBM Plex Sans Thai"'),
@@ -62,11 +65,17 @@ function text(ctx, str, x, y, { font, color = INK, align = 'center', spacing = 0
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
-function masthead(ctx) {
-  text(ctx, 'Kepfa', 90, 150, { font: `500 64px ${SERIF}`, align: 'left' });
-  text(ctx, t.skyCollection.toUpperCase(), W - 90, 146, { font: `26px ${SANS}`, color: SOFT, align: 'right', spacing: 5 });
+/** Name, then the quote that invites people in, then a rule. Returns the rule's y. */
+function masthead(ctx, quote) {
+  text(ctx, 'Kepfa', W / 2, 140, { font: `500 64px ${SERIF}` });
+  const font = `italic 40px ${SERIF}`;
+  ctx.font = font;
+  const lines = wrap(ctx, `“${quote}”`, W - 220, 2);
+  lines.forEach((ln, i) => text(ctx, ln, W / 2, 205 + i * 50, { font, color: '#3A3631' }));
+  const y = 205 + (lines.length - 1) * 50 + 40;
   ctx.fillStyle = RULE;
-  ctx.fillRect(90, 182, W - 180, 2);
+  ctx.fillRect(90, y, W - 180, 2);
+  return y;
 }
 
 function footer(ctx) {
@@ -98,39 +107,6 @@ function wrap(ctx, str, maxW, maxLines) {
     lines[maxLines - 1] = lines[maxLines - 1].replace(/.$/, '…');
   }
   return lines;
-}
-
-/** Round postmark with the month and day, inked slightly off-square like a real stamp. */
-function postmark(ctx, cx, cy, top, bottom, scale = 1) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(-0.12);
-  ctx.strokeStyle = STAMP;
-  ctx.globalAlpha = 0.82;
-  ctx.lineWidth = 5 * scale;
-  ctx.beginPath(); ctx.arc(0, 0, 108 * scale, 0, Math.PI * 2); ctx.stroke();
-  ctx.lineWidth = 3 * scale;
-  ctx.beginPath(); ctx.arc(0, 0, 80 * scale, 0, Math.PI * 2); ctx.stroke();
-  text(ctx, top, 0, -4 * scale, { font: `500 ${58 * scale}px ${SERIF}`, color: STAMP, spacing: 3 * scale });
-  text(ctx, bottom, 0, 44 * scale, { font: `${36 * scale}px ${MONO}`, color: STAMP });
-  ctx.restore();
-}
-
-/** Wavy cancellation lines that run off the jar's edge. */
-function cancellation(ctx, x, y) {
-  ctx.save();
-  ctx.strokeStyle = STAMP;
-  ctx.globalAlpha = 0.72;
-  ctx.lineWidth = 4;
-  for (let k = 0; k < 4; k++) {
-    ctx.beginPath();
-    for (let dx = 0; dx <= 300; dx += 6) {
-      const yy = y + k * 22 + Math.sin(dx / 18) * 7;
-      if (dx === 0) ctx.moveTo(x + dx, yy); else ctx.lineTo(x + dx, yy);
-    }
-    ctx.stroke();
-  }
-  ctx.restore();
 }
 
 /** Paper tag tied around the jar's neck. */
@@ -174,26 +150,25 @@ function swatches(ctx, palette, y) {
   }
 }
 
-async function storySingle(sky, showPlace) {
+async function storySingle(sky, showPlace, quote) {
   const [c, ctx] = page();
-  masthead(ctx);
+  const top = masthead(ctx, quote);
 
-  const bw = 660, bh = Math.round(660 * JAR_RATIO), bx = (W - bw) / 2, by = 250;
+  const bw = 620, bh = Math.round(620 * JAR_RATIO), bx = (W - bw) / 2, by = top + 50;
   const { img, release } = await loadImage(sky.photo);
   drawJar(ctx, { x: bx, y: by, w: bw, h: bh, image: img, ink: INK, paper: PAPER, glass: GLASS });
   release();
   const g = jarShape(bw, bh);
   if (showPlace && sky.place) tag(ctx, bx + bw - g.mx, by + g.threads[1], sky.place);
-  cancellation(ctx, bx + bw - 170, by + bh - 280);
-  const d = new Date(sky.takenAt);
-  postmark(ctx, bx - 10, by + bh - 200, MONTHS_SHORT[d.getMonth()].toUpperCase(), String(d.getDate()));
 
   let y = by + bh + 110;
   if (sky.note) {
-    ctx.font = `56px ${SERIF}`;
+    // Handwriting for English; Thai keeps the regular face at a regular size.
+    const font = isThai(sky.note) ? `46px ${SANS}` : `68px ${HAND}`;
+    ctx.font = font;
     const lines = wrap(ctx, sky.note, W - 260, 2);
-    lines.forEach((ln, i) => text(ctx, ln, W / 2, y + i * 70, { font: `56px ${SERIF}` }));
-    y += lines.length * 70 - 20;
+    lines.forEach((ln, i) => text(ctx, ln, W / 2, y + i * 76, { font }));
+    y += lines.length * 76 - 26;
   }
   rule(ctx, y);
   text(ctx, fmt.stamp(sky.takenAt), W / 2, y + 70, { font: `40px ${MONO}`, color: SOFT });
@@ -202,15 +177,14 @@ async function storySingle(sky, showPlace) {
   return toBlob(c);
 }
 
-async function storyJar({ year, month, skies }) {
+async function storyJar({ year, month, skies, quote }) {
   const [c, ctx] = page();
-  masthead(ctx);
-  text(ctx, MONTHS[month], W / 2, 340, { font: `500 128px ${SERIF}` });
-  text(ctx, t.storyKept(year, skies.length), W / 2, 410, { font: `36px ${SANS}`, color: SOFT });
+  const top = masthead(ctx, quote);
+  text(ctx, MONTHS[month], W / 2, top + 130, { font: `500 128px ${SERIF}` });
+  text(ctx, t.storyKept(year, skies.length), W / 2, top + 195, { font: `36px ${SANS}`, color: SOFT });
 
-  const bw = 560, bh = Math.round(560 * JAR_RATIO), bx = (W - bw) / 2, by = 480;
+  const bw = 540, bh = Math.round(540 * JAR_RATIO), bx = (W - bw) / 2, by = top + 250;
   drawJar(ctx, { x: bx, y: by, w: bw, h: bh, skies, capacity: new Date(year, month + 1, 0).getDate(), ink: INK, paper: PAPER, glass: GLASS });
-  postmark(ctx, bx - 10, by + bh - 200, MONTHS_SHORT[month].toUpperCase(), String(year), 0.95);
 
   // One square per sky: the month as a row of colors.
   const size = 34, gap = 10, perRow = 16;
@@ -226,19 +200,19 @@ async function storyJar({ year, month, skies }) {
   return toBlob(c);
 }
 
-async function storyYear({ year, skies }) {
+async function storyYear({ year, skies, quote }) {
   const [c, ctx] = page();
-  masthead(ctx);
-  text(ctx, String(year), W / 2, 340, { font: `500 140px ${SERIF}` });
-  text(ctx, `${skies.length} ${t.kept(skies.length)}`, W / 2, 410, { font: `36px ${SANS}`, color: SOFT });
+  const top = masthead(ctx, quote);
+  text(ctx, String(year), W / 2, top + 140, { font: `500 140px ${SERIF}` });
+  text(ctx, `${skies.length} ${t.kept(skies.length)}`, W / 2, top + 205, { font: `36px ${SANS}`, color: SOFT });
 
-  const bw = 176, bh = Math.round(176 * JAR_RATIO), gapX = 52, rowH = bh + 110;
+  const bw = 176, bh = Math.round(176 * JAR_RATIO), gapX = 52, rowH = bh + 100, firstRow = top + 260;
   const left = (W - (4 * bw + 3 * gapX)) / 2;
   const now = new Date();
   for (let m = 0; m < 12; m++) {
     const r = Math.floor(m / 4), col = m % 4;
     const x = left + col * (bw + gapX);
-    const y = 470 + r * rowH;
+    const y = firstRow + r * rowH;
     const future = year > now.getFullYear() || (year === now.getFullYear() && m > now.getMonth());
     drawJar(ctx, {
       x, y, w: bw, h: bh, skies: skies.filter((s) => new Date(s.takenAt).getMonth() === m),
@@ -254,7 +228,7 @@ async function storyYear({ year, skies }) {
   }
 
   // The year as a strip of colors, one sliver per sky.
-  const sx = 90, sy = 470 + 3 * rowH + 20, sw = W - 180, sh = 90;
+  const sx = 90, sy = firstRow + 3 * rowH + 20, sw = W - 180, sh = 90;
   ctx.fillStyle = TAG;
   ctx.fillRect(sx, sy, sw, sh);
   if (skies.length) {
@@ -273,7 +247,7 @@ async function storyYear({ year, skies }) {
 
 export async function makeStory(kind, payload) {
   await fontsReady();
-  if (kind === 'single') return storySingle(payload.sky, payload.showPlace);
+  if (kind === 'single') return storySingle(payload.sky, payload.showPlace, payload.quote);
   if (kind === 'jar') return storyJar(payload);
   return storyYear(payload);
 }
