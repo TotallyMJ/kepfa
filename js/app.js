@@ -271,12 +271,11 @@ function renderShelf() {
       </div>
     </section>
     ${bannerHtml()}
-    ${memory ? `<section class="memory-block">
-      <p class="eyebrow">${memory.label}</p>
-      <div class="memory">${slotButton(memory.sky)}
-        <p>${memory.sky.note ? `<span class="memory-note ${handClass(memory.sky.note)}">${esc(memory.sky.note)}</span>` : ''}<span class="memory-date">${fmt.shelf(memory.sky.takenAt)[0]}, ${new Date(memory.sky.takenAt).getFullYear()} · ${fmt.shelf(memory.sky.takenAt)[1]}</span></p>
-      </div>
-    </section>` : ''}
+    ${memory ? `<button type="button" class="memory" id="memory" aria-label="${t.openSky(fmt.long(memory.sky.takenAt))}">
+      <span class="memory-jar">${jarSvg({ href: photoUrl(memory.sky) })}</span>
+      <span class="memory-text"><span class="eyebrow">${memory.label}</span>${memory.sky.note ? `<span class="memory-note ${handClass(memory.sky.note)}">${esc(memory.sky.note)}</span>` : ''}<span class="memory-date">${fmt.shelf(memory.sky.takenAt)[0]}, ${new Date(memory.sky.takenAt).getFullYear()} · ${fmt.shelf(memory.sky.takenAt)[1]}</span></span>
+      ${ICON.right}
+    </button>` : ''}
     <div class="section-head"><h2 class="section-title">${MONTHS[now.getMonth()]} <span>${now.getFullYear()}</span></h2><span class="eyebrow">${thisMonth.length} ${t.kept(thisMonth.length)}</span></div>
     ${thisMonth.length
       ? shelfRowsHtml(thisMonth)
@@ -287,6 +286,7 @@ function renderShelf() {
     ${state.skies.length > thisMonth.length ? `<p class="see-months"><a class="btn-text" href="#/months">${t.seeMonths}</a></p>` : ''}`;
 
   bindJarSlots(view);
+  $('#memory')?.addEventListener('click', () => openDetail(memory.sky));
   $('#clearSamples')?.addEventListener('click', clearSamples);
   $('#setPlace')?.addEventListener('click', askLocation);
   $('#lookUp').addEventListener('click', () => { state.viaPrompt = true; openCapture(); });

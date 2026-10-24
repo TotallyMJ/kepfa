@@ -258,13 +258,27 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .dots i.is-new { background: none; position: relative; }
 .dots i.is-new::after { content: ""; position: absolute; inset: 0; background: var(--ink); animation: dot-in var(--t-pop) var(--ease-spring) 300ms both; }
 @keyframes dot-in { from { transform: scale(0); } }
-.memory-block { margin-top: var(--s-5); }
-.memory-block .eyebrow { margin: 0; }
-.memory { display: flex; align-items: flex-end; gap: var(--s-3); margin-top: var(--s-2); }
-.memory .jar-slot { flex: none; width: 44px; }
-.memory p { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--s-1); }
+/* A sky from this day back then: the same soft paper card as the challenge tick, the whole card opens it. */
+.memory {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  width: 100%;
+  margin-top: var(--s-5);
+  padding: 14px var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  text-align: left;
+  transition: transform var(--t-quick) var(--ease-spring);
+}
+.memory:active { transform: scale(.98); transition-duration: var(--t-press); transition-timing-function: var(--ease-out); }
+.memory-jar { flex: none; width: 58px; }
+.memory-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-1); }
 .memory-note { overflow-wrap: anywhere; }
+.memory-note.hand:not(.is-thai) { font-size: var(--t-hand-lg); line-height: 1.1; }
 .memory-date { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); line-height: 1.5; }
+.memory > svg { flex: none; width: 18px; height: 18px; color: var(--ink-soft); }
 
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-6); }
 .section-head .section-title { margin: 0; }
@@ -659,7 +673,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   background: radial-gradient(closest-side, rgba(30, 28, 25, .22), rgba(30, 28, 25, 0));
 }
 .review-form { display: flex; flex-direction: column; gap: 30px; }
-.review-form .slip { margin: var(--s-2) var(--s-3) 0; transform: rotate(-1.5deg); }
+.review-form .slip { margin: var(--s-2) 28px 0; transform: rotate(-1.5deg); }
 .slip .field-label { color: #8A8277; }
 .slip .field-label ~ .field-label { margin-top: var(--s-3); }
 .slip .field { border-bottom-color: rgba(30, 28, 25, .25); }
