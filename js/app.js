@@ -1,6 +1,6 @@
 import { store, newId } from './store.js';
 import { prepareImage, makeSampleSky, hexToRgb, luminance, dominant, hex, mix } from './sky.js';
-import { BOX, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
+import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, JAR_RATIO } from './jar.js';
 import { foldStage } from './fold.js';
 import { sunTimes } from './sun.js';
 import { makeStory, shareImage, saveImage } from './story.js';
@@ -424,6 +424,7 @@ function shakeJar(list) {
 
 let stream = null;
 let draft = null;
+let camWindow = null;   // the jar's glass interior on screen, in CSS px: what the shot keeps
 
 function showStep(name) {
   cap.querySelectorAll('.cap-step').forEach((s) => { s.hidden = s.dataset.step !== name; });
@@ -437,6 +438,8 @@ function layoutCameraFrame() {
   const x = (W - jw) / 2, y = (H - jh) / 2 - H * 0.02;
   // Place the photo's coordinate space so its jar box lands at x,y, jw wide.
   const place = `translate(${x} ${y}) scale(${jw / BOX.w}) translate(${-BOX.x} ${-BOX.y})`;
+  const k = jw / BOX.w;
+  camWindow = { x: x + (INSIDE.x - BOX.x) * k, y: y + (INSIDE.y - BOX.y) * k, w: INSIDE.w * k, h: INSIDE.h * k };
   $('#camFrame').setAttribute('viewBox', `0 0 ${W} ${H}`);
   $('#camFrame').innerHTML = `
     <defs><mask id="camMask"><rect width="${W}" height="${H}" fill="white"/><path d="${INTERIOR}" transform="${place}" fill="black"/></mask></defs>
@@ -458,7 +461,8 @@ async function openCapture() {
   if (!navigator.mediaDevices?.getUserMedia) return showFallback();
   try {
     const s = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } },
+      // As sharp as the phone allows: the shot keeps only the part inside the jar.
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } },
       audio: false,
     });
     if (cap.hidden || camStep.hidden) { s.getTracks().forEach((tr) => tr.stop()); return; }
@@ -497,10 +501,16 @@ function closeCapture() {
 async function snap() {
   const v = $('#camVideo');
   if (!v.videoWidth) return;
+  // Keep what was framed: map the jar window back through the video's object-fit: cover onto the camera frame.
+  const vw = v.videoWidth, vh = v.videoHeight;
+  const s = Math.max(innerWidth / vw, innerHeight / vh);
+  const ox = (innerWidth - vw * s) / 2, oy = (innerHeight - vh * s) / 2;
+  const sx = Math.max(0, (camWindow.x - ox) / s), sy = Math.max(0, (camWindow.y - oy) / s);
+  const sw = Math.min(vw - sx, camWindow.w / s), sh = Math.min(vh - sy, camWindow.h / s);
   const c = document.createElement('canvas');
-  c.width = v.videoWidth;
-  c.height = v.videoHeight;
-  c.getContext('2d').drawImage(v, 0, 0);
+  c.width = Math.round(sw);
+  c.height = Math.round(sh);
+  c.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
   chime([2093], 0);
   const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
   stopCamera();
