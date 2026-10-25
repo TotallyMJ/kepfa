@@ -15,6 +15,7 @@ const ICON = {
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M6 11v7.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>',
   save: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10 11v5.5M14 11v5.5"/></svg>',
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -1079,21 +1080,12 @@ function noteHtml(sky, { rolled = false } = {}) {
 
 const shareHtml = () => `<button type="button" class="btn light share" id="shareOne">${ICON.share}${t.shareSky}</button>`;
 
-/** ⋯ at the top: the things you can do to this sky that aren't on the polaroid itself. */
-function bindSkyMenu(sky) {
-  const more = $('#skyMore');
-  const menu = $('#skyMenu');
-  const close = () => { menu.hidden = true; more.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside, true); };
-  const outside = (e) => { if (!menu.contains(e.target) && !more.contains(e.target)) close(); };
-  more.addEventListener('click', () => {
+/** The bin at the top: the one thing to do to this sky that isn't on the polaroid itself (the note's pen edits). */
+function bindSkyDelete(sky) {
+  $('#skyDelete').addEventListener('click', async () => {
     if (viewer.busy || viewer.editing) return;
-    if (!menu.hidden) { close(); return; }
-    menu.hidden = false;
-    more.setAttribute('aria-expanded', 'true');
-    document.addEventListener('pointerdown', outside, true);
+    if (await deleteSky(sky)) closeSheet();
   });
-  $('#menuEdit').addEventListener('click', () => { close(); startEdit(sky); });
-  $('#menuDelete').addEventListener('click', async () => { close(); if (await deleteSky(sky)) closeSheet(); });
 }
 
 function bindPolaroid(sky) {
@@ -1119,11 +1111,7 @@ function openDetail(sky, { from = 0 } = {}) {
     <div class="viewer-top">
       <button type="button" class="viewer-icon" id="closeJar" aria-label="${t.closeJar}">${ICON.close}</button>
       <span class="viewer-count">${n > 1 ? t.skyOf(pos, n) : ''}</span>
-      <button type="button" class="viewer-icon" id="skyMore" aria-label="${t.more}" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18.5" cy="12" r="1"/></svg></button>
-      <div class="viewer-menu" id="skyMenu" role="menu" hidden>
-        <button type="button" role="menuitem" id="menuEdit">${t.editNote}</button>
-        <button type="button" role="menuitem" class="danger" id="menuDelete">${t.deleteSky}</button>
-      </div>
+      <button type="button" class="viewer-icon" id="skyDelete" aria-label="${t.deleteSky}">${ICON.trash}</button>
     </div>
     <div class="viewer-stage" id="viewerStage"></div>
     <div class="viewer-stack">
@@ -1145,7 +1133,7 @@ function openDetail(sky, { from = 0 } = {}) {
   viewer.stage = stage;
   viewer.pol = $('.polaroid', body);
   $('#closeJar').addEventListener('click', closeJar);
-  bindSkyMenu(sky);
+  bindSkyDelete(sky);
   bindPolaroid(sky);
 
   if (swapping) {

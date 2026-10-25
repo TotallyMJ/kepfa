@@ -1113,6 +1113,8 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .polaroid-empty { font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: #8A8277; }
 .pen { width: 14px; height: 14px; margin-left: 6px; vertical-align: -1px; stroke: #8A8277; }
 .polaroid-meta { margin: 6px 0 0; font-family: var(--f-mono); font-size: 10px; color: #6B645B; }
+/* With a note taped over the strip's lower part, the date sits midway between the photo and the tape. */
+.polaroid-meta:only-child { margin: 0 0 12px; }
 /* Close, where-am-I and more, across the top like a photo viewer; paper-coloured on the dim. */
 .viewer-top {
   position: absolute;
@@ -1131,21 +1133,6 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .viewer-icon:last-of-type { justify-self: end; }
 .viewer-icon svg { width: 24px; height: 24px; stroke-width: 1.8; }
 .viewer-count { text-align: center; font-family: var(--f-mono); font-size: var(--t-cap); letter-spacing: .08em; }
-.viewer-menu {
-  position: absolute;
-  top: calc(100% + 2px);
-  right: var(--s-3);
-  min-width: 180px;
-  padding: var(--s-1) 0;
-  background: var(--polaroid);
-  border-radius: 8px;
-  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, .5);
-  animation: pop-in var(--t-quick) var(--ease-out) both;
-  transform-origin: top right;
-}
-.viewer-menu button { display: block; width: 100%; min-height: 44px; padding: 0 var(--s-4); border: 0; background: none; color: #1E1C19; font-size: var(--t-sm); text-align: left; }
-.viewer-menu button + button { border-top: 1px solid rgba(30, 28, 25, .1); }
-.viewer-menu .danger { color: var(--danger); }
 .viewer-actions { display: flex; align-items: center; justify-content: center; gap: var(--s-5); }
 .viewer-actions .btn.light { min-width: calc(var(--pw) * .6); }
 /* Share is the thing to do with a sky you're looking at: full polaroid width, with its icon. */

@@ -152,7 +152,6 @@ export const t = {
   seeMySkies: 'See my skies',
 
   closeJar: 'Close the jar',
-  more: 'More',
   skyOf: (i, n) => `${i} / ${n}`,
   swipeHint: '‹  Swipe for other skies  ›',
   shareSky: 'Share this sky',
