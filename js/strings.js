@@ -94,6 +94,53 @@ export const THEMES = {
       'The sky in a reflection you didn’t expect.',
     ],
   },
+  3: {
+    name: 'Color match',
+    prompts: [
+      'Something the same blue as today’s sky.', 'Something white against the sky.', 'Your shirt and the sky in one shot.',
+      'A flower against the sky.', 'Something yellow under the sky.', 'A green leaf against the sky.',
+      'Something red against the sky.', 'The sky beside a colorful wall.', 'A fruit held up to the sky.',
+      'A drink that matches the sky.', 'Something orange against the sky.', 'Something pink against the sky.',
+      'A painted door or window, with sky.', 'Two colors and the sky in one shot.', 'Something gray against the sky.',
+      'Something purple against the sky.', 'A colorful bag or umbrella against the sky.', 'A colored car, with the sky above.',
+      'Something brown against the sky.', 'Something black against the sky.', 'A bold-colored sign against the sky.',
+      'Colored paper held up to the sky.', 'A snack wrapper against the sky.', 'Something that matches the sky’s lightest part.',
+      'Something that matches the sky’s darkest part.', 'A plant pot against the sky.', 'Clothes or fabric against the sky.',
+      'Something gold or shiny under the sky.', 'The sky beside something that clashes with it.', 'Every color you can find, with the sky.',
+    ],
+  },
+  // Every one works rain or shine.
+  4: {
+    name: 'Weather',
+    prompts: [
+      'Today’s weather in one shot.', 'The sky right now, whatever it’s doing.', 'The clouds today, or the lack of them.',
+      'The sky first thing, to check the weather.', 'The darkest part of today’s sky.', 'The sky after rain, or before it.',
+      'Anything moving in the wind, with the sky.', 'The sky at the hottest time of day.', 'The sky from where you’d shelter from rain.',
+      'Something wet under the sky: rain, a hose or a glass.', 'The sky through a window with drops or dust on it.', 'The biggest cloud you can see, or the clearest patch.',
+      'The sky your weather app is describing today.', 'The sky at the coolest moment of the day.', 'The sky with an umbrella in it.',
+      'Light breaking through clouds, or a plain bright sky.', 'The sky over a wet street, or a dry one.', 'The sky that tells you what to wear.',
+      'Today’s shadows, with the sky.', 'The sky that makes you want to stay in.', 'The sky that makes you want to go out.',
+      'The sky at the moment the weather turns.', 'Steam, mist or haze against the sky.', 'The sky after the rain stops, or as the sun drops.',
+      'The sky over somewhere damp or green.', 'The weather on your way out.', 'The sky with something drying in the sun.',
+      'The sky behind a fan or an air-con unit.', 'Clouds moving fast, or not moving at all.', 'The sky that matched your mood today.',
+      'May’s last weather.',
+    ],
+  },
+  5: {
+    name: 'Small skies',
+    prompts: [
+      'The sky in a drop of water.', 'The sky through a keyhole or a small hole.', 'The sky through a straw.',
+      'The sky through a bottle neck.', 'A tiny patch of sky between leaves.', 'The sky through a gap smaller than your thumb.',
+      'The sky through a small loop or buttonhole.', 'The sky in a drop on a leaf.', 'The smallest piece of sky you can find.',
+      'The sky through lace or patterned cloth.', 'The sky through a crack in something.', 'The sky through a small cup or glass.',
+      'The sky through a single square of a fence.', 'The sky in the smallest window you can see.', 'The sky between two fingers, barely open.',
+      'The sky through the handles of scissors.', 'The sky through a hole in a leaf.', 'The sky in a single pane of a window.',
+      'The sky through a peephole or slot.', 'The sky through a gap in a hedge or plant.', 'The sky through a bracelet or hair tie.',
+      'The sky in a tiny puddle.', 'The sky through a ring of tape.', 'The sky through a keyring.',
+      'The sky through a curled leaf.', 'The sky in a raindrop on glass.', 'The sky through a gap in a shutter.',
+      'A sliver of sky between buildings.', 'The sky through a pinhole you make in paper.', 'June’s smallest sky.',
+    ],
+  },
   10: {
     name: 'Me & the sky',
     prompts: [
