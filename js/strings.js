@@ -13,7 +13,6 @@ export const fmt = {
   stamp: (ms) => { const d = new Date(ms); return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()} · ${hm(d)}`; },
   time: (d) => hm(d),
   duration: (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return `${Math.floor(m / 60)}:${pad2(m % 60)}`; },
-  issueDate: (d) => `${MONTHS[d.getMonth()]} ${d.getFullYear()}`,
   // Prompt days are keyed 'YYYY-MM-DD'.
   dayShort: (key) => { const [, m, d] = key.split('-').map(Number); return `${d} ${MONTHS_SHORT[m - 1]}`; },
   dayLong: (key) => { const [y, m, d] = key.split('-').map(Number); return `${d} ${MONTHS_SHORT[m - 1]} ${y}`; },
@@ -281,6 +280,10 @@ export const t = {
   locationDenied: (city) => `Location is off. Sun times stay set to ${city}.`,
 
   lookFor: 'Look for',
+  // What Kepfa is for: at the top of Home, and the short poem that closes it.
+  tagline: 'The art of noticing the sky',
+  poem: ['Look up once a day.', 'Keep the sky you saw.', 'Then go back to your day,', 'a little lighter.'],
+  poemSign: 'Kepfa · the art of noticing',
   sameSky: 'Wherever you are today, we’re all under the same sky.',
   seeWho: 'See who caught it ↗',
   lookUp: 'Catch today’s sky',

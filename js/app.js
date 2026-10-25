@@ -349,7 +349,7 @@ function renderShelf() {
 
   view.innerHTML = `
     <header class="masthead">
-      <div class="masthead-meta"><span class="eyebrow">${fmt.issueDate(now)}</span></div>
+      <div class="masthead-meta"><span class="eyebrow">${t.tagline}</span></div>
       <h1 class="wordmark">Kepfa</h1>
     </header>
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
@@ -389,6 +389,7 @@ function renderShelf() {
       <span class="memory-text"><span class="eyebrow">${memory.label}</span>${memory.sky.note ? `<span class="memory-note ${handClass(memory.sky.note)}">${esc(memory.sky.note)}</span>` : ''}<span class="memory-date">${fmt.shelf(memory.sky.takenAt)[0]}, ${new Date(memory.sky.takenAt).getFullYear()} · ${fmt.shelf(memory.sky.takenAt)[1]}</span></span>
       ${ICON.right}
     </button>` : ''}
+    <section class="poem"><p>${t.poem.join('<br>')}</p><span class="eyebrow">${t.poemSign}</span></section>
     <p class="credit">${t.madeBy} <a href="https://vibethebloom.com" target="_blank" rel="noopener">${t.maker}</a> ↗</p>`;
 
   bindJarSlots(view);
@@ -440,8 +441,9 @@ function renderMonths() {
   const all = skiesIn(y);
   const minYear = Math.min(now.getFullYear(), ...state.skies.map((s) => new Date(s.takenAt).getFullYear()));
   const isNow = (m) => y === now.getFullYear() && m === now.getMonth();
-  // Only the months that hold skies, in calendar order, plus this month so there's always a jar to fill.
-  const shown = [...Array(12).keys()].filter((m) => isNow(m) || skiesIn(y, m).length);
+  // The months that hold skies and this one; in the current year the months still to come wait as faded empty jars.
+  const isFuture = (m) => y === now.getFullYear() && m > now.getMonth();
+  const shown = [...Array(12).keys()].filter((m) => isNow(m) || isFuture(m) || skiesIn(y, m).length);
 
   // Three to an oak shelf, each jar with a tent card in front: the month and how many skies (render scrolls to this month).
   view.innerHTML = `
@@ -458,12 +460,12 @@ function renderMonths() {
     </header>
     ${all.length ? `<button type="button" class="btn primary share share-year" id="shareYear">${ICON.share}${t.shareYear}</button>` : ''}
     ${chunk(shown, 3).map((ms) => `<div class="shelf-row">
-        <div class="shelf-jars">${ms.map((m) => `<button type="button" class="month-slot" data-month="${m}"
-          aria-label="${t.monthJar(MONTHS[m], skiesIn(y, m).length)}"><canvas></canvas></button>`).join('')}</div>
-        <div class="shelf-labels tents">${ms.map((m) => `<p${isNow(m) ? ' class="is-now"' : ''}><span>${MONTHS_SHORT[m]}</span><span>${skiesIn(y, m).length}</span></p>`).join('')}</div>
+        <div class="shelf-jars">${ms.map((m) => `<button type="button" class="month-slot${isFuture(m) ? ' is-future' : ''}" data-month="${m}"
+          aria-label="${t.monthJar(MONTHS[m], skiesIn(y, m).length)}"${isFuture(m) ? ' disabled' : ''}><canvas></canvas></button>`).join('')}</div>
+        <div class="shelf-labels tents">${ms.map((m) => `<p${isNow(m) ? ' class="is-now"' : isFuture(m) ? ' class="is-future"' : ''}><span>${MONTHS_SHORT[m]}</span><span>${skiesIn(y, m).length}</span></p>`).join('')}</div>
       </div>`).join('')}`;
 
-  view.querySelectorAll('.month-slot').forEach((el) => {
+  view.querySelectorAll('.month-slot:not(.is-future)').forEach((el) => {
     el.addEventListener('click', () => go(`#/month/${y}-${pad2(+el.dataset.month + 1)}`));
   });
   $('#shareYear')?.addEventListener('click', () => openStory('year', { year: y, skies: all }));

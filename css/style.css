@@ -266,6 +266,11 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .head-link { min-height: 44px; display: inline-flex; align-items: center; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
 .section-head + .shelf-row, .section-head + .empty { margin-top: var(--s-2); }
 .memory { margin-top: var(--s-5); }
+/* What Kepfa is for, set like the last page of a book: a short rule, four italic lines, a small signature. */
+.poem { max-width: 260px; margin: var(--s-7) auto 0; text-align: center; }
+.poem::before { content: ""; display: block; width: 36px; height: 1px; margin: 0 auto var(--s-4); background: var(--ink); }
+.poem p { margin: 0; font-family: var(--f-display); font-style: italic; font-size: 21px; line-height: 1.45; }
+.poem .eyebrow { display: block; margin-top: var(--s-4); }
 /* The maker's signature at the very end of the shelf: small, quiet, one tap to their site. */
 .credit { margin: var(--s-6) 0 0; text-align: center; font-family: var(--f-mono); font-size: var(--t-cap); letter-spacing: .06em; color: var(--ink-soft); }
 .credit a { display: inline-block; min-height: 44px; line-height: 44px; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
@@ -570,6 +575,9 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 @keyframes jar-x-in { from { opacity: 0; transform: scale(.3); } }
 .month-slot canvas { display: block; }
 .month-slot:disabled { cursor: default; }
+/* A month still to come: its empty jar waits, faded. */
+.month-slot.is-future { opacity: .35; }
+.shelf-labels.tents p.is-future { opacity: .55; }
 
 .empty { text-align: center; margin-top: var(--s-7); }
 .empty h2 { margin: var(--s-4) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); }
