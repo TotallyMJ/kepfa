@@ -690,8 +690,11 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   release();
 
   // A note in the margin, scrapbook style: handwriting and a hand-drawn arrow into the jar.
-  const jarLeft = jx + bw * 0.04, jarMid = jy + bh * 0.58;
-  const tx = jarLeft - 70, ty = py + ph + 165;
+  const jarLeft = jx + bw * 0.04;
+  // Room on its right for the arrow, but never past the page margin on its left.
+  ctx.font = `108px ${HAND}`;
+  const wide = Math.max(...t.keptInJar.map((ln) => ctx.measureText(ln).width));
+  const tx = Math.max(jarLeft - 140, MARGIN + wide), ty = py + ph + 165;
   ctx.save();
   ctx.translate(tx, ty);
   ctx.rotate((-5 * Math.PI) / 180);
@@ -700,8 +703,9 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   ctx.strokeStyle = '#2a2420';
   ctx.lineWidth = 4;
   ctx.lineCap = ctx.lineJoin = 'round';
-  const sx = tx + 20, sy = ty - 34, ex = jx - 18, ey = jarMid, c2x = ex - 50, c2y = ey + 50;
-  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx + 40, sy, c2x, c2y, ex, ey); ctx.stroke();
+  // A short hook from the end of the writing that arrives level, pointing in at the jar's lower half.
+  const sx = tx + 18, sy = ty - 40, ex = jx - 26, ey = jy + bh * 0.7, c2x = ex - 44, c2y = ey + 4;
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx + 30, sy - 6, c2x, c2y, ex, ey); ctx.stroke();
   const ang = Math.atan2(ey - c2y, ex - c2x);
   for (const turn of [-0.45, 0.45]) {
     ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - Math.cos(ang + turn) * 28, ey - Math.sin(ang + turn) * 28); ctx.stroke();
