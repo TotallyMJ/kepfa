@@ -197,7 +197,8 @@ function footer(ctx) {
 function wrap(ctx, str, maxW, maxLines) {
   // Wrap by words. Thai has no spaces between words, so it's split into words by the browser where it can,
   // and by characters only as a last resort.
-  const tokens = !isThai(str) ? str.split(/(\s+)/)
+  // A comma with no space after it ("bangkok,thailand") can still break.
+  const tokens = !isThai(str) ? str.split(/(\s+)|(?<=,)(?=\S)/).filter(Boolean)
     : 'Segmenter' in Intl ? Array.from(new Intl.Segmenter('th', { granularity: 'word' }).segment(str), (s) => s.segment)
       : Array.from(str);
   const lines = [];
@@ -699,7 +700,7 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   ctx.strokeStyle = '#2a2420';
   ctx.lineWidth = 4;
   ctx.lineCap = ctx.lineJoin = 'round';
-  const sx = tx + 20, sy = ty - 34, ex = jarLeft - 6, ey = jarMid, c2x = ex - 50, c2y = ey + 50;
+  const sx = tx + 20, sy = ty - 34, ex = jx - 18, ey = jarMid, c2x = ex - 50, c2y = ey + 50;
   ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx + 40, sy, c2x, c2y, ex, ey); ctx.stroke();
   const ang = Math.atan2(ey - c2y, ex - c2x);
   for (const turn of [-0.45, 0.45]) {
