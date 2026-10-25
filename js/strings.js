@@ -26,7 +26,7 @@ const skies = (n) => (n === 1 ? 'sky' : 'skies');
 
 export const CHALLENGE_TAG = 'kepfachallenge';
 export const CHALLENGE_SIZE = 30;
-const SITE = 'totallymj.github.io/kepfa';
+const SITE = 'kepfa.vibethebloom.com';
 
 // One prompt a day, the same for everyone. Each works in any weather; 30 so a month goes by before one comes back.
 export const PROMPTS = [
