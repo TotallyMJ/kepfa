@@ -25,11 +25,11 @@
 
 <nav class="tabbar" aria-label="Main">
   <div class="tabbar-inner">
-    <a href="#/" class="tab" data-tab="shelf"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3.5h8M7.5 6h9l.5 2v10.5a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V8z"/><path d="M7 13c2-1 3.5 1 5 0s3-1 5 0"/></svg>My Skies</a>
+    <a href="#/" class="tab" data-tab="shelf"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-6h-6v6H5.5A1.5 1.5 0 0 1 4 19z"/></svg>Home</a>
     <button class="keep-btn" id="openCapture" type="button" aria-label="Keep a sky">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>
     </button>
-    <a href="#/months" class="tab" data-tab="months"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>Months</a>
+    <a href="#/months" class="tab" data-tab="months"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/><path d="M8 13.5h2M11 13.5h2M14 13.5h2M8 16.5h2M11 16.5h2"/></svg>Year</a>
   </div>
 </nav>
 
@@ -44,26 +44,23 @@
       <label class="btn on-dark" for="fileLibrary">Choose from your photos</label>
     </div>
     <div class="cam-top">
-      <button class="btn-text on-dark" type="button" data-close-capture>Cancel</button>
-      <p class="cam-hint">Frame the sky in the jar</p>
-      <span class="cam-spacer"></span>
+      <button class="cam-icon" type="button" data-close-capture aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
     </div>
+    <p class="cam-hint">Frame the sky in the jar</p>
     <div class="cam-bottom">
-      <label class="btn-text on-dark cam-library" for="fileLibrary">From your photos</label>
+      <label class="cam-icon" for="fileLibrary" aria-label="From your photos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l4.5-4.5 3 3 2.5-2.5L20 17"/></svg></label>
       <button class="shutter" id="shutter" type="button" aria-label="Take photo"></button>
-      <span class="cam-spacer"><button class="cam-flip" id="camFlip" type="button" aria-label="Switch camera" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5A2.5 2.5 0 0 1 6.5 7h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z"/><path d="M9 12.5a3 3 0 0 1 5.2-2M15 14.5a3 3 0 0 1-5.2 2"/><path d="M14.4 9v1.7h-1.7M9.6 18v-1.7h1.7"/></svg></button></span>
+      <span class="cam-spacer"><button class="cam-icon" id="camFlip" type="button" aria-label="Switch camera" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5A2.5 2.5 0 0 1 6.5 7h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z"/><path d="M9 12.5a3 3 0 0 1 5.2-2M15 14.5a3 3 0 0 1-5.2 2"/><path d="M14.4 9v1.7h-1.7M9.6 18v-1.7h1.7"/></svg></button></span>
     </div>
   </div>
   <div class="cap-step frame" data-step="frame" hidden>
     <img id="frameImg" alt="">
     <svg id="frameMask" class="cam-frame" aria-hidden="true"></svg>
     <div class="cam-top">
-      <button class="btn-text on-dark" type="button" data-close-capture>Cancel</button>
-      <p class="cam-hint">Fit the sky in the jar</p>
-      <span class="cam-spacer"></span>
+      <button class="cam-icon" type="button" data-close-capture aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
     </div>
+    <p class="cam-hint">Drag and pinch to fit the sky in the jar</p>
     <div class="frame-bottom">
-      <p class="frame-hint">Drag to move · pinch to zoom</p>
       <div class="frame-actions">
         <button class="btn on-dark" type="button" id="frameAnother">Choose another</button>
         <button class="btn primary on-dark" type="button" id="frameUse">Use this</button>

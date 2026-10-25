@@ -734,22 +734,37 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 }
 .cam-top { top: 0; padding-top: calc(env(safe-area-inset-top, 0px) + var(--s-2)); }
 .cam-bottom { bottom: 0; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-6)); display: grid; grid-template-columns: 1fr auto 1fr; }
-.cam-bottom .cam-library { width: auto; justify-self: start; white-space: normal; line-height: 1.3; }
-.cam-hint { margin: 0; font-size: var(--t-sm); text-align: center; }
+/* Right above the jar's lid (top set by layoutCameraFrame), where your eyes already are while you frame. */
+.cam-hint {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(20, 18, 16, .45);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  font-size: var(--t-sm);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
 .cam-spacer { width: 56px; flex: none; }
-.cam-bottom .cam-spacer { justify-self: end; display: grid; place-items: center; }
-/* Front/back flip, right of the shutter where every camera app keeps it. */
-.cam-flip { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .14); color: var(--camera-ink); }
-.cam-flip svg { width: 24px; height: 24px; }
+.cam-bottom > label, .cam-bottom .cam-spacer { justify-self: center; display: grid; place-items: center; }
+/* Close, photos and front/back flip: the same round icon button, like every camera app. */
+.cam-icon { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: rgba(20, 18, 16, .38); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: var(--camera-ink); cursor: pointer; }
+.cam-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .cam.is-front video { transform: scaleX(-1); }
-.cam-top .btn-text, .cam-bottom .btn-text { width: 56px; }
+/* A white disc in a white ring, so it reads as the shutter on any sky. */
 .shutter {
   width: 72px; height: 72px;
   border-radius: 50%;
-  border: 3px solid var(--camera-ink);
-  background: transparent;
+  border: 4px solid var(--camera-ink);
+  background: var(--camera-ink);
+  box-shadow: inset 0 0 0 4px rgba(20, 18, 16, .55);
+  transition: transform var(--t-quick) var(--ease-out);
 }
-.shutter:active { background: var(--camera-ink); }
+.shutter:active { transform: scale(.92); }
 .cam-fallback {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -775,7 +790,6 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   z-index: 2;
   padding: 0 var(--gutter-r) calc(env(safe-area-inset-bottom, 0px) + var(--s-5)) var(--gutter-l);
 }
-.frame-hint { margin: 0 0 var(--s-4); font-size: var(--t-sm); text-align: center; opacity: .85; }
 .frame-actions { display: grid; grid-template-columns: auto 1fr; gap: var(--s-3); }
 
 .review { overflow-y: auto; background: var(--paper); color: var(--ink); }

@@ -564,6 +564,9 @@ function layoutCameraFrame(svg = $('#camFrame'), maskId = 'camMask') {
     <defs><mask id="${maskId}"><rect width="${W}" height="${H}" fill="white"/><path d="${INTERIOR}" transform="${place}" fill="black"/></mask></defs>
     <rect class="cam-scrim" width="${W}" height="${H}" mask="url(#${maskId})"/>
     <g transform="${place}">${jarSvg({ lidded: true }).replace(/^<svg[^>]*>|<\/svg>\s*$/g, '')}</g>`;
+  // The hint sits just above the lid, clear of the close button.
+  const hint = svg.parentElement.querySelector('.cam-hint');
+  if (hint) hint.style.top = `${Math.max(y - 44, 60)}px`;
 }
 
 async function openCapture() {

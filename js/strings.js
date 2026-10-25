@@ -64,7 +64,7 @@ export const QUOTES = [
 export const t = {
   kept: (n) => `${skies(n)} kept`,
   mySkies: 'My Skies',
-  seeMonths: 'See every month ›',
+  seeMonths: 'See the whole year ›',
   madeBy: 'Made by',
   maker: 'Vibe the Bloom',
   monthEmpty: (month) => `Your first ${month} sky is still out there.`,
@@ -113,7 +113,7 @@ export const t = {
   prevYear: 'Previous year',
   nextYear: 'Next year',
   monthJar: (name, n) => `${name}, ${n} ${skies(n)}`,
-  backToMonths: 'Months',
+  backToMonths: 'Year',
   tapLayer: 'Tap a sky to open it',
   tiltToPlay: 'Tilt to play',
   emptyMonthTitle: 'This jar is empty',
