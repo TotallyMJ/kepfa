@@ -1,8 +1,8 @@
 // 1080×1920 images sized for an Instagram story, printed on paper under a Kepfa quote:
 // one jarred sky with its handwritten note, one month's jar, or the whole year's shelf.
 
-import { drawJar, jarPoint, JAR_RATIO } from './jar.js';
-import { loadThumbs, ROLLS, paperIndex } from './pile.js';
+import { drawJar, jarPoint, JAR_RATIO, INSIDE } from './jar.js';
+import { loadThumbs, ROLLS, paperIndex, pileFor, drawPile } from './pile.js';
 import { loadImage } from './sky.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG, CHALLENGE_SIZE } from './strings.js';
 
@@ -497,6 +497,101 @@ function ringText(ctx, str, cx, cy, r, font) {
   ctx.textBaseline = 'alphabetic';
 }
 
+/** The month's pile drawn into the jar's inside (so the glass still goes over it), with this sky as a small unfolded print on top. */
+function jarContents(month, img) {
+  const c = document.createElement('canvas');
+  c.width = INSIDE.w;
+  c.height = INSIDE.h;
+  const x = c.getContext('2d');
+  x.translate(-INSIDE.x, -INSIDE.y);
+  const pile = pileFor(month);
+  drawPile(x, pile);
+  const top = Math.min(...pile.map((p) => p.y));
+  const s = INSIDE.w * 0.46, b = s * 0.07;
+  x.translate(INSIDE.x + INSIDE.w * 0.52, top - s * 0.2);
+  x.rotate(-0.22);
+  x.shadowColor = 'rgba(30, 28, 25, .35)';
+  x.shadowBlur = 14;
+  x.shadowOffsetY = 5;
+  x.fillStyle = '#FDFCF8';
+  x.fillRect(-s / 2 - b, -s / 2 - b, s + b * 2, s + b * 3.4);
+  x.shadowColor = 'transparent';
+  const k = Math.max(s / img.naturalWidth, s / img.naturalHeight);
+  x.beginPath(); x.rect(-s / 2, -s / 2, s, s); x.clip();
+  x.drawImage(img, (-img.naturalWidth * k) / 2, (-img.naturalHeight * k) / 2, img.naturalWidth * k, img.naturalHeight * k);
+  return c;
+}
+
+/**
+ * A printed jam label with the month on it, in the jar's upper middle, made to look real: cream stock with grain and fibres,
+ * a hand-cut scalloped edge, uneven red stitches, ink soaked into the paper, shaded as it wraps round the glass, and the glass's glare.
+ */
+function jamLabel(ctx, bw, bh, month, year, tagged) {
+  // With a place tag hanging on the right, the label is a little smaller and sits left of it.
+  const w = bw * (tagged ? 0.6 : 0.74), h = bw * (tagged ? 0.3 : 0.36), pad = 6, cx = bw * (tagged ? 0.42 : 0.5);
+  const c = document.createElement('canvas');
+  c.width = w + pad * 2;
+  c.height = h + pad * 2;
+  const x = c.getContext('2d');
+  x.translate(c.width / 2, c.height / 2);
+  const wob = (a) => Math.sin(a * 16) * 0.028 + Math.sin(a * 5 + 1.3) * 0.006;
+  const edge = () => {
+    x.beginPath();
+    for (let i = 0; i <= 160; i++) { const a = (i / 160) * Math.PI * 2, r = 1 + wob(a); x.lineTo(Math.cos(a) * (w / 2) * r, Math.sin(a) * (h / 2) * r); }
+    x.closePath();
+  };
+  // A soft shadow where the edge lifts off the glass.
+  x.save(); x.shadowColor = 'rgba(40, 30, 20, .35)'; x.shadowBlur = 5; x.shadowOffsetY = 1.5; edge(); x.fillStyle = '#F6EEDB'; x.fill(); x.restore();
+  x.save();
+  edge();
+  x.clip();
+  const paper = x.createRadialGradient(-w * 0.1, -h * 0.2, 0, 0, 0, w * 0.6);
+  paper.addColorStop(0, '#FCF6E8');
+  paper.addColorStop(1, '#EFE4CB');
+  x.fillStyle = paper;
+  x.fillRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
+  for (let n = 0; n < (w * h) / 9; n++) {
+    x.fillStyle = Math.random() < 0.5 ? 'rgba(120, 95, 55, .07)' : 'rgba(255, 255, 255, .18)';
+    x.fillRect((Math.random() - 0.5) * w, (Math.random() - 0.5) * h, 1.2, 1.2);
+  }
+  x.strokeStyle = 'rgba(150, 120, 80, .14)';
+  x.lineWidth = 0.6;
+  for (let n = 0; n < 26; n++) {
+    const fx = (Math.random() - 0.5) * w, fy = (Math.random() - 0.5) * h, a = Math.random() * Math.PI;
+    x.beginPath(); x.moveTo(fx, fy); x.quadraticCurveTo(fx + Math.cos(a) * 6, fy + Math.sin(a) * 6 + 2, fx + Math.cos(a) * 11, fy + Math.sin(a) * 11); x.stroke();
+  }
+  // Red stitches round the edge, each a touch different.
+  x.strokeStyle = '#B3261E';
+  x.lineCap = 'round';
+  for (let i = 0; i < 46; i++) {
+    const a0 = (i / 46) * Math.PI * 2;
+    x.lineWidth = 1.6 + Math.random() * 0.5;
+    x.globalAlpha = 0.8 + Math.random() * 0.2;
+    x.beginPath(); x.ellipse(0, 0, w / 2 - 9, h / 2 - 8, 0, a0, a0 + 0.085); x.stroke();
+  }
+  x.globalAlpha = 1;
+  // The writing, inked into the paper so the grain shows through.
+  x.globalCompositeOperation = 'multiply';
+  text(x, month, 0, h * 0.1, { font: `${h * 0.48}px ${HAND}`, color: '#2a2420' });
+  text(x, String(year), 0, h * 0.34, { font: `600 ${h * 0.13}px ${MONO}`, color: '#B3261E', spacing: 3 });
+  x.globalCompositeOperation = 'source-over';
+  // It wraps round the jar: darker toward both sides, a soft highlight just left of centre.
+  const round = x.createLinearGradient(-w / 2, 0, w / 2, 0);
+  round.addColorStop(0, 'rgba(60, 40, 20, .28)'); round.addColorStop(0.18, 'rgba(60, 40, 20, 0)');
+  round.addColorStop(0.38, 'rgba(255, 255, 255, .22)'); round.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+  round.addColorStop(0.82, 'rgba(60, 40, 20, 0)'); round.addColorStop(1, 'rgba(60, 40, 20, .32)');
+  x.fillStyle = round;
+  x.fillRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
+  // The glass in front catches the light in a slanted streak.
+  x.rotate(-0.35);
+  const glare = x.createLinearGradient(-w * 0.28, 0, -w * 0.12, 0);
+  glare.addColorStop(0, 'rgba(255, 255, 255, 0)'); glare.addColorStop(0.5, 'rgba(255, 255, 255, .38)'); glare.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  x.fillStyle = glare;
+  x.fillRect(-w * 0.28, -h, w * 0.16, h * 2);
+  x.restore();
+  ctx.drawImage(c, cx - c.width / 2, bh * 0.47 - c.height / 2);
+}
+
 /** The red KEPT postmark: two rings, the month round the edge, the day in the middle. A thin cream glow keeps it legible on dark photos. */
 function postmark(ctx, cx, cy, size, { ring, word, center }) {
   const k = size / 104;
@@ -520,8 +615,11 @@ function postmark(ctx, cx, cy, size, { ring, word, center }) {
   ctx.restore();
 }
 
-/** @param challenge  {text, day, tag} when the sky was kept for that day's prompt */
-async function storySingle(sky, showPlace, quote, challenge) {
+/**
+ * @param challenge  {text, day, tag} when the sky was kept for that day's prompt
+ * @param month      every sky kept that month, for the pile in the jar
+ */
+async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   const [c, ctx] = page();
   const d = new Date(sky.takenAt);
   const top = masthead(ctx, quote, t.issueLine(d.getDate(), MONTHS[d.getMonth()], d.getFullYear()));
@@ -552,7 +650,7 @@ async function storySingle(sky, showPlace, quote, challenge) {
   const below = pw * 0.37 * JAR_RATIO * 0.38 + 50;
   const total = pw * 1.096 + below + (prompt ? prompt.h + 34 : 0) + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
   const py = top + Math.max(60, (H - 112 - top - total) / 2);
-  const { img, release } = await loadImage(sky.photo);
+  const [{ img, release }] = await Promise.all([loadImage(sky.photo), loadThumbs(month)]);
   const ph = polaroid(ctx, img, W / 2, py, pw, -3, fmt.time(d));
   tapeStrip(ctx, tapeImg, W / 2, py + 4, 216, -4);
 
@@ -573,10 +671,30 @@ async function storySingle(sky, showPlace, quote, challenge) {
   ctx.fillStyle = g;
   ctx.fillRect(0, bh - bw * 0.2, bw, bw * 0.4);
   if (placed) tagThreadBack(ctx, 0, 0, bw);
-  drawJar(ctx, { x: 0, y: 0, w: bw, image: img });
+  // Not the same photo again: the month's folded skies, with this one as a small print on top, and the month's label.
+  drawJar(ctx, { x: 0, y: 0, w: bw, image: jarContents(month, img) });
+  jamLabel(ctx, bw, bh, MONTHS[d.getMonth()], d.getFullYear(), placed);
   if (placed) tag(ctx, 0, 0, bw, sky.place);
   ctx.restore();
   release();
+
+  // A note in the margin, scrapbook style: handwriting and a hand-drawn arrow into the jar.
+  const jarLeft = jx + bw * 0.04, jarMid = jy + bh * 0.58;
+  const tx = jarLeft - 34, ty = py + ph + 96;
+  ctx.save();
+  ctx.translate(tx, ty);
+  ctx.rotate((-5 * Math.PI) / 180);
+  text(ctx, t.keptInJar, 0, 0, { font: `84px ${HAND}`, color: '#2a2420', align: 'right' });
+  ctx.restore();
+  ctx.strokeStyle = '#2a2420';
+  ctx.lineWidth = 3.6;
+  ctx.lineCap = ctx.lineJoin = 'round';
+  const sx = tx - 30, sy = ty - 62, ex = jarLeft - 6, ey = jarMid, c2x = ex - 90, c2y = ey - 30;
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx + 10, sy - 70, c2x, c2y, ex, ey); ctx.stroke();
+  const ang = Math.atan2(ey - c2y, ex - c2x);
+  for (const turn of [-0.45, 0.45]) {
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - Math.cos(ang + turn) * 28, ey - Math.sin(ang + turn) * 28); ctx.stroke();
+  }
 
   // KEPT, stamped across the print's left edge.
   postmark(ctx, W / 2 - pw / 2 - pw * 0.04, py + ph * 0.5, pw * 0.55,
@@ -821,7 +939,7 @@ async function storyDone({ round, skies }) {
 
 export async function makeStory(kind, payload) {
   await fontsReady();
-  if (kind === 'single') return storySingle(payload.sky, payload.showPlace, payload.quote, payload.challenge);
+  if (kind === 'single') return storySingle(payload.sky, payload.showPlace, payload.quote, payload.challenge, payload.monthSkies);
   if (kind === 'jar') return storyJar(payload);
   if (kind === 'done') return storyDone(payload);
   return storyYear(payload);

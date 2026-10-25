@@ -14,6 +14,7 @@ const ICON = {
   pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>',
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M6 11v7.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>',
+  save: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>',
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -1441,18 +1442,19 @@ async function openStory(kind, payload) {
   let placeOn = false;
   try { placeOn = localStorage.getItem('kepfa.showPlace') === '1'; } catch { /* stays off */ }
   const challenge = kind === 'single' ? challengeFor(payload.sky) : null;
+  // A single sky's jar holds that month's pile.
+  const monthSkies = kind === 'single' ? skiesIn(new Date(payload.sky.takenAt).getFullYear(), new Date(payload.sky.takenAt).getMonth()) : null;
   art.innerHTML = `
     <div class="grabber"></div>
     <div class="sheet-head"><span></span><h2>${title}</h2><button type="button" class="viewer-icon" data-close-story aria-label="${t.close}">${ICON.close}</button></div>
     <div class="story-preview" id="storyPreview"><div class="spinner"></div></div>
     ${canShowPlace ? `<label class="switch"><span>${t.showPlace}</span><input type="checkbox" id="showPlace" ${placeOn ? 'checked' : ''}></label>
-      <p class="hint left">${t.showPlaceHint}</p>` : ''}
-    <p class="hint left">${t.captionHint}</p>
-    <p class="hint left">${t.storyTip}</p>
+      <p class="hint place-note">${t.showPlaceHint}</p>` : ''}
     <div class="sheet-actions">
-      <button type="button" class="btn" id="saveStory" disabled>${t.saveImage}</button>
-      <button type="button" class="btn primary" id="shareStory" disabled>${t.share}</button>
-    </div>`;
+      <button type="button" class="btn" id="saveStory" disabled>${ICON.save}${t.saveImage}</button>
+      <button type="button" class="btn primary" id="shareStory" disabled>${ICON.share}${t.share}</button>
+    </div>
+    <p class="hint">${t.captionHint}</p>`;
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
 
@@ -1466,7 +1468,7 @@ async function openStory(kind, payload) {
     $('#shareStory').disabled = true;
     let out;
     try {
-      out = await makeStory(kind, { ...payload, showPlace, quote, challenge });
+      out = await makeStory(kind, { ...payload, showPlace, quote, challenge, monthSkies });
     } catch {
       $('#storyPreview').innerHTML = `<p class="hint">${t.storyFailed}</p>`;
       return;

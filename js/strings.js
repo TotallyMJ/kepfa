@@ -182,7 +182,6 @@ export const t = {
   showPlace: 'Show place',
   showPlaceHint: 'Stays the way you last set it. No GPS ever leaves with the image.',
   close: 'Close',
-  storyTip: 'Tap Share to post it anywhere, or save it to Photos.',
   saveImage: 'Save image',
   share: 'Share',
   saved: 'Image saved',
@@ -201,13 +200,14 @@ export const t = {
   },
 
   // Every image that leaves the app says where it came from and where to go.
-  footerLine: 'Start your own',
+  footerLine: 'Keep the sky in a jar',
   site: SITE,
   issueLine: (n, month, year) => `No. ${n} · ${month} ${year}`,
   ticketLine: (day) => `Sky homework, day ${day}. Handed in.`,
   volume: (year) => `Vol. ${year}`,
   keptRing: (month, year) => `KEPT · ${month.toUpperCase()} · ${year} · KEPFA · `,
   keptWord: 'KEPT',
+  keptInJar: 'kept in a jar',
   storyKept: (y, n) => `${y} · ${n} ${skies(n)} kept`,
   stripCaption: 'Every sky you kept, in order',
 };
