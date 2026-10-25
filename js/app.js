@@ -508,8 +508,10 @@ function renderMonth(year, month) {
     <header class="page-head">
       <a class="eyebrow back" href="#/months">‹ ${t.backToMonths}</a>
     </header>
-    <h1 class="title">${MONTHS[month]}</h1>
-    <p class="subtitle">${year}</p>
+    <div class="month-head">
+      <h1 class="title">${MONTHS[month]}</h1>
+      <p class="eyebrow">${year}<br>${list.length} ${t.kept(list.length)}</p>
+    </div>
     <div class="jar-stage" id="jarStage"><canvas id="bigJar" aria-label="${t.monthJar(MONTHS[month], list.length)}"></canvas></div>
     ${list.length
       ? `<p class="hint">${t.tapLayer}${!reduceMotion() && window.DeviceOrientationEvent?.requestPermission ? `<span id="tiltPlay"> · <button type="button" class="btn-text hint-link">${t.tiltToPlay}</button></span>` : ''}</p>

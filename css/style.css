@@ -296,9 +296,12 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-6); }
 .section-head .section-title { margin: 0; }
+/* A month's page: its name on the left, the year and how many skies on the right, ruled off like the home shelf. */
+.month-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-3); padding-bottom: var(--s-3); border-bottom: 1px solid var(--ink); }
+.month-head .title { margin: 0; line-height: .9; }
+.month-head .eyebrow { margin: 0 0 4px; text-align: right; line-height: 1.7; }
 
 .title { margin: var(--s-4) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xxl); line-height: 1.1; }
-.subtitle { margin: 0; font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: var(--ink-soft); }
 .section-title { margin: var(--s-6) 0 var(--s-3); font-family: var(--f-display); font-weight: 500; font-size: var(--t-lg); }
 .hint { margin: var(--s-2) 0 0; font-size: var(--t-cap); color: var(--ink-soft); text-align: center; }
 .hint.left { text-align: left; }
