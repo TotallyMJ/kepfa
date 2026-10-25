@@ -65,6 +65,8 @@ export const t = {
   kept: (n) => `${skies(n)} kept`,
   mySkies: 'My Skies',
   seeMonths: 'See every month ›',
+  madeBy: 'Made by',
+  maker: 'Vibe the Bloom',
   monthEmpty: (month) => `Your first ${month} sky is still out there.`,
 
   sunriseIn: (time, dur) => `Sunrise ${time} · in ${dur}`,

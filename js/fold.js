@@ -281,6 +281,8 @@ export async function rollNote(slip, jar, paper, { note = '', quick = false, ski
   ghost.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
   ghost.classList.add('note-ghost');
   ghost.style.cssText = `left:${cx0 - w / 2}px;top:${cy0 - h / 2}px;width:${w}px;height:${h}px`;
+  // Whatever tilt the slip has where it sits (the keep form, the viewer), the stand-in takes the same.
+  ghost.style.transform = getComputedStyle(slip).transform;
   document.body.append(ghost);
   slip.style.visibility = 'hidden';
   const tube = document.createElement('div');

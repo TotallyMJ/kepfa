@@ -296,7 +296,8 @@ function renderShelf() {
            <div class="empty-jar">${jarSvg()}</div>
            ${state.skies.length ? `<p>${t.monthEmpty(MONTHS[now.getMonth()])}</p>` : `<h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>`}
          </div>`}
-    ${state.skies.length > thisMonth.length ? `<p class="see-months"><a class="btn-text" href="#/months">${t.seeMonths}</a></p>` : ''}`;
+    ${state.skies.length > thisMonth.length ? `<p class="see-months"><a class="btn-text" href="#/months">${t.seeMonths}</a></p>` : ''}
+    <p class="credit">${t.madeBy} <a href="https://vibethebloom.com" target="_blank" rel="noopener">${t.maker}</a> ↗</p>`;
 
   bindJarSlots(view);
   $('#memory')?.addEventListener('click', () => openDetail(memory.sky));
@@ -1023,6 +1024,7 @@ function openDetail(sky, { from = 0 } = {}) {
     stage.card.style.opacity = 0;
     stage.el.classList.add('is-behind');
     body.classList.add('is-out', 'is-swap');
+    $('#noteSlot').classList.add('is-taped');
     if (!reduceMotion()) {
       [[viewer.pol, -2], [$('#viewNote'), -1.5]].filter(([n]) => n).forEach(([n, tilt]) => n.animate(
         [{ transform: `translateX(${from * 60}px) rotate(${tilt}deg)`, opacity: 0 }, { transform: `rotate(${tilt}deg)`, opacity: 1 }],
@@ -1041,7 +1043,7 @@ function openDetail(sky, { from = 0 } = {}) {
     if (viewer.stage !== stage) return;
     await popOut(stage, viewer.pol, body);
     if (rest && viewer.stage === stage) await unrollNote(rest, $('#viewNote'), paperFor(sky.id), { quick, skipped: stage.isSkipped });
-    if (viewer.stage === stage) viewer.busy = false;
+    if (viewer.stage === stage) { viewer.busy = false; $('#noteSlot').classList.add('is-taped'); }
   });
 }
 
@@ -1080,6 +1082,8 @@ async function closeJar() {
   if (viewer.busy) { stage.skip(); skipNote(); return; }
   if (viewer.editing) endEdit(state.detail);
   viewer.busy = true;
+  // The tape comes off before the note rolls back up.
+  $('#noteSlot')?.classList.remove('is-taped');
   const body = $('#sheet .viewer-body');
   const slip = $('#viewNote');
   body.classList.add('is-closing');

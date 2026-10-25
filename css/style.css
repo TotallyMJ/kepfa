@@ -195,6 +195,8 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 }
 @media (prefers-color-scheme: dark) {
   .slip { filter: brightness(.9) drop-shadow(0 8px 14px rgba(0, 0, 0, .5)); }
+  .prompt .slip.torn { filter: sepia(.12) brightness(.96) saturate(.9) drop-shadow(0 8px 14px rgba(0, 0, 0, .5)); }
+  .viewer-body .viewer-note { filter: brightness(.9) drop-shadow(0 8px 14px rgba(0, 0, 0, .5)); }
   .tape { filter: brightness(.9); }
 }
 
@@ -244,6 +246,8 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .prompt-pin { position: relative; margin-right: 36px; }
 .prompt .tape-top { left: calc(50% - 37px); top: -10px; }
 .prompt .slip { transform: rotate(-1.5deg); padding: var(--s-4) var(--s-3) var(--s-1); }
+/* Warm ivory with a deeper shadow, so the prompt lifts off the page instead of matching it. */
+.prompt .slip.torn { filter: sepia(.12) brightness(1.08) saturate(.9) drop-shadow(0 1px 1px rgba(30, 28, 25, .18)) drop-shadow(0 12px 18px rgba(30, 28, 25, .2)); }
 .prompt-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
 .prompt .slip .eyebrow { color: var(--ink); }
 .prompt-count { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); white-space: nowrap; }
@@ -256,6 +260,9 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .section-title span, .see-months { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
 .see-months { display: flex; justify-content: center; margin: var(--s-5) 0 0; }
 .see-months .btn-text { color: var(--ink); font-family: var(--f-body); font-size: var(--t-sm); }
+/* The maker's signature at the very end of the shelf: small, quiet, one tap to their site. */
+.credit { margin: var(--s-7) 0 0; text-align: center; font-family: var(--f-mono); font-size: var(--t-cap); letter-spacing: .06em; color: var(--ink-soft); }
+.credit a { display: inline-block; min-height: 44px; line-height: 44px; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
 /* Always one row of 30, however narrow the phone. */
 .dots { display: grid; grid-template-columns: repeat(30, minmax(0, 6px)); justify-content: space-between; gap: 2px; margin-top: var(--s-2); }
 .dots i { aspect-ratio: 1; border: 1px solid var(--ink); }
@@ -924,17 +931,40 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .polaroid-note .hand, .view-note .hand { font-size: 27px; line-height: 1.05; overflow-wrap: anywhere; }
 .polaroid-note .hand.is-long, .view-note .hand.is-long { font-size: 22px; }
 .polaroid-note .hand.is-thai, .view-note .hand.is-thai { font-size: var(--t-body); line-height: 1.5; }
-/* The note out of its jar: a slip of its own paper just under the polaroid. */
-.viewer-note { width: calc(var(--pw) * .96); margin-top: calc(var(--s-3) - var(--s-6)); }
+/* The note out of its jar: a strip of its own paper, torn top and bottom, laid over the polaroid's bottom edge
+   at the opposite tilt and taped down once it has unrolled. The shadow sits on the wrapper so the tear can't clip it. */
+.viewer-note {
+  position: relative;
+  z-index: 1;
+  width: calc(var(--pw) * .96);
+  margin-top: calc(-16px - var(--s-6));
+  filter: drop-shadow(0 1px 1px rgba(30, 28, 25, .14)) drop-shadow(0 8px 12px rgba(30, 28, 25, .18));
+}
 .viewer-note:empty { display: none; }
+.viewer-note.is-taped::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: calc(50% - 30px);
+  top: -8px;
+  width: 60px;
+  height: 17px;
+  background: url(../assets/tape.webp) center / 100% 100% no-repeat;
+  transform: rotate(-4deg);
+  animation: fade var(--t-quick) var(--ease-out) both;
+}
+.is-editing .viewer-note::before { display: none; }
 .view-note {
   display: block;
   width: 100%;
-  padding: 20px var(--s-4) var(--s-3);
+  padding: 20px var(--s-4) 22px;
   background: none;
   text-align: center;
   cursor: text;
-  transform: rotate(-1.5deg);
+  transform: rotate(2deg);
+  filter: none;
+  -webkit-mask-box-image: url(../assets/paper.webp) 12 12 84 12 stretch;
+  -webkit-mask-box-image-width: 3px 3px 18px 3px;
 }
 .is-closing .view-note { visibility: visible; }
 .polaroid-empty { font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: #8A8277; }

@@ -82,6 +82,24 @@ const smallCaps = (ctx, str, x, y, align) => text(ctx, str.toUpperCase(), x, y, 
  * @returns where the page's content starts
  */
 function masthead(ctx, quote, issue, { title = 'Kepfa', kicker = '' } = {}) {
+  // A single sky has no title of its own, so the quote is the headline and the name shrinks to one small line.
+  if (title === 'Kepfa') {
+    smallCaps(ctx, `Kepfa · ${issue}`, W / 2, 118, 'center');
+    ctx.fillStyle = INK;
+    ctx.fillRect(W / 2 - 120, 148, 240, 2);
+    const font = `italic 74px ${SERIF}`;
+    ctx.font = font;
+    // Balanced: narrow the measure while the line count holds, so a quote never ends on a lone word or two.
+    const maxW = W - MARGIN * 2 - 40;
+    let lines = wrap(ctx, quote, maxW, 3);
+    for (let w = maxW - 20; lines.length > 1 && w > maxW * 0.5; w -= 20) {
+      const tighter = wrap(ctx, quote, w, 3);
+      if (tighter.length > lines.length) break;
+      lines = tighter;
+    }
+    lines.forEach((ln, i) => text(ctx, ln, W / 2, 240 + i * 80, { font }));
+    return 240 + (lines.length - 1) * 80 + 40;
+  }
   smallCaps(ctx, 'Kepfa', MARGIN, 118, 'left');
   smallCaps(ctx, issue, W - MARGIN, 118, 'right');
   ctx.fillStyle = INK;
@@ -347,7 +365,23 @@ function texture(name) {
 // Edges in the source photo [top, right, bottom, left] and how thick they draw. The torn edge is the tall bottom band.
 const SLIPS = {
   torn: { src: [12, 12, 84, 12], dst: [8, 8, 57, 8] },
+  // The note: the same torn paper, torn along the top as well, as in the app.
+  torn2: { src: [12, 12, 84, 12], dst: [8, 8, 57, 8], both: true },
 };
+
+/** Tears the top edge too: the paper is cut by its own torn outline turned upside down. */
+function tearTop(paper) {
+  const c = document.createElement('canvas');
+  c.width = paper.width;
+  c.height = paper.height;
+  const x = c.getContext('2d');
+  x.drawImage(paper, 0, 0);
+  x.globalCompositeOperation = 'destination-in';
+  x.translate(0, c.height);
+  x.scale(1, -1);
+  x.drawImage(paper, 0, 0);
+  return c;
+}
 
 /** The paper stretched to w×h without bending its edges: corners stay, sides and middle stretch. */
 function stretchPaper(img, w, h, { src, dst }) {
@@ -397,7 +431,7 @@ function slip(ctx, img, kind, cx, y, w, h, tilt, inside, tint) {
   ctx.shadowBlur = 26;
   ctx.shadowOffsetY = 10;
   if (img) {
-    const paper = stretchPaper(img, w, h, SLIPS[kind]);
+    const paper = SLIPS[kind].both ? tearTop(stretchPaper(img, w, h, SLIPS[kind])) : stretchPaper(img, w, h, SLIPS[kind]);
     ctx.drawImage(tint ? tintPaper(paper, tint) : paper, 0, 0);
   }
   else { ctx.fillStyle = TAG; ctx.fillRect(0, 0, w, h); }
@@ -487,7 +521,7 @@ function postmark(ctx, cx, cy, size, takenAt) {
 async function storySingle(sky, showPlace, quote, challenge) {
   const [c, ctx] = page();
   const d = new Date(sky.takenAt);
-  const top = masthead(ctx, quote, t.issueLine(MONTHS[d.getMonth()], d.getFullYear()));
+  const top = masthead(ctx, quote, fmt.issueDate(d));
   const [paperImg, tapeImg] = await Promise.all(['paper', 'tape'].map(texture));
 
   // The print is the hero, centred and tilted left; a challenge sky makes room for its prompt slip.
@@ -502,7 +536,7 @@ async function storySingle(sky, showPlace, quote, challenge) {
     ctx.font = font;
     const lines = wrap(ctx, sky.note, W - MARGIN * 2 - padX * 2, 2);
     const w = Math.min(W - MARGIN * 2, Math.max(...lines.map((ln) => ctx.measureText(ln).width)) + padX * 2);
-    note = { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn.dst[2] };
+    note = { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn2.dst[2] * 2 };
   }
   if (challenge) {
     // The day's prompt on a small pale-blue ticket, smaller than the note and above it; it grows with its lines.
@@ -569,10 +603,10 @@ async function storySingle(sky, showPlace, quote, challenge) {
     y += h + 34;
   }
   if (note) {
-    // The note's slip is the sky's own paper colour, as in the app.
+    // The note's slip is the sky's own paper colour, torn top and bottom and tilted against the print, as in the app.
     const { font, lh, lines, w, h } = note;
-    slip(ctx, paperImg, 'torn', W / 2, y, w, h, -1.5, () => {
-      lines.forEach((ln, i) => text(ctx, ln, w / 2, 30 + lh * 0.78 + i * lh, { font }));
+    slip(ctx, paperImg, 'torn2', W / 2, y, w, h, 2, () => {
+      lines.forEach((ln, i) => text(ctx, ln, w / 2, 30 + SLIPS.torn2.dst[2] * 0.6 + lh * 0.78 + i * lh, { font }));
     }, ROLLS[paperIndex(sky.id)]);
     y += h + 30;
   }
