@@ -46,6 +46,54 @@ export const PROMPTS = [
 // Months without a theme use PROMPTS. Themes start in November 2026 (THEMES_FROM).
 export const THEMES_FROM = { year: 2026, month: 10 };
 export const THEMES = {
+  0: {
+    name: 'Looking up',
+    prompts: [
+      'The sky straight up from your doorstep.', 'The sky from under a tree.', 'The sky between two buildings.',
+      'The sky above a staircase.', 'The sky from the foot of a wall.', 'The sky through the leaves above you.',
+      'The sky above a lamp post, from its base.', 'The sky over the tallest thing near you.', 'The sky above a sign.',
+      'The sky above your street, from the pavement.', 'The sky between the roofs.', 'The sky above a pole or a post.',
+      'The sky with a bird in it, or where one just was.', 'The sky above a balcony.', 'The sky above a fence.',
+      'Lay your phone down, facing up.', 'The sky over a rooftop edge.', 'The sky above a bus stop.',
+      'The sky from under an awning or umbrella.', 'The sky above the highest window you can see.', 'The sky above a plant, from the soil’s view.',
+      'The sky above a courtyard or stairwell.', 'The sky above a clothesline.', 'The sky above your workplace or school.',
+      'The sky while you wait for something.', 'The sky above a pointed roof.', 'The sky above the tallest tree you can find.',
+      'The sky between two branches.', 'The sky above a gate.', 'The sky with your phone held as high as you can reach.',
+      'The last sky of January, straight up.',
+    ],
+  },
+  // Twenty-nine, for leap years.
+  1: {
+    name: 'Frames',
+    prompts: [
+      'The sky through a window frame.', 'The sky through an open door.', 'The sky between the curtains.',
+      'The sky through a bus or car window.', 'The sky through a gap in a fence.', 'The sky framed by two trees.',
+      'The sky through a stair railing.', 'The sky through a gate.', 'The sky through the blinds.',
+      'The sky framed by an arch.', 'The sky through any hole or gap.', 'The sky through a shop window.',
+      'The sky through a mesh or screen.', 'The sky inside a heart made with your hands.', 'The sky through a cup handle.',
+      'The sky through a paper roll or a tube.', 'The sky framed by leaves.', 'The sky through the back of a chair.',
+      'The sky framed by rooftops.', 'The sky through a balcony railing.', 'The sky through a doorway at the end of a hall.',
+      'The sky through a bag handle.', 'The sky framed by a pair of poles.', 'The sky through the frame of your glasses.',
+      'The sky through a window from across the room.', 'The sky inside anything square.', 'The sky inside anything round.',
+      'The sky framed by the edges of a street.', 'The sky through a window you’ve never looked out of.',
+    ],
+  },
+  2: {
+    name: 'Reflections',
+    prompts: [
+      'The sky in a window.', 'The sky in a glass of water.', 'The sky in a spoon.',
+      'The sky on a car’s shiny roof or door.', 'The sky in your phone’s dark screen.', 'The sky in a mirror held up to it.',
+      'The sky in a puddle, or water you pour on the ground.', 'The sky in a metal bottle.', 'The sky in a glass door.',
+      'The sky in a shop window.', 'The sky in a bowl of water.', 'The sky in any water nearby.',
+      'The sky in a shiny table.', 'The sky in a door handle.', 'The sky in a building’s glass wall.',
+      'The sky in a pair of glasses.', 'The sky in a bus or train window.', 'The sky in a pot or pan lid.',
+      'The sky in a watch face.', 'The sky in a wet road or floor.', 'The sky upside down in a reflection.',
+      'The sky in a car’s side mirror.', 'The sky and its reflection in one shot.', 'The sky in a shiny bag or jacket.',
+      'The sky in a tiled wall.', 'The sky in a screen that’s switched off.', 'The sky in an elevator door or steel wall.',
+      'The sky in a window across the street.', 'The sky in a glass jar.', 'The sky in a polished floor.',
+      'The sky in a reflection you didn’t expect.',
+    ],
+  },
   10: {
     name: 'Me & the sky',
     prompts: [
