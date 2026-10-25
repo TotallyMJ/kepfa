@@ -351,6 +351,7 @@ function renderShelf() {
   const latest = state.skies[state.skies.length - 1];
   const jarMonth = skiesIn(now.getFullYear(), now.getMonth()).length || !latest ? now : new Date(latest.takenAt);
   const sun = sunLine();
+  const next = nextStamp();
 
   view.innerHTML = `
     <header class="masthead">
@@ -389,6 +390,12 @@ function renderShelf() {
            <div class="empty-jar">${jarSvg()}</div>
            ${state.skies.length ? `<p>${t.weekEmpty}</p>` : `<h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>`}
          </div>`}
+    ${next ? `<a class="memory next-stamp" href="#/stamps">
+      <span class="next-slot">${next.have}/${next.need}</span>
+      <span class="memory-text"><span class="eyebrow">${t.nextStamp}</span><span class="next-name">${esc(t.stamps[next.id].name)}</span>
+        <span class="memory-date">${t.stamps[next.id].hint} · ${t.moreToGo(next.need - next.have)}</span></span>
+      ${ICON.right}
+    </a>` : ''}
     ${memory ? `<button type="button" class="memory" id="memory" aria-label="${t.openSky(fmt.long(memory.sky.takenAt))}">
       <span class="memory-jar">${jarSvg({ href: photoUrl(memory.sky) })}</span>
       <span class="memory-text"><span class="eyebrow">${memory.label}</span>${memory.sky.note ? `<span class="memory-note ${handClass(memory.sky.note)}">${esc(memory.sky.note)}</span>` : ''}<span class="memory-date">${fmt.shelf(memory.sky.takenAt)[0]}, ${new Date(memory.sky.takenAt).getFullYear()} · ${fmt.shelf(memory.sky.takenAt)[1]}</span></span>
@@ -520,6 +527,13 @@ function stampSvg({ id, href, name, n, w = 86 }) {
 }
 
 /** The album: three stamps to a row, each tucked behind a glassine strip; the ones still to come show a hint. */
+/** The stamp nearest to being earned (by how much of it is done), or null once all are in or only samples are kept. */
+function nextStamp() {
+  if (!state.skies.some((s) => !s.sample) && state.skies.length) return null;
+  const left = album(state.skies, stampCtx()).filter((st) => !st.got);
+  return left.reduce((best, st) => (st.have / st.need > best.have / best.need ? st : best), left[0]) || null;
+}
+
 /** The sky a stamp is printed from: the one that earned it, or the latest kept if that one was deleted. */
 function stampSky(got) {
   const real = state.skies.filter((s) => !s.sample);
@@ -1379,7 +1393,10 @@ function showLetter() {
     </div>
     <p class="postcard-hint">${t.letterTap}</p>
     <p class="letter-ps"><span class="eyebrow">${t.letterPS}</span><span class="letter-stamp">${copy.name}</span></p>
-    <div class="done-actions"><button type="button" class="btn-text" id="letterNext">${t.letterNext}</button></div>`;
+    <div class="done-actions">
+      <button type="button" class="btn primary share" id="letterShare">${ICON.share}${t.letterShare}</button>
+      <button type="button" class="btn-text" id="letterNext">${t.letterNext}</button>
+    </div>`;
   el.hidden = false;
   el.scrollTop = 0;
   doneStars(el, '.letter, .postcard, .postcard-hint, .letter-ps, .done-actions > *', 0.6);
@@ -1402,6 +1419,11 @@ function showLetter() {
   });
   // Tapping the pen writes too.
   el.querySelectorAll('.postcard .pen').forEach((p) => p.addEventListener('click', () => p.previousElementSibling.focus()));
+  // The postcard is shared with the words on it now, rewritten or not.
+  $('#letterShare').addEventListener('click', () => {
+    const words = (field) => el.querySelector(`[data-field="${field}"]`).textContent.trim();
+    openStory('stamp', { name: copy.name, need: st.need, at: st.got.at, letter: copy.letter, card: words('card') || copy.card, to: words('to') || t.letterToWho, sky });
+  });
   $('#letterNext').addEventListener('click', () => (state.letters.length ? showLetter() : closeLetter()));
 }
 
@@ -1781,7 +1803,7 @@ async function openStory(kind, payload) {
   if (wrap.hidden) openLayer('story', closeStory);
   const art = wrap.querySelector('.sheet');
   const title = kind === 'single' ? t.shareTitle.single : kind === 'jar' ? t.shareTitle.jar(MONTHS[payload.month])
-    : kind === 'done' ? t.shareTitle.done : t.shareTitle.year(payload.year);
+    : kind === 'done' ? t.shareTitle.done : kind === 'stamp' ? t.shareTitle.stamp : t.shareTitle.year(payload.year);
   const canShowPlace = kind === 'single' && payload.sky.place;
   // Show place starts off, then keeps whatever you chose last time, on this phone only.
   let placeOn = false;
@@ -1832,7 +1854,7 @@ async function openStory(kind, payload) {
   const caption = challenge ? t.caption(challenge)
     : kind === 'single' ? t.shareCaption.single(payload.sky.note)
       : kind === 'jar' ? t.shareCaption.jar(MONTHS[payload.month])
-        : kind === 'done' ? t.shareCaption.done() : t.shareCaption.year(payload.year);
+        : kind === 'done' ? t.shareCaption.done() : kind === 'stamp' ? t.shareCaption.stamp(payload.name) : t.shareCaption.year(payload.year);
   const copyCaption = () => (navigator.clipboard
     ? navigator.clipboard.writeText(caption).then(() => true, () => false)
     : Promise.resolve(false));

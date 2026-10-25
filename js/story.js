@@ -953,11 +953,208 @@ async function storyDone({ round, skies }) {
   return toBlob(c);
 }
 
+// ---------- a stamp's letter: what the sky wrote, and the postcard that came with it ----------
+
+const PEN = '#2E3F63';   // the app's --pen
+const STAMP_RED = '#C8352A';   // the app's --stamp
+
+/** Letters along an arc, centred on `mid` (radians). On the top they run clockwise; underneath they stay upright. */
+function arcText(ctx, str, cx, cy, r, mid, spacing, under) {
+  const widths = [...str].map((ch) => ctx.measureText(ch).width + spacing);
+  const span = (widths.reduce((a, b) => a + b, 0) - spacing) / r;
+  let a = under ? mid + span / 2 : mid - span / 2;
+  [...str].forEach((ch, i) => {
+    const step = (widths[i] - spacing) / 2 / r;
+    a += under ? -step : step;
+    ctx.save();
+    ctx.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    ctx.rotate(under ? a - Math.PI / 2 : a + Math.PI / 2);
+    ctx.fillText(ch, 0, 0);
+    ctx.restore();
+    a += (under ? -1 : 1) * (step + spacing / r);
+  });
+}
+
+/** The postmark from the letter page (its 140×70 drawing), with its top-left at x,y and `w` wide. */
+function letterPostmark(ctx, x, y, w, at, n) {
+  const k = w / 140, d = new Date(at);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  ctx.globalAlpha = 0.7;
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.strokeStyle = ctx.fillStyle = STAMP_RED;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.arc(44, 35, 26, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(44, 35, 19, 0, Math.PI * 2); ctx.stroke();
+  ctx.font = `5.2px ${MONO}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  arcText(ctx, 'KEPFA', 44, 35, 20.6, -Math.PI / 2, 1.2, false);
+  arcText(ctx, `${d.getDate()} ${MONTHS_SHORT[d.getMonth()].toUpperCase()} ${d.getFullYear()}`, 44, 35, 24.2, Math.PI / 2, 1.2, true);
+  [21.5, 66.5].forEach((cx) => { ctx.beginPath(); ctx.arc(cx, 35, 0.9, 0, Math.PI * 2); ctx.fill(); });
+  ctx.font = `600 16px ${SERIF}`;
+  ctx.fillText(`${n}/${n}`, 44.1, 38.6);
+  ctx.lineWidth = 2.2;
+  for (let i = 0; i < 4; i++) {
+    const wy = 20 + i * 10;
+    ctx.beginPath();
+    ctx.moveTo(74, wy);
+    for (let s = 0; s < 4; s++) ctx.quadraticCurveTo(82 + s * 16, wy + (s % 2 ? 5 : -5), 90 + s * 16, wy);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** A perforated stamp printed from the sky (the album's 100×124 drawing), top-left at x,y and `w` wide. */
+function stampPrint(ctx, img, x, y, w, name, n) {
+  const k = w / 100, sw = 100, sh = 124;
+  const c = document.createElement('canvas');
+  c.width = Math.round(w); c.height = Math.round(sh * k);
+  const g = c.getContext('2d');
+  g.scale(k, k);
+  g.fillStyle = '#FBF7EE';
+  g.fillRect(0, 0, sw, sh);
+  if (img) {
+    const iw = img.naturalWidth, ih = img.naturalHeight, bw = sw - 16, bh = sh - 40;
+    const s = Math.min(iw / bw, ih / bh);
+    g.drawImage(img, (iw - bw * s) / 2, (ih - bh * s) / 2, bw * s, bh * s, 8, 8, bw, bh);
+  }
+  g.fillStyle = '#FBF7EE';
+  g.font = `500 11px ${SERIF}`;
+  g.textAlign = 'left';
+  g.fillText(String(n), 13, 21);
+  g.fillStyle = '#2a2420';
+  g.font = `italic 12px ${SERIF}`;
+  g.textAlign = 'center';
+  g.fillText(name, sw / 2, sh - 18);
+  g.fillStyle = '#8A8277';
+  g.font = `5.2px ${MONO}`;
+  if ('letterSpacing' in g) g.letterSpacing = '1.6px';
+  g.fillText('KEPFA', sw / 2, sh - 8);
+  // The perforations: half-holes punched along every edge.
+  g.globalCompositeOperation = 'destination-out';
+  g.beginPath();
+  for (let px = 4.8; px <= sw; px += 9.6) { g.moveTo(px + 3.2, 0); g.arc(px, 0, 3.2, 0, Math.PI * 2); g.moveTo(px + 3.2, sh); g.arc(px, sh, 3.2, 0, Math.PI * 2); }
+  for (let py = 5.4; py <= sh; py += 9.6) { g.moveTo(3.2, py); g.arc(0, py, 3.2, 0, Math.PI * 2); g.moveTo(sw + 3.2, py); g.arc(sw, py, 3.2, 0, Math.PI * 2); }
+  g.fill();
+  ctx.save();
+  ctx.shadowColor = 'rgba(30, 28, 25, .25)';
+  ctx.shadowBlur = 10 * k;
+  ctx.shadowOffsetY = 4 * k;
+  ctx.drawImage(c, x, y);
+  ctx.restore();
+}
+
+/** Lines of the postcard's words, in handwriting (Thai in the regular face), centred in a box. */
+function postcardWords(ctx, str, cx, top, w, h, size) {
+  const thai = isThai(str);
+  const font = thai ? `${size * 0.62}px ${SANS}` : `${size}px ${HAND}`;
+  const lh = thai ? size * 0.93 : size * 1.12;
+  ctx.font = font;
+  const lines = wrap(ctx, str, w, 6);
+  const y0 = top + (h - lines.length * lh) / 2 + lh * 0.78;
+  lines.forEach((ln, i) => text(ctx, ln, cx, y0 + i * lh, { font, color: PEN }));
+}
+
+/** The postcard from the letter page (its 300×196 card), centred on cx with its top at y. */
+async function postcard(ctx, cx, y, pw, { card, to, sky, name, need, at }) {
+  const k = pw / 300, ph = 196 * k, b = 5 * k;
+  ctx.save();
+  ctx.translate(cx, y + ph / 2);
+  ctx.rotate((-1.5 * Math.PI) / 180);
+  ctx.translate(-pw / 2, -ph / 2);
+  ctx.shadowColor = 'rgba(30, 28, 25, .4)';
+  ctx.shadowBlur = 26 * k;
+  ctx.shadowOffsetY = 14 * k;
+  ctx.fillStyle = '#FBF8F1';
+  ctx.fillRect(0, 0, pw, ph);
+  ctx.shadowColor = 'transparent';
+  // Airmail edge: stripes of red and blue at 45°, only in the border.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, pw, ph);
+  ctx.rect(b, b, pw - b * 2, ph - b * 2);
+  ctx.clip('evenodd');
+  const period = 28 * k;
+  for (let o = -ph; o < pw + ph; o += period) {
+    [[0, 'rgba(200, 53, 42, .8)'], [14 * k, 'rgba(46, 63, 99, .8)']].forEach(([d, color]) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(o + d, 0); ctx.lineTo(o + d + 9 * k, 0); ctx.lineTo(o + d + 9 * k - ph, ph); ctx.lineTo(o + d - ph, ph);
+      ctx.fill();
+    });
+  }
+  ctx.restore();
+  // Inside the border, measured as on the page: message on the left, a rule, the address side on the right.
+  const ix = b, iy = b, iw = 290 * k, ih = 186 * k, split = ix + iw * 0.54;
+  ctx.fillStyle = 'rgba(58, 51, 44, .18)';
+  ctx.fillRect(split, iy + 22 * k, Math.max(1, k), ih - 44 * k);
+  postcardWords(ctx, card, (ix + 20 * k + split - 18 * k) / 2, iy + 18 * k, split - ix - 38 * k, ih - 36 * k, 21 * k);
+  const toFont = isThai(to) ? `${13 * k}px ${SANS}` : `${18 * k}px ${HAND}`;
+  text(ctx, `${t.letterTo} `, split + 14 * k, iy + ih - 46 * k - 4 * k, { font: `${18 * k}px ${HAND}`, color: PEN, align: 'left' });
+  ctx.font = `${18 * k}px ${HAND}`;
+  const toX = split + 14 * k + ctx.measureText(`${t.letterTo} `).width;
+  text(ctx, to, toX, iy + ih - 46 * k - 4 * k, { font: toFont, color: PEN, align: 'left' });
+  let img = null, release = () => {};
+  if (sky) ({ img, release } = await loadImage(sky.thumb));
+  const sw = 62 * k, sx = ix + iw - 14 * k - sw, sy = iy + 14 * k;
+  ctx.save();
+  ctx.translate(sx + sw / 2, sy + (sw * 1.24) / 2);
+  ctx.rotate((2 * Math.PI) / 180);
+  stampPrint(ctx, img, -sw / 2, -(sw * 1.24) / 2, sw, name, need);
+  ctx.restore();
+  release();
+  letterPostmark(ctx, ix + iw - 22 * k - 116 * k, iy + 18 * k, 116 * k, at, need);
+  ctx.restore();
+  return ph;
+}
+
+/** The letter page as a story: letterhead, the sky's note and sign-off, the postcard, the P.S. and the stamp's name. */
+async function storyStamp(p) {
+  const [c, ctx] = page();
+  const k = (W - MARGIN * 2) / 340;   // the letter page's 340px column, at story size
+  const d = new Date(p.at);
+  // Measured first: the whole letter sits in the middle of the page, with the postcard full width as its centrepiece.
+  const bodyFont = `${17.5 * k}px ${SERIF}`, lh = 17.5 * 1.4 * k;
+  ctx.font = bodyFont;
+  const lines = wrap(ctx, p.letter, W - MARGIN * 2, 5);
+  const pw = W - MARGIN * 2, ph = (pw / 300) * 196;
+  const hiY = 8 * k + 16 * k + 28 * k, bodyY = hiY + 8 * k + 17.5 * k * 1.1;
+  const signY = bodyY + (lines.length - 1) * lh + 28 * k;
+  const cardY = signY + 34 * k, psY = cardY + ph + 46 * k, nameY = psY + 38 * k;
+  const y0 = Math.max(170, (H - 150 - nameY) / 2);
+  scatterStars(ctx, W, H - 140, { scale: 0.6, avoid: [
+    { x: MARGIN - 20, y: y0 - 70, w: W - MARGIN * 2 + 40, h: signY + 90 },
+    { x: MARGIN - 30, y: y0 + cardY - 30, w: pw + 60, h: ph + 60 },
+    { x: MARGIN + 80, y: y0 + psY - 40, w: W - MARGIN * 2 - 160, h: nameY - psY + 70 },
+  ] });
+  // Letterhead
+  text(ctx, 'Kepfa', MARGIN, y0, { font: `500 ${24 * k}px ${SERIF}`, align: 'left' });
+  text(ctx, `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`.toUpperCase(), W - MARGIN, y0 - 4, { font: `${10 * k}px ${MONO}`, color: SOFT, align: 'right', spacing: 1.2 * k });
+  ctx.fillStyle = INK;
+  ctx.fillRect(MARGIN, y0 + 6 * k + 4, W - MARGIN * 2, 2 * k);
+  text(ctx, t.letterHi, MARGIN, y0 + hiY, { font: `italic 500 ${28 * k}px ${SERIF}`, align: 'left' });
+  lines.forEach((ln, i) => text(ctx, ln, MARGIN, y0 + bodyY + i * lh, { font: bodyFont, align: 'left' }));
+  ctx.save();
+  ctx.translate(W - MARGIN, y0 + signY);
+  ctx.rotate((-3 * Math.PI) / 180);
+  text(ctx, t.letterSign, 0, 0, { font: `${26 * k}px ${HAND}`, color: PEN, align: 'right' });
+  ctx.restore();
+  await postcard(ctx, W / 2, y0 + cardY, pw, p);
+  smallCaps(ctx, t.letterPS, W / 2, y0 + psY, 'center');
+  text(ctx, p.name, W / 2, y0 + nameY, { font: `italic 500 ${32 * k}px ${SERIF}` });
+  footer(ctx);
+  return toBlob(c);
+}
+
 export async function makeStory(kind, payload) {
   await fontsReady();
   if (kind === 'single') return storySingle(payload.sky, payload.showPlace, payload.quote, payload.challenge, payload.monthSkies);
   if (kind === 'jar') return storyJar(payload);
   if (kind === 'done') return storyDone(payload);
+  if (kind === 'stamp') return storyStamp(payload);
   return storyYear(payload);
 }
 

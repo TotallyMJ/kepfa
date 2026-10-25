@@ -328,6 +328,9 @@ export const t = {
   letterToWho: 'me',
   letterTap: 'Tap the words to write your own',
   letterNext: 'Lovely, keep going',
+  letterShare: 'Share this postcard',
+  nextStamp: 'Next stamp',
+  moreToGo: (n) => `${n} more to go`,
   letterEdit: 'Write your own words',
   letterEditTo: 'Who it’s to',
   openLetter: (name) => `Open the letter for ${name}`,
@@ -447,7 +450,7 @@ export const t = {
   deleted: 'Sky deleted',
   holdHint: 'Hold a jar to delete it',
 
-  shareTitle: { single: 'Share this sky', jar: (m) => `Share ${m}’s jar`, year: () => 'Share my year in skies', done: `Share my ${CHALLENGE_SIZE} days` },
+  shareTitle: { single: 'Share this sky', jar: (m) => `Share ${m}’s jar`, year: () => 'Share my year in skies', done: `Share my ${CHALLENGE_SIZE} days`, stamp: 'Share this postcard' },
   showPlace: 'Show place',
   showPlaceHint: 'Stays the way you last set it. No GPS ever leaves with the image.',
   close: 'Close',
@@ -466,6 +469,7 @@ export const t = {
     jar: (month) => `My ${month} in skies, kept with Kepfa.\nStart your own: ${SITE}\n#kepfa`,
     year: (year) => `My ${year} in skies, kept with Kepfa.\nStart your own: ${SITE}\n#kepfa`,
     done: () => `${CHALLENGE_SIZE} days, ${CHALLENGE_SIZE} skies. I finished the Kepfa sky challenge.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #kepfa`,
+    stamp: (name) => `The sky sent me a stamp: ${name}.\nStart your own: ${SITE}\n#kepfa`,
   },
 
   // Every image that leaves the app says where it came from and where to go.
