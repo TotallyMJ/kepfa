@@ -440,8 +440,39 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   gap: var(--s-3);
   padding: 0 var(--s-2);
 }
-.shelf-jars { align-items: end; border-bottom: 2px solid var(--ink); }
+/* Every shelf is the pale oak plank from the share images: a lit top edge, a darker front, a soft shadow below. */
+.shelf-jars { position: relative; align-items: end; margin-bottom: 14px; }
+.shelf-jars::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  bottom: -14px;
+  height: 14px;
+  border-radius: 3px;
+  background: linear-gradient(#EFE3CD 0 17%, #D9C6A5 17% 45%, #C8B08A 45%, #C3AA82);
+  box-shadow: 0 12px 14px -10px rgba(60, 40, 20, .55);
+}
+.shelf-jars > * { position: relative; z-index: 1; }
 .shelf-labels { padding-top: var(--s-2); }
+/* Months: a tent card stands on the shelf in front of each jar, low enough to leave the pile in view. */
+.shelf-labels.tents { position: relative; z-index: 2; margin-top: -25px; padding-top: 0; }
+.shelf-labels.tents p {
+  position: relative;
+  flex-direction: row;
+  justify-content: center;
+  gap: 6px;
+  justify-self: center;
+  width: 66%;
+  padding: 3px 0 2px;
+  background: linear-gradient(#F7F1E6, #EAE0CF);
+  border-bottom: 1.5px solid rgba(70, 45, 20, .35);
+  box-shadow: 0 3px 5px -2px rgba(60, 40, 20, .38);
+}
+.shelf-labels.tents p::before { content: ""; position: absolute; left: 8%; right: 8%; top: -3px; height: 3px; background: #DCCFB6; }   /* its back, over the fold */
+.shelf-labels.tents p span:first-child { font-family: var(--f-body); font-weight: 500; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #1E1C19; }
+.shelf-labels.tents p span + span { color: #B3261E; }
+.shelf-labels.tents p.is-now { outline: 1.5px solid var(--ink); outline-offset: 1px; }
 .shelf-labels p, .mini p {
   margin: 0;
   display: flex;
@@ -452,8 +483,6 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   line-height: 1.5;
 }
 .shelf-labels p span + span, .mini p span + span { color: var(--ink-soft); }
-/* This month: a small ink tag under its jar. */
-.shelf-labels p.is-now span:first-child { padding: 0 var(--s-2); border-radius: 3px; background: var(--ink); color: var(--paper); }
 .btn.share { gap: var(--s-2); }
 .btn.primary.share-year { width: 100%; margin-top: var(--s-5); }
 

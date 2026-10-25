@@ -407,11 +407,11 @@ function renderMonths() {
   const now = new Date();
   const all = skiesIn(y);
   const minYear = Math.min(now.getFullYear(), ...state.skies.map((s) => new Date(s.takenAt).getFullYear()));
-  const isFuture = (m) => y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth());
-
   const isNow = (m) => y === now.getFullYear() && m === now.getMonth();
+  // Only the months that hold skies, in calendar order, plus this month so there's always a jar to fill.
+  const shown = [...Array(12).keys()].filter((m) => isNow(m) || skiesIn(y, m).length);
 
-  // January to December, read like a calendar; the month you're filling is marked (render scrolls to it).
+  // Three to an oak shelf, each jar with a tent card in front: the month and how many skies (render scrolls to this month).
   view.innerHTML = `
     <header class="masthead">
       <div class="masthead-meta"><span class="eyebrow">${all.length} ${t.kept(all.length)}</span>
@@ -424,14 +424,11 @@ function renderMonths() {
       <h1 class="wordmark">${t.months}</h1>
     </header>
     ${all.length ? `<button type="button" class="btn primary share share-year" id="shareYear">${ICON.share}${t.shareYear}</button>` : ''}
-    ${[0, 1, 2, 3].map((r) => {
-      const ms = [0, 1, 2].map((c) => r * 3 + c);
-      return `<div class="shelf-row">
-        <div class="shelf-jars">${ms.map((m) => `<button type="button" class="month-slot" data-month="${m}" ${isFuture(m) ? 'disabled' : ''}
+    ${chunk(shown, 3).map((ms) => `<div class="shelf-row">
+        <div class="shelf-jars">${ms.map((m) => `<button type="button" class="month-slot" data-month="${m}"
           aria-label="${t.monthJar(MONTHS[m], skiesIn(y, m).length)}"><canvas></canvas></button>`).join('')}</div>
-        <div class="shelf-labels">${ms.map((m) => `<p${isNow(m) ? ' class="is-now"' : ''}><span>${MONTHS_SHORT[m]}</span><span>${isFuture(m) ? '–' : skiesIn(y, m).length}</span></p>`).join('')}</div>
-      </div>`;
-    }).join('')}`;
+        <div class="shelf-labels tents">${ms.map((m) => `<p${isNow(m) ? ' class="is-now"' : ''}><span>${MONTHS_SHORT[m]}</span><span>${skiesIn(y, m).length}</span></p>`).join('')}</div>
+      </div>`).join('')}`;
 
   view.querySelectorAll('.month-slot').forEach((el) => {
     el.addEventListener('click', () => go(`#/month/${y}-${pad2(+el.dataset.month + 1)}`));
@@ -447,7 +444,7 @@ function renderMonths() {
       const w = Math.min(el.clientWidth, 96);
       const h = Math.round(w * JAR_RATIO);
       const ctx = setupCanvas(el.querySelector('canvas'), w, h);
-      drawJar(ctx, { x: 0, y: 0, w, skies: skiesIn(y, m), ghost: el.disabled, dark });
+      drawJar(ctx, { x: 0, y: 0, w, skies: skiesIn(y, m), dark });
     });
   };
   state.redraw = redraw;
