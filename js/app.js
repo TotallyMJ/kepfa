@@ -354,9 +354,9 @@ function renderShelf() {
   const next = nextStamp();
 
   view.innerHTML = `
-    <header class="masthead">
-      <div class="masthead-meta"><span class="eyebrow">${t.tagline}</span></div>
+    <header class="masthead masthead-home">
       <h1 class="wordmark">Kepfa</h1>
+      <span class="eyebrow">${t.tagline}</span>
     </header>
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
       <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${ICON.pin}<u>${savedPlace() ? t.nearYou : esc(zoneCity())}</u></button></div>` : ''}

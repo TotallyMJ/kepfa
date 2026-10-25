@@ -120,6 +120,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 
 .masthead { border-bottom: 2px solid var(--ink); padding-bottom: var(--s-2); }
 .masthead-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-height: 24px; }
+/* Home: the name on the left, what it does on the right, both sitting on the same line. */
+.masthead-home { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-3); }
+.masthead-home .wordmark { margin: 0; }
+.masthead-home .eyebrow { max-width: 9em; margin-bottom: 6px; text-align: right; line-height: 1.5; }   /* its last line on the wordmark's baseline */
 .wordmark { margin: var(--s-1) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xxl); line-height: 1; letter-spacing: -.01em; }
 
 .sunline {

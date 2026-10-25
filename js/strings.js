@@ -349,7 +349,7 @@ export const t = {
 
   lookFor: 'Look for',
   // What Kepfa is for: at the top of Home, and the short poem that closes it.
-  tagline: 'The art of noticing the sky',
+  tagline: 'Keep the sky in a jar',
   poem: ['Look up once a day.', 'Keep the sky you saw.', 'Then go back to your day,', 'a little lighter.'],
   poemSign: 'Kepfa · the art of noticing',
   sameSky: 'Wherever you are today, we’re all under the same sky.',
