@@ -285,7 +285,7 @@ export const t = {
   poem: ['Look up once a day.', 'Keep the sky you saw.', 'Then go back to your day,', 'a little lighter.'],
   poemSign: 'Kepfa · the art of noticing',
   sameSky: 'Wherever you are today, we’re all under the same sky.',
-  seeWho: 'See who caught it ↗',
+  seeWho: 'Everyone’s sky today ↗',
   lookUp: 'Catch today’s sky',
   challengeBadge: 'Daily sky challenge',
   challenge: (round) => (round > 1 ? `Your ${CHALLENGE_SIZE}-day challenge · round ${round}` : `Your ${CHALLENGE_SIZE}-day challenge`),
