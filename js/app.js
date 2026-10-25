@@ -1203,7 +1203,7 @@ async function popOut(stage, pol, body) {
 }
 
 // Putting a sky back you've already seen goes quicker than keeping it the first time.
-const PUT_BACK = 0.7;
+const PUT_BACK = 0.55;
 
 /** ✕: back in the order it went in: the polaroid folds into the jar, the note rolls up after it, then the lid. */
 async function closeJar() {

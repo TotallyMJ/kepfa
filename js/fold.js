@@ -269,7 +269,7 @@ const go = (node, frames, opts) => (isSkipped() ? Promise.resolve()
  */
 export async function rollNote(slip, jar, paper, { note = '', quick = false, skipped } = {}) {
   startNote(skipped);
-  const k = quick ? 0.6 : 1;
+  const k = quick ? 0.45 : 1;
   const rest = noteScroll(paper, note);
   if (reduceMotion()) { slip.style.visibility = 'hidden'; jar.append(rest); return; }
 
@@ -330,7 +330,7 @@ export async function rollNote(slip, jar, paper, { note = '', quick = false, ski
   jar.append(rest);
   if (isSkipped()) return;
   const at = (y, r) => `translate(-50%, calc(50% + ${y}px)) rotate(${r}deg)`;
-  await rest.animate([
+  const landing = rest.animate([
     { offset: 0, opacity: 0, transform: at(-10, 86), easing: GRAVITY },
     { offset: 0.22, opacity: 1, transform: at(0, 80), easing: RISE },
     { offset: 0.45, transform: at(-7, 84), easing: GRAVITY },
@@ -339,6 +339,9 @@ export async function rollNote(slip, jar, paper, { note = '', quick = false, ski
     { offset: 0.9, transform: at(0, 82) },
     { offset: 1, transform: at(0, 82) },
   ], { duration: 640 * k }).finished.catch(() => {});
+  // Putting it back, the lid comes down while it's still bouncing.
+  if (quick) return;
+  await landing;
   await wait(200 * k);
 }
 

@@ -1089,7 +1089,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   position: absolute;
   z-index: 2;
   left: calc(50% - 30px);
-  top: 2px;   /* half on the polaroid, half on the torn edge of the paper */
+  top: -3px;   /* half on the polaroid, half on the torn edge of the paper */
   width: 60px;
   height: 17px;
   background: url(../assets/tape.webp) center / 100% 100% no-repeat;
@@ -1114,7 +1114,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .pen { width: 14px; height: 14px; margin-left: 6px; vertical-align: -1px; stroke: #8A8277; }
 .polaroid-meta { margin: 6px 0 0; font-family: var(--f-mono); font-size: 10px; color: #6B645B; }
 /* With a note taped over the strip's lower part, the date sits midway between the photo and the tape. */
-.polaroid-meta:only-child { margin: 0 0 2px; }
+.polaroid-meta:only-child { margin: 0 0 7px; }
 /* Close, where-am-I and more, across the top like a photo viewer; paper-coloured on the dim. */
 .viewer-top {
   position: absolute;
