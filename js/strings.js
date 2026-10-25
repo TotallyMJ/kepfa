@@ -95,6 +95,12 @@ export const t = {
   preparing: (i, n) => `Filling a few sample jars… ${i}/${n}`,
   notPersistent: 'This browser won’t keep your skies after you close the tab.',
 
+  inAppTitle: (app) => `You’re in ${app}’s browser.`,
+  inAppIos: 'Open Kepfa in Safari to use the camera and keep your skies. Tap ⋯, then open in your browser.',
+  inAppAndroid: 'Open Kepfa in Chrome to use the camera and keep your skies.',
+  copyLink: 'Copy link',
+  openChrome: 'Open in Chrome ↗',
+  linkCopied: 'Link copied. Paste it into your browser.',
   sampleBanner: 'These skies are samples. Clear them and start your own.',
   clearSamples: 'Clear samples',
   samplesCleared: 'All clear. Your first sky is out there.',

@@ -40,7 +40,8 @@
     <div class="cam-fallback" id="camFallback" hidden>
       <div class="fallback-jar" id="fallbackJar"></div>
       <p class="cam-fallback-title">The camera can’t open here</p>
-      <label class="btn primary on-dark" for="fileLibrary">Choose from your photos</label>
+      <label class="btn primary on-dark" for="fileCamera">Take a photo</label>
+      <label class="btn on-dark" for="fileLibrary">Choose from your photos</label>
     </div>
     <div class="cam-top">
       <button class="btn-text on-dark" type="button" data-close-capture>Cancel</button>
@@ -70,6 +71,7 @@
     </div>
   </div>
   <input type="file" id="fileLibrary" accept="image/*" hidden>
+  <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
   <div class="cap-step review" data-step="review" hidden></div>
   <div class="cap-step drop" data-step="drop" hidden></div>
 </section>

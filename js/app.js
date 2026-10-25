@@ -213,10 +213,66 @@ function render() {
 }
 
 function go(hash) {
+  // A window closed with ✕ is still taking its history step back; move on once it has.
+  if (unwinding) { afterUnwind = () => go(hash); return; }
   if (location.hash === hash) render(); else location.hash = hash;
 }
 
+// ---------- back button: each open window is one step in history ----------
+
+// Android's back button (and the browser's) closes the window on top instead of leaving the app.
+// Opening a window adds a history step; closing it with ✕ takes that step back without anything else happening.
+const layers = [];
+let unwinding = 0, afterUnwind = null;   // steps still being taken back after ✕
+
+function openLayer(name, onBack) {
+  layers.push({ name, onBack });
+  history.pushState({ kepfa: name }, '');
+}
+
+function closeLayer(name) {
+  const i = layers.findIndex((l) => l.name === name);
+  if (i < 0) return;   // already taken off by the back button
+  layers.splice(i, 1);
+  unwinding++;
+  history.back();
+}
+
+window.addEventListener('popstate', () => {
+  if (unwinding) {
+    if (--unwinding) return;
+    const next = afterUnwind;
+    afterUnwind = null;
+    next?.();
+    return;
+  }
+  layers.pop()?.onBack();
+});
+
 // ---------- shelf (home): one jar per sky ----------
+
+// The app this page is open inside (Instagram, LINE…), or '' in a real browser. Their browsers can't run the
+// live camera and keep their own storage, so skies kept there don't show up in Safari or Chrome.
+const IN_APP = [[/Instagram/i, 'Instagram'], [/FBAN|FBAV|FB_IAB/, 'Facebook'], [/\bLine\//i, 'LINE'],
+  [/TikTok|musical_ly|BytedanceWebview/i, 'TikTok'], [/Twitter/i, 'X'], [/KAKAOTALK/i, 'KakaoTalk'],
+  [/MicroMessenger/i, 'WeChat'], [/Snapchat/i, 'Snapchat'], [/LinkedInApp/i, 'LinkedIn']]
+  .find(([re]) => re.test(navigator.userAgent))?.[1] || '';
+const ANDROID = /Android/i.test(navigator.userAgent);
+const homeUrl = () => `${location.origin}${location.pathname}`;
+
+function inAppHtml() {
+  if (!IN_APP) return '';
+  // Android can hand the page straight to Chrome; iOS has no such link, so it says where the menu is.
+  const chrome = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=com.android.chrome;end`;
+  return `<div class="banner in-app"><p><b>${t.inAppTitle(IN_APP)}</b> ${ANDROID ? t.inAppAndroid : t.inAppIos}</p>
+    <div class="in-app-actions"><button type="button" class="btn-text" id="copyLink">${t.copyLink}</button>${ANDROID ? `<a class="btn-text" href="${chrome}">${t.openChrome}</a>` : ''}</div></div>`;
+}
+
+function copyLink() {
+  const url = homeUrl();
+  (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject())
+    .then(() => toast(t.linkCopied), () => toast(url, 6000));
+}
 
 function bannerHtml() {
   if (!state.skies.some((s) => s.sample)) return '';
@@ -263,6 +319,7 @@ function renderShelf() {
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
       <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${ICON.pin}${savedPlace()
         ? `<span>${t.nearYou}</span>` : `<span>${esc(zoneCity())} · <u>${t.notHere}</u></span>`}</button></div>` : ''}
+    ${inAppHtml()}
     <section class="prompt is-${skyPhase(now)}">
       <div class="prompt-print">
         <div class="prompt-sky"></div>
@@ -302,6 +359,7 @@ function renderShelf() {
   bindJarSlots(view);
   $('#memory')?.addEventListener('click', () => openDetail(memory.sky));
   $('#clearSamples')?.addEventListener('click', clearSamples);
+  $('#copyLink')?.addEventListener('click', copyLink);
   $('#setPlace')?.addEventListener('click', askLocation);
   $('#lookUp').addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
   state.redraw = null;
@@ -506,6 +564,7 @@ function layoutCameraFrame(svg = $('#camFrame'), maskId = 'camMask') {
 }
 
 async function openCapture() {
+  if (cap.hidden) openLayer('capture', closeCapture);
   cap.hidden = false;
   document.body.style.overflow = 'hidden';
   showStep('camera');
@@ -581,6 +640,7 @@ function closeCapture() {
   state.viaPrompt = false;
   cap.hidden = true;
   document.body.style.overflow = '';
+  closeLayer('capture');
 }
 
 async function snap() {
@@ -981,6 +1041,7 @@ function openDetail(sky, { from = 0 } = {}) {
   const wrap = $('#sheet');
   const body = wrap.querySelector('.viewer-body');
   const swapping = !wrap.hidden && from !== 0;
+  if (wrap.hidden) openLayer('sky', skyBack);
   // Opened from the shelf, the note waits in the jar as a scroll and unrolls once the photo is out.
   const rolled = !swapping && !!sky.note && !reduceMotion();
   // Numbered newest first, the way the shelf reads; swiping left goes back in time.
@@ -1173,6 +1234,18 @@ function closeSheet() {
   viewer.busy = false;
   viewer.editing = false;
   if (cap.hidden && $('#storyModal').hidden) document.body.style.overflow = '';
+  closeLayer('sky');
+}
+
+/** Back while a sky is open: finish whatever is playing or being typed first, otherwise put it back in its jar. */
+function skyBack() {
+  if (viewer.editing || viewer.busy) {
+    if (viewer.editing) endEdit(state.detail);
+    else { viewer.stage?.skip(); skipNote(); }
+    openLayer('sky', skyBack);
+    return;
+  }
+  closeJar();
 }
 
 /** Drag the polaroid down to put it back, or sideways to the next sky. A tap on the dimmed space closes. */
@@ -1229,7 +1302,9 @@ function confirmDialog({ title, body, no, yes }) {
   el.hidden = false;
   $('#confirmNo').focus();
   return new Promise((resolve) => {
-    const done = (answer) => { el.hidden = true; resolve(answer); };
+    const done = (answer) => { el.hidden = true; closeLayer('confirm'); resolve(answer); };
+    // Back is the same as "keep it".
+    openLayer('confirm', () => done(false));
     $('#confirmNo').onclick = () => done(false);
     $('#confirmYes').onclick = () => done(true);
     el.onclick = (e) => { if (e.target === el) done(false); };
@@ -1291,6 +1366,7 @@ let storyUrl = null;
 
 async function openStory(kind, payload) {
   const wrap = $('#storyModal');
+  if (wrap.hidden) openLayer('story', closeStory);
   const art = wrap.querySelector('.sheet');
   const title = kind === 'single' ? t.shareTitle.single : kind === 'jar' ? t.shareTitle.jar(MONTHS[payload.month]) : t.shareTitle.year(payload.year);
   const canShowPlace = kind === 'single' && payload.sky.place;
@@ -1363,6 +1439,7 @@ function closeStory() {
   $('#storyModal').hidden = true;
   if (storyUrl) { URL.revokeObjectURL(storyUrl); storyUrl = null; }
   if (cap.hidden && $('#sheet').hidden) document.body.style.overflow = '';
+  closeLayer('story');
 }
 
 // ---------- sample shelf ----------
@@ -1422,6 +1499,7 @@ function bindGlobal() {
   $('#shutter').addEventListener('click', snap);
   $('#camFlip').addEventListener('click', flipCamera);
   $('#fileLibrary').addEventListener('change', picked);
+  $('#fileCamera').addEventListener('change', picked);
   $('#frameAnother').addEventListener('click', () => $('#fileLibrary').click());
   $('#frameUse').addEventListener('click', useFrame);
   bindFrameGestures();
@@ -1463,6 +1541,13 @@ function bindGlobal() {
 }
 
 async function init() {
+  // LINE opens a page in the phone's own browser when asked to in the address.
+  if (IN_APP === 'LINE' && !new URLSearchParams(location.search).has('openExternalBrowser')) {
+    const u = new URL(location.href);
+    u.searchParams.set('openExternalBrowser', '1');
+    location.replace(u.href);
+    return;
+  }
   bindGlobal();
   view.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t.opening}</p></div>`;
 
