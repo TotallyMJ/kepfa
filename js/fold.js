@@ -117,7 +117,7 @@ export function foldStage(href, size, state) {
   };
 
   /** Drops on with gravity, bounces once, then screws down in one twist: light sweeps the brass, a click and a tiny buzz. */
-  async function lidOn() {
+  async function lidOn({ pace = 1 } = {}) {
     if (reduceMotion() || skipped) return show('kept');
     lid.style.opacity = 1;
     await run(lid, [
@@ -126,7 +126,7 @@ export function foldStage(href, size, state) {
       { offset: 0.7, transform: 'translateY(-5px) rotate(-1deg)', easing: RISE },
       { offset: 0.85, transform: 'translateY(-25px) rotate(-1.5deg)', easing: GRAVITY },
       { offset: 1, opacity: 1, transform: 'translateY(-10px) rotate(0)' },
-    ], { duration: 420 });
+    ], { duration: 420 * pace });
     mouth.style.opacity = 0;
     if (!skipped) shine.animate([{ opacity: 0, transform: 'translateX(0)' }, { opacity: 1, offset: 0.3 }, { opacity: 0, transform: `translateX(${shineTravel}px)` }], { duration: 340, easing: 'ease-in-out' });
     setTimeout(() => { if (!skipped) { click(); navigator.vibrate?.(15); } }, 120);
@@ -139,38 +139,39 @@ export function foldStage(href, size, state) {
   }
 
   /** @param lid  false leaves the jar open (the keep screen closes it later with lidOn) */
-  async function foldIn({ lid: withLid = true } = {}) {
+  async function foldIn({ lid: withLid = true, pace = 1 } = {}) {
     skipped = false;
+    const d = (ms) => ms * pace;
     if (reduceMotion()) return show(withLid ? 'kept' : 'filled');
     // Fold 1: top-right half over the diagonal; its back is paper.
     base.style.clipPath = SQUARE;
-    shade(f1, [1, 0.72], 140);
-    sheen('100%', '0%', 140);
-    await run(f1, [{ transform: 'rotate3d(1,1,0,0deg)' }, { transform: 'rotate3d(1,1,0,90deg)' }], { duration: 140, easing: 'cubic-bezier(.6,0,1,1)' });
+    shade(f1, [1, 0.72], d(140));
+    sheen('100%', '0%', d(140));
+    await run(f1, [{ transform: 'rotate3d(1,1,0,0deg)' }, { transform: 'rotate3d(1,1,0,90deg)' }], { duration: d(140), easing: 'cubic-bezier(.6,0,1,1)' });
     asPaper(f1, true);
-    shade(f1, [0.8, 1.04, 1], 140);
-    await run(f1, [{ transform: 'rotate3d(1,1,0,90deg)' }, { transform: 'rotate3d(1,1,0,180deg)' }], { duration: 140, easing: 'cubic-bezier(0,0,.4,1)' });
+    shade(f1, [0.8, 1.04, 1], d(140));
+    await run(f1, [{ transform: 'rotate3d(1,1,0,90deg)' }, { transform: 'rotate3d(1,1,0,180deg)' }], { duration: d(140), easing: 'cubic-bezier(0,0,.4,1)' });
     // Fold 2: the triangle in half.
     asPaper(base, true);
     f1.hidden = true;
     base.style.clipPath = HALF;
     f2.hidden = false;
-    shade(f2, tipAway, 220);
-    await run(f2, [{ transform: 'rotate3d(1,-1,0,0deg)' }, { transform: 'rotate3d(1,-1,0,-180deg)' }], { duration: 220, easing: EASE });
+    shade(f2, tipAway, d(220));
+    await run(f2, [{ transform: 'rotate3d(1,-1,0,0deg)' }, { transform: 'rotate3d(1,-1,0,-180deg)' }], { duration: d(220), easing: EASE });
     // Fold 3: and in half again.
     f2.hidden = true;
     base.style.clipPath = QUARTER;
     f3.hidden = false;
-    shade(f3, tipAway, 200);
-    await run(f3, [{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(180deg)' }], { duration: 200, easing: EASE });
+    shade(f3, tipAway, d(200));
+    await run(f3, [{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(180deg)' }], { duration: d(200), easing: EASE });
     // Flip into the jar with a short light trail.
     const flight = [{ transform: 'none' }, { transform: midAir, offset: 0.45 }, { transform: inJar }];
     whoosh(false);
-    trail(flight, 440);
-    await run(main, flight.map((f, i) => ({ ...f, opacity: i === 2 ? 0 : 1 })), { duration: 440, easing: 'cubic-bezier(.45,0,.75,.5)' });
+    trail(flight, d(440));
+    await run(main, flight.map((f, i) => ({ ...f, opacity: i === 2 ? 0 : 1 })), { duration: d(440), easing: 'cubic-bezier(.45,0,.75,.5)' });
     energy();
-    await run(sky, [{ opacity: 0, transform: 'scale(.7)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 220, easing: 'cubic-bezier(.2,.8,.3,1)' });
-    if (withLid) await lidOn();
+    await run(sky, [{ opacity: 0, transform: 'scale(.7)' }, { opacity: 1, transform: 'scale(1)' }], { duration: d(220), easing: 'cubic-bezier(.2,.8,.3,1)' });
+    if (withLid) await lidOn({ pace });
     else show('filled');
   }
 

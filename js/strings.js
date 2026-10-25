@@ -178,6 +178,7 @@ export const t = {
   footerLine: 'Start your own sky collection',
   issueLine: (month, year) => `Issue · ${month} ${year}`,
   issueNo: (n) => `No. ${n}`,
+  ticketLine: (day) => `Sky homework, day ${day}. Handed in.`,
   volume: (year) => `Vol. ${year}`,
   keptRing: (month, year) => `KEPT · ${month.toUpperCase()} · ${year} · KEPFA · `,
   keptWord: 'KEPT',

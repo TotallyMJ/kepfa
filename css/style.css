@@ -596,6 +596,11 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .cam-bottom .cam-library { width: auto; justify-self: start; white-space: normal; line-height: 1.3; }
 .cam-hint { margin: 0; font-size: var(--t-sm); text-align: center; }
 .cam-spacer { width: 56px; flex: none; }
+.cam-bottom .cam-spacer { justify-self: end; display: grid; place-items: center; }
+/* Front/back flip, right of the shutter where every camera app keeps it. */
+.cam-flip { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .14); color: var(--camera-ink); }
+.cam-flip svg { width: 24px; height: 24px; }
+.cam.is-front video { transform: scaleX(-1); }
 .cam-top .btn-text, .cam-bottom .btn-text { width: 56px; }
 .shutter {
   width: 72px; height: 72px;

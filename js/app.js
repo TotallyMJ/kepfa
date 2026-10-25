@@ -158,7 +158,9 @@ function newDot(filled) {
 function challengeFor(sky) {
   if (!sky.prompt) return null;
   const p = promptFor(sky.prompt);
-  return { text: sky.promptText || p.text, day: fmt.dayLong(sky.prompt), tag: p.tag, kept: challengeProgress().filled };
+  // Which day of the challenge this sky was, counted up to its own day, so an old share keeps its number.
+  const n = new Set(state.skies.filter((s) => s.prompt && (!s.sample || s.id === sky.id) && s.prompt <= sky.prompt).map((s) => s.prompt)).size;
+  return { text: sky.promptText || p.text, day: fmt.dayLong(sky.prompt), tag: p.tag, kept: ((n - 1) % CHALLENGE_SIZE) + 1 };
 }
 
 /** A strip of masking tape; where it sits and how it tilts lives in CSS. */
@@ -477,6 +479,7 @@ function shakeJar(list) {
 // ---------- capture ----------
 
 let stream = null;
+let facing = 'environment';
 let draft = null;
 let camWindow = null;   // the jar's glass interior on screen, in CSS px: what the shot keeps
 
@@ -513,19 +516,44 @@ async function openCapture() {
   layoutCameraFrame();
 
   if (!navigator.mediaDevices?.getUserMedia) return showFallback();
+  // Always the sky-facing camera first; the front one is a tap away.
+  facing = 'environment';
   try {
-    const s = await navigator.mediaDevices.getUserMedia({
-      // As sharp as the phone allows: the shot keeps only the part inside the jar.
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } },
-      audio: false,
-    });
-    if (cap.hidden || camStep.hidden) { s.getTracks().forEach((tr) => tr.stop()); return; }
-    stream = s;
-    const v = $('#camVideo');
-    v.srcObject = stream;
-    await v.play();
+    await startCamera();
   } catch {
     showFallback();
+    return;
+  }
+  // Only offer the flip when the phone has more than one camera.
+  const cams = (await navigator.mediaDevices.enumerateDevices().catch(() => [])).filter((d) => d.kind === 'videoinput');
+  $('#camFlip').hidden = cams.length < 2;
+}
+
+async function startCamera() {
+  const camStep = cap.querySelector('.cam');
+  const s = await navigator.mediaDevices.getUserMedia({
+    // As sharp as the phone allows: the shot keeps only the part inside the jar.
+    video: { facingMode: { ideal: facing }, width: { ideal: 4096 }, height: { ideal: 3072 } },
+    audio: false,
+  });
+  if (cap.hidden || camStep.hidden) { s.getTracks().forEach((tr) => tr.stop()); return; }
+  stream = s;
+  // The front camera previews like a mirror, the way every selfie screen does.
+  camStep.classList.toggle('is-front', facing === 'user');
+  const v = $('#camVideo');
+  v.srcObject = stream;
+  await v.play();
+}
+
+async function flipCamera() {
+  const was = facing;
+  facing = facing === 'user' ? 'environment' : 'user';
+  stopCamera();
+  try {
+    await startCamera();
+  } catch {
+    facing = was;
+    try { await startCamera(); } catch { showFallback(); }
   }
 }
 
@@ -561,7 +589,9 @@ async function snap() {
   const vw = v.videoWidth, vh = v.videoHeight;
   const s = Math.max(innerWidth / vw, innerHeight / vh);
   const ox = (innerWidth - vw * s) / 2, oy = (innerHeight - vh * s) / 2;
-  const sx = Math.max(0, (camWindow.x - ox) / s), sy = Math.max(0, (camWindow.y - oy) / s);
+  // A mirrored preview shows the jar window's left edge from the frame's right side; the saved photo reads the right way round.
+  const wx = v.closest('.is-front') ? innerWidth - camWindow.x - camWindow.w : camWindow.x;
+  const sx = Math.max(0, (wx - ox) / s), sy = Math.max(0, (camWindow.y - oy) / s);
   const sw = Math.min(vw - sx, camWindow.w / s), sh = Math.min(vh - sy, camWindow.h / s);
   const c = document.createElement('canvas');
   c.width = Math.round(sw);
@@ -768,6 +798,7 @@ async function review(blob, { takenAt, source }) {
       </div>
     </div>`;
 
+  fitPlaceholder($('#noteInput'));
   const stage = foldStage(draft.url, Math.min(150, innerWidth * 0.4), 'open');
   $('#foldSlot').append(stage.el);
   Object.assign(draft, { stage, prompt, paper, counts });
@@ -815,6 +846,16 @@ function skyFields({ takenAt, source, paper }) {
       <input id="placeInput" class="field" maxlength="24" placeholder="${t.placeHint}" autocomplete="off" enterkeyhint="done">
       ${when}
     </div>`;
+}
+
+/** The example note is drawn from the ones that fit this slip, so it's never cut off at the edge. */
+function fitPlaceholder(input) {
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.font = getComputedStyle(input).font;
+  const room = input.clientWidth - 4;
+  if (ctx.measureText(input.placeholder).width <= room) return;
+  const fits = t.notePrompts.filter((p) => ctx.measureText(p).width <= room);
+  if (fits.length) input.placeholder = fits[Math.floor(Math.random() * fits.length)];
 }
 
 async function saveDraft() {
@@ -1029,6 +1070,9 @@ async function popOut(stage, pol, body) {
     { duration: MOTION.pop, easing: MOTION.spring }).finished.catch(() => {});
 }
 
+// Putting a sky back you've already seen goes quicker than keeping it the first time.
+const PUT_BACK = 0.7;
+
 /** ✕: back in the order it went in: the polaroid folds into the jar, the note rolls up after it, then the lid. */
 async function closeJar() {
   const { stage, pol } = viewer;
@@ -1041,20 +1085,20 @@ async function closeJar() {
   body.classList.add('is-closing');
   if (!reduceMotion()) {
     await pol.animate([{ transform: 'rotate(-2deg)' }, onTheCard(stage.card, pol)],
-      { duration: MOTION.move, easing: MOTION.in, fill: 'forwards' }).finished.catch(() => {});
+      { duration: MOTION.move * PUT_BACK, easing: MOTION.in, fill: 'forwards' }).finished.catch(() => {});
   }
   body.classList.remove('is-out');
   stage.card.style.opacity = 1;
   stage.el.classList.remove('is-behind');
   if (slip) {
     // The note starts rolling while the photo is still folding, and lands just after it.
-    const folding = stage.foldIn({ lid: false });
-    if (!reduceMotion()) await new Promise((r) => setTimeout(r, 450));
+    const folding = stage.foldIn({ lid: false, pace: PUT_BACK });
+    if (!reduceMotion()) await new Promise((r) => setTimeout(r, 450 * PUT_BACK));
     await rollNote(slip, stage.el.querySelector('.fold-jar'), paperFor(state.detail.id), { note: state.detail.note, quick: true, skipped: stage.isSkipped });
     await folding;
-    await stage.lidOn();
+    await stage.lidOn({ pace: PUT_BACK });
   } else {
-    await stage.foldIn();
+    await stage.foldIn({ pace: PUT_BACK });
   }
   viewer.busy = false;
   closeSheet();
@@ -1372,6 +1416,7 @@ function markSeeded() {
 function bindGlobal() {
   $('#openCapture').addEventListener('click', () => { state.viaPrompt = false; openCapture(); });
   $('#shutter').addEventListener('click', snap);
+  $('#camFlip').addEventListener('click', flipCamera);
   $('#fileLibrary').addEventListener('change', picked);
   $('#frameAnother').addEventListener('click', () => $('#fileLibrary').click());
   $('#frameUse').addEventListener('click', useFrame);

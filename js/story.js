@@ -10,6 +10,7 @@ const isThai = (s) => /[฀-๿]/.test(s);
 
 const W = 1080, H = 1920;
 const PAPER = '#F1EDE6';
+const GRID = 'rgba(74, 120, 184, .1)', GRID_CELL = 60;
 const TAG = '#FBF9F5';
 const INK = '#1E1C19';
 const SOFT = '#6B645B';
@@ -40,6 +41,10 @@ function page() {
   const ctx = c.getContext('2d');
   ctx.fillStyle = PAPER;
   ctx.fillRect(0, 0, W, H);
+  // The app's grid paper (--grid), at the size it reads on a phone held full screen.
+  ctx.fillStyle = GRID;
+  for (let x = GRID_CELL - 1; x < W; x += GRID_CELL) ctx.fillRect(x, 0, 2, H);
+  for (let y = GRID_CELL - 1; y < H; y += GRID_CELL) ctx.fillRect(0, y, W, 2);
   // paper grain, and it stops IG's compression from banding flat areas
   const img = ctx.getImageData(0, 0, W, H);
   const d = img.data;
@@ -500,11 +505,11 @@ async function storySingle(sky, showPlace, quote, challenge) {
     note = { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn.dst[2] };
   }
   if (challenge) {
-    // The day's prompt on a small pale-blue ticket, smaller than the note and above it.
-    const w = 560, lh = 50, font = `500 44px ${SERIF}`;
+    // The day's prompt on a small pale-blue ticket, smaller than the note and above it; it grows with its lines.
+    const w = 560, lh = 52, font = `500 44px ${SERIF}`;
     ctx.font = font;
-    const lines = wrap(ctx, challenge.text, w - 110, 2);
-    prompt = { font, lh, lines, w, h: 92 + (lines.length - 1) * lh };
+    const lines = wrap(ctx, challenge.text, w - 110, 3);
+    prompt = { font, lh, lines, w, h: 96 + (lines.length - 1) * lh + 34 };
   }
   // Whatever comes under the print starts below the jar that leans on its corner.
   const below = pw * 0.37 * JAR_RATIO * 0.38 + 50;
@@ -515,8 +520,11 @@ async function storySingle(sky, showPlace, quote, challenge) {
   tapeStrip(ctx, tapeImg, W / 2, py + 4, 216, -4);
 
   // The jar leans the other way against the print's bottom-right corner (the place tag hangs from its neck).
-  const bw = pw * 0.37, bh = bw * JAR_RATIO, jx = W / 2 + pw * 0.5 - bw * 0.62, jy = py + ph - bh * 0.62;
   const placed = showPlace && sky.place;
+  const bw = pw * 0.37, bh = bw * JAR_RATIO, jy = py + ph - bh * 0.62;
+  // With a tag hanging on its right, the jar slides in just enough to keep the widest tag inside the margin.
+  const reach = jarPoint(925, 540, bw)[0] + 165 * Math.max(bw / 540, 0.62);
+  const jx = Math.min(W / 2 + pw * 0.5 - bw * 0.62, placed ? W - MARGIN - reach : Infinity);
   ctx.save();
   ctx.translate(jx + bw / 2, jy + bh / 2);
   ctx.rotate((7 * Math.PI) / 180);
@@ -555,8 +563,8 @@ async function storySingle(sky, showPlace, quote, challenge) {
     ctx.setLineDash([8, 8]);
     ctx.beginPath(); ctx.moveTo(30, 18); ctx.lineTo(30, h - 18); ctx.stroke();
     ctx.setLineDash([]);
-    text(ctx, `${t.challengeBadge} · ${challenge.day}`.toUpperCase(), 64, 40, { font: `500 20px ${SANS}`, color: '#2C4A8C', align: 'left', spacing: 4 });
-    lines.forEach((ln, i) => text(ctx, ln, 64, 78 + i * lh, { font, color: '#1F2F55', align: 'left' }));
+    text(ctx, t.ticketLine(challenge.kept).toUpperCase(), 64, 44, { font: `500 20px ${SANS}`, color: '#2C4A8C', align: 'left', spacing: 4 });
+    lines.forEach((ln, i) => text(ctx, ln, 64, 96 + i * lh, { font, color: '#1F2F55', align: 'left' }));
     ctx.restore();
     y += h + 34;
   }
