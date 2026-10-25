@@ -340,16 +340,19 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .btn.light { background: var(--polaroid); border-color: var(--polaroid); color: #1E1C19; border-radius: 5px; }
 
 /* Press: sinks fast, springs back when let go. */
-.btn, .btn-text, .keep-btn, .shutter, .tick-row, .polaroid-close {
+.btn, .btn-text, .keep-btn, .shutter, .tick-row, .viewer-icon {
   transition: transform var(--t-quick) var(--ease-spring);
 }
-.btn:active:not(:disabled), .btn-text:active, .keep-btn:active, .shutter:active, .tick-row:active, .polaroid-close:active {
+.btn:active:not(:disabled), .btn-text:active, .keep-btn:active, .shutter:active, .tick-row:active, .viewer-icon:active {
   transform: scale(.95);
   transition-duration: var(--t-press);
   transition-timing-function: var(--ease-out);
 }
 
 .actions { display: flex; gap: var(--s-3); justify-content: center; flex-wrap: wrap; margin-top: var(--s-4); }
+/* With a share in the row, it leads, full width like every other share; the rest stack under it. */
+.actions:has(.share) .btn { flex: 1 1 100%; }
+.actions .btn.share { order: -1; }
 
 /* ---------- jar ---------- */
 .jar { display: block; width: 100%; height: auto; stroke: none; overflow: visible; }
@@ -406,6 +409,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   line-height: 1.5;
 }
 .shelf-labels p span + span, .mini p span + span { color: var(--ink-soft); }
+/* This month: a small ink tag under its jar. */
+.shelf-labels p.is-now span:first-child { padding: 0 var(--s-2); border-radius: 3px; background: var(--ink); color: var(--paper); }
+.btn.share { gap: var(--s-2); }
+.btn.primary.share-year { width: 100%; margin-top: var(--s-5); }
 
 .jar-slot, .month-slot {
   display: flex;
@@ -532,17 +539,23 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   align-items: center;
   padding: var(--s-1) var(--gutter-r) var(--s-1) var(--gutter-l);
 }
+/* Icon over label, like every phone's tab bar; the page you're on is the one in full ink. */
 .tab {
+  justify-self: center;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  min-height: 44px;
-  padding: 0 var(--s-4);
-  font-size: var(--t-sm);
+  gap: 2px;
+  min-width: 72px;
+  min-height: 48px;
+  justify-content: center;
+  font-size: var(--t-cap);
   color: var(--ink-soft);
   text-decoration: none;
 }
-.tab:last-child { justify-self: end; }
-.tab[aria-current="page"] { color: var(--ink); text-decoration: underline; text-underline-offset: 6px; text-decoration-thickness: 1px; }
+.tab svg { width: 24px; height: 24px; }
+.tab[aria-current="page"] { color: var(--ink); font-weight: 500; }
+.tab[aria-current="page"] svg { stroke-width: 1.9; }
 /* The one thing to press: big, centred, in thumb reach, lifted above the bar. */
 .keep-btn {
   width: 72px;
@@ -922,41 +935,57 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .polaroid-empty { font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: #8A8277; }
 .pen { width: 14px; height: 14px; margin-left: 6px; vertical-align: -1px; stroke: #8A8277; }
 .polaroid-meta { margin: 6px 0 0; font-family: var(--f-mono); font-size: 10px; color: #6B645B; }
-.polaroid-close {
+/* Close, where-am-I and more, across the top like a photo viewer; paper-coloured on the dim. */
+.viewer-top {
   position: absolute;
-  top: -20px;
-  right: -20px;
-  width: 44px;
-  height: 44px;
+  top: env(safe-area-inset-top, 0px);
+  left: 0; right: 0;
+  z-index: 3;
   display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #1E1C19;
+  grid-template-columns: 56px 1fr 56px;
+  align-items: center;
+  padding: var(--s-2) var(--s-2) 0;
+  color: var(--polaroid);
+  visibility: hidden;
 }
-.polaroid-close::before {
-  content: "";
+.is-out .viewer-top { visibility: visible; }
+.viewer-icon { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; }
+.viewer-icon:last-of-type { justify-self: end; }
+.viewer-icon svg { width: 24px; height: 24px; stroke-width: 1.8; }
+.viewer-count { text-align: center; font-family: var(--f-mono); font-size: var(--t-cap); letter-spacing: .08em; }
+.viewer-menu {
   position: absolute;
-  inset: 5px;
-  border-radius: 50%;
+  top: calc(100% + 2px);
+  right: var(--s-3);
+  min-width: 180px;
+  padding: var(--s-1) 0;
   background: var(--polaroid);
-  border: 1px solid #CFC7BB;
-  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, .35);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, .5);
+  animation: pop-in var(--t-quick) var(--ease-out) both;
+  transform-origin: top right;
 }
-.polaroid-close svg { position: relative; width: 16px; height: 16px; }
+.viewer-menu button { display: block; width: 100%; min-height: 44px; padding: 0 var(--s-4); border: 0; background: none; color: #1E1C19; font-size: var(--t-sm); text-align: left; }
+.viewer-menu button + button { border-top: 1px solid rgba(30, 28, 25, .1); }
+.viewer-menu .danger { color: var(--danger); }
 .viewer-actions { display: flex; align-items: center; justify-content: center; gap: var(--s-5); }
 .viewer-actions .btn.light { min-width: calc(var(--pw) * .6); }
+/* Share is the thing to do with a sky you're looking at: full polaroid width, with its icon. */
+.viewer-actions .btn.share { width: var(--pw); min-height: 52px; gap: var(--s-2); font-weight: 500; font-size: var(--t-body); }
+.btn.share svg { width: 20px; height: 20px; stroke-width: 1.8; }
+.viewer-swipe { margin: calc(var(--s-3) - var(--s-6)) 0 0; font-size: var(--t-cap); color: var(--polaroid); opacity: .7; white-space: pre; }
 
-/* After the pop, the strip, ✕ and the button arrive one after another. */
+/* After the pop, the strip, the top bar and the button arrive one after another. */
 .is-out:not(.is-swap) .polaroid-strip > *,
-.is-out:not(.is-swap) .polaroid-close,
-.is-out:not(.is-swap) .viewer-actions { animation: rise-in var(--t-move) var(--ease-out) both; }
+.is-out:not(.is-swap) .viewer-top,
+.is-out:not(.is-swap) .viewer-actions,
+.is-out:not(.is-swap) .viewer-swipe { animation: rise-in var(--t-move) var(--ease-out) both; }
 .is-out:not(.is-swap) .polaroid-strip > :first-child { animation-delay: calc(var(--t-pop) * .5); }
 .is-out:not(.is-swap) .polaroid-strip > :nth-child(2) { animation-delay: calc(var(--t-pop) * .5 + var(--stagger)); }
-.is-out:not(.is-swap) .polaroid-close { animation-name: pop-in; animation-timing-function: var(--ease-spring); animation-delay: calc(var(--t-pop) * .5 + var(--stagger) * 2); }
+.is-out:not(.is-swap) .viewer-top { animation-name: fade; animation-delay: calc(var(--t-pop) * .5 + var(--stagger) * 2); }
 .is-out:not(.is-swap) .viewer-actions { animation-delay: calc(var(--t-pop) * .5 + var(--stagger) * 3); }
-.is-closing .polaroid-close, .is-closing .viewer-actions { opacity: 0; transition: opacity var(--t-quick) var(--ease-in); }
+.is-out:not(.is-swap) .viewer-swipe { animation-delay: calc(var(--t-pop) * .5 + var(--stagger) * 4); }
+.is-closing .viewer-top, .is-closing .viewer-actions, .is-closing .viewer-swipe { opacity: 0; transition: opacity var(--t-quick) var(--ease-in); }
 @keyframes rise-in { from { opacity: 0; transform: translateY(8px); } }
 @keyframes pop-in { from { opacity: 0; transform: scale(.3); } }
 
@@ -964,7 +993,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .viewer-body.is-editing { place-items: start center; }
 .is-editing .viewer-stack { gap: var(--s-4); }
 .is-editing .polaroid { --pw: min(240px, calc(100vw - 96px)); transition: width var(--t-move) var(--ease-out); }
-.is-editing .polaroid-close { display: none; }
+.is-editing .viewer-top, .is-editing .viewer-swipe { display: none; }
 .polaroid-form { display: flex; flex-direction: column; align-items: center; gap: var(--s-1); width: 100%; }
 .polaroid-input {
   width: 100%;
@@ -999,7 +1028,11 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .confirm-actions .btn { flex: 1; }
 @keyframes confirm-in { from { opacity: 0; transform: translateY(16px) scale(.96); } }
 
-.story-sheet h2 { margin: 0 0 var(--s-4); font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); text-align: center; }
+/* Title centred between a spacer and ✕, so the way out is always in the same corner. */
+.sheet-head { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; margin: calc(var(--s-2) * -1) calc(var(--s-2) * -1) var(--s-4); }
+.sheet-head .viewer-icon { color: var(--ink-soft); justify-self: end; }
+.sheet-head .viewer-icon svg { width: 22px; height: 22px; }
+.story-sheet h2 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); text-align: center; }
 .story-preview {
   width: min(58vw, 240px);
   aspect-ratio: 9 / 16;

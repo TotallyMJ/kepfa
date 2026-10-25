@@ -143,6 +143,9 @@ export const t = {
   seeMySkies: 'See my skies',
 
   closeJar: 'Close the jar',
+  more: 'More',
+  skyOf: (i, n) => `${i} / ${n}`,
+  swipeHint: '‹  Swipe for other skies  ›',
   shareSky: 'Share this sky',
   editNote: 'Edit the note',
   writeOn: 'Write on this one',
@@ -159,7 +162,8 @@ export const t = {
 
   shareTitle: { single: 'Share this sky', jar: (m) => `Share ${m}’s jar`, year: () => 'Share my year in skies' },
   showPlace: 'Show place',
-  showPlaceHint: 'Off unless you turn it on. No GPS ever leaves with the image.',
+  showPlaceHint: 'Stays the way you last set it. No GPS ever leaves with the image.',
+  close: 'Close',
   storyTip: 'Tap Share to post it anywhere, or save it to Photos.',
   saveImage: 'Save image',
   share: 'Share',

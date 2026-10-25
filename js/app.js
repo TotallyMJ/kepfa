@@ -12,6 +12,8 @@ const ICON = {
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6l6 6-6 6"/></svg>',
   pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>',
+  share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M6 11v7.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>',
+  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>',
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -200,7 +202,12 @@ function render() {
   if (route.name === 'month') renderMonth(route.year, route.month);
   else if (route.name === 'months') renderMonths();
   else renderShelf();
-  if (location.hash !== state.lastRoute) { window.scrollTo(0, 0); state.lastRoute = location.hash; }
+  if (location.hash !== state.lastRoute) {
+    window.scrollTo(0, 0);
+    state.lastRoute = location.hash;
+    // Months opens on the shelf you're filling now.
+    if (route.name === 'months') view.querySelector('.is-now')?.closest('.shelf-row').scrollIntoView({ block: 'center' });
+  }
 }
 
 function go(hash) {
@@ -338,7 +345,9 @@ function renderMonths() {
   const minYear = Math.min(now.getFullYear(), ...state.skies.map((s) => new Date(s.takenAt).getFullYear()));
   const isFuture = (m) => y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth());
 
-  // Newest shelf on top so the jars you're filling now are the first thing you see.
+  const isNow = (m) => y === now.getFullYear() && m === now.getMonth();
+
+  // January to December, read like a calendar; the month you're filling is marked (render scrolls to it).
   view.innerHTML = `
     <header class="masthead">
       <div class="masthead-meta"><span class="eyebrow">${all.length} ${t.kept(all.length)}</span>
@@ -350,13 +359,13 @@ function renderMonths() {
       </div>
       <h1 class="wordmark">${t.months}</h1>
     </header>
-    ${all.length ? `<div class="section-head"><span></span><button type="button" class="btn-text" id="shareYear">${t.shareYear}</button></div>` : ''}
-    ${[3, 2, 1, 0].map((r) => {
+    ${all.length ? `<button type="button" class="btn primary share share-year" id="shareYear">${ICON.share}${t.shareYear}</button>` : ''}
+    ${[0, 1, 2, 3].map((r) => {
       const ms = [0, 1, 2].map((c) => r * 3 + c);
       return `<div class="shelf-row">
         <div class="shelf-jars">${ms.map((m) => `<button type="button" class="month-slot" data-month="${m}" ${isFuture(m) ? 'disabled' : ''}
           aria-label="${t.monthJar(MONTHS[m], skiesIn(y, m).length)}"><canvas></canvas></button>`).join('')}</div>
-        <div class="shelf-labels">${ms.map((m) => `<p><span>${MONTHS_SHORT[m]}</span><span>${isFuture(m) ? '–' : skiesIn(y, m).length}</span></p>`).join('')}</div>
+        <div class="shelf-labels">${ms.map((m) => `<p${isNow(m) ? ' class="is-now"' : ''}><span>${MONTHS_SHORT[m]}</span><span>${isFuture(m) ? '–' : skiesIn(y, m).length}</span></p>`).join('')}</div>
       </div>`;
     }).join('')}`;
 
@@ -405,7 +414,7 @@ function renderMonth(year, month) {
       ? `<p class="hint">${t.tapLayer}${!reduceMotion() && window.DeviceOrientationEvent?.requestPermission ? `<span id="tiltPlay"> · <button type="button" class="btn-text hint-link">${t.tiltToPlay}</button></span>` : ''}</p>
          <div class="actions">
            <button type="button" class="btn" id="shake">${t.shake}</button>
-           <button type="button" class="btn primary" id="shareJar">${t.shareMonth(MONTHS[month])}</button>
+           <button type="button" class="btn primary share" id="shareJar">${ICON.share}${t.shareMonth(MONTHS[month])}</button>
          </div>
          <div class="stats">
            <div class="stat"><b class="num">${list.length}</b><span>${t.daysOf(days)}</span></div>
@@ -899,7 +908,24 @@ function noteHtml(sky, { rolled = false } = {}) {
     <span class="${noteClass(sky.note)}">${esc(sky.note)}</span>${PEN}</button>`;
 }
 
-const shareHtml = () => `<button type="button" class="btn light" id="shareOne">${t.shareSky}</button>`;
+const shareHtml = () => `<button type="button" class="btn light share" id="shareOne">${ICON.share}${t.shareSky}</button>`;
+
+/** ⋯ at the top: the things you can do to this sky that aren't on the polaroid itself. */
+function bindSkyMenu(sky) {
+  const more = $('#skyMore');
+  const menu = $('#skyMenu');
+  const close = () => { menu.hidden = true; more.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside, true); };
+  const outside = (e) => { if (!menu.contains(e.target) && !more.contains(e.target)) close(); };
+  more.addEventListener('click', () => {
+    if (viewer.busy || viewer.editing) return;
+    if (!menu.hidden) { close(); return; }
+    menu.hidden = false;
+    more.setAttribute('aria-expanded', 'true');
+    document.addEventListener('pointerdown', outside, true);
+  });
+  $('#menuEdit').addEventListener('click', () => { close(); startEdit(sky); });
+  $('#menuDelete').addEventListener('click', async () => { close(); if (await deleteSky(sky)) closeSheet(); });
+}
 
 function bindPolaroid(sky) {
   $('#editNote')?.addEventListener('click', () => startEdit(sky));
@@ -915,17 +941,29 @@ function openDetail(sky, { from = 0 } = {}) {
   const swapping = !wrap.hidden && from !== 0;
   // Opened from the shelf, the note waits in the jar as a scroll and unrolls once the photo is out.
   const rolled = !swapping && !!sky.note && !reduceMotion();
+  // Numbered newest first, the way the shelf reads; swiping left goes back in time.
+  const n = state.skies.length;
+  const pos = n - state.skies.findIndex((s) => s.id === sky.id);
   body.className = 'viewer-body';
   body.innerHTML = `
+    <div class="viewer-top">
+      <button type="button" class="viewer-icon" id="closeJar" aria-label="${t.closeJar}">${ICON.close}</button>
+      <span class="viewer-count">${n > 1 ? t.skyOf(pos, n) : ''}</span>
+      <button type="button" class="viewer-icon" id="skyMore" aria-label="${t.more}" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18.5" cy="12" r="1"/></svg></button>
+      <div class="viewer-menu" id="skyMenu" role="menu" hidden>
+        <button type="button" role="menuitem" id="menuEdit">${t.editNote}</button>
+        <button type="button" role="menuitem" class="danger" id="menuDelete">${t.deleteSky}</button>
+      </div>
+    </div>
     <div class="viewer-stage" id="viewerStage"></div>
     <div class="viewer-stack">
       <div class="polaroid">
-        <button type="button" class="polaroid-close" id="closeJar" aria-label="${t.closeJar}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
         <div class="polaroid-photo" style="background-image:url('${photoUrl(sky, 'photo')}')" role="img" aria-label="${t.openSky(fmt.long(sky.takenAt))}"></div>
         <div class="polaroid-strip" id="strip">${stripHtml(sky)}</div>
       </div>
       <div class="viewer-note" id="noteSlot">${noteHtml(sky, { rolled })}</div>
       <div class="viewer-actions" id="viewerActions">${shareHtml()}</div>
+      ${n > 1 ? `<p class="viewer-swipe">${t.swipeHint}</p>` : ''}
     </div>`;
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
@@ -937,6 +975,7 @@ function openDetail(sky, { from = 0 } = {}) {
   viewer.stage = stage;
   viewer.pol = $('.polaroid', body);
   $('#closeJar').addEventListener('click', closeJar);
+  bindSkyMenu(sky);
   bindPolaroid(sky);
 
   if (swapping) {
@@ -1151,17 +1190,18 @@ function confirmDialog({ title, body, no, yes }) {
 
 async function deleteSky(sky) {
   const yes = await confirmDialog({ title: t.deleteTitle, body: t.deleteBody, no: t.keepIt, yes: t.deleteYes });
-  if (!yes) return;
+  if (!yes) return false;
   try {
     await store.remove(sky.id);
   } catch {
     toast(t.saveFailed);
-    return;
+    return false;
   }
   state.skies = state.skies.filter((s) => s.id !== sky.id);
   forgetUrls(sky.id);
   render();
   toast(t.deleted);
+  return true;
 }
 
 /** The held jar wiggles with a round ✕ on its corner, like deleting an app on a phone. */
@@ -1206,12 +1246,15 @@ async function openStory(kind, payload) {
   const art = wrap.querySelector('.sheet');
   const title = kind === 'single' ? t.shareTitle.single : kind === 'jar' ? t.shareTitle.jar(MONTHS[payload.month]) : t.shareTitle.year(payload.year);
   const canShowPlace = kind === 'single' && payload.sky.place;
+  // Show place starts off, then keeps whatever you chose last time, on this phone only.
+  let placeOn = false;
+  try { placeOn = localStorage.getItem('kepfa.showPlace') === '1'; } catch { /* stays off */ }
   const challenge = kind === 'single' ? challengeFor(payload.sky) : null;
   art.innerHTML = `
     <div class="grabber"></div>
-    <h2>${title}</h2>
+    <div class="sheet-head"><span></span><h2>${title}</h2><button type="button" class="viewer-icon" data-close-story aria-label="${t.close}">${ICON.close}</button></div>
     <div class="story-preview" id="storyPreview"><div class="spinner"></div></div>
-    ${canShowPlace ? `<label class="switch"><span>${t.showPlace}</span><input type="checkbox" id="showPlace"></label>
+    ${canShowPlace ? `<label class="switch"><span>${t.showPlace}</span><input type="checkbox" id="showPlace" ${placeOn ? 'checked' : ''}></label>
       <p class="hint left">${t.showPlaceHint}</p>` : ''}
     ${challenge ? `<p class="hint left">${t.captionHint}</p>` : ''}
     <p class="hint left">${t.storyTip}</p>
@@ -1261,9 +1304,11 @@ async function openStory(kind, payload) {
     if (how === 'saved') toast(t.sharedFallback);
     else if (await copying) toast(t.captionCopied);
   });
-  // Place stays off every time the sheet opens, so it never leaves the phone by accident.
-  $('#showPlace')?.addEventListener('change', (e) => make(e.target.checked));
-  make(false);
+  $('#showPlace')?.addEventListener('change', (e) => {
+    try { localStorage.setItem('kepfa.showPlace', e.target.checked ? '1' : '0'); } catch { /* this time only */ }
+    make(e.target.checked);
+  });
+  make(!!canShowPlace && placeOn);
 }
 
 function closeStory() {
