@@ -7,7 +7,7 @@ import { sunTimes, guessPlace } from './sun.js';
 import { placeNear } from './places.js';
 import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
-import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, QUOTES, CHALLENGE_SIZE } from './strings.js';
+import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE } from './strings.js';
 
 const ICON = {
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>',
@@ -135,10 +135,15 @@ function askLocation() {
 function todayPrompt(d = new Date()) {
   return promptFor(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`);
 }
+/** The month's theme, or null: themed months started with November 2026, earlier ones kept the everyday prompts. */
+const themeFor = (year, month) => (year * 12 + month >= THEMES_FROM.year * 12 + THEMES_FROM.month ? THEMES[month] || null : null);
+
 function promptFor(key) {
   const [y, m, d] = key.split('-').map(Number);
   const day = Math.floor(Date.UTC(y, m - 1, d) / 864e5);
-  return { key, text: PROMPTS[day % PROMPTS.length], tag: fmt.dayTag(key) };
+  // A themed month takes its prompts in date order; other months cycle the everyday list.
+  const theme = themeFor(y, m - 1);
+  return { key, text: theme ? theme.prompts[(d - 1) % theme.prompts.length] : PROMPTS[day % PROMPTS.length], theme: theme?.name || '', tag: fmt.dayTag(key) };
 }
 const tagUrl = (tag) => `https://www.instagram.com/explore/tags/${tag.toLowerCase()}/`;
 
@@ -358,7 +363,7 @@ function renderShelf() {
       <div class="prompt-pin">
         ${tape('tape-top')}
         <div class="slip torn">
-          <span class="eyebrow">${t.lookFor}</span>
+          <span class="eyebrow">${prompt.theme ? `${MONTHS[now.getMonth()]} · ${prompt.theme}` : t.lookFor}</span>
           <h2 class="prompt-text">${prompt.text}</h2>
           <p class="prompt-line">${t.sameSky}</p>
           <button type="button" class="btn primary prompt-go" id="lookUp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>${t.lookUp}</button>
@@ -532,6 +537,7 @@ function renderMonth(year, month) {
   const prev = keys.filter((k) => k < key).pop(), next = keys.find((k) => k > key);
   const name = (k) => MONTHS[k % 12] + (Math.floor(k / 12) !== year ? ` ${Math.floor(k / 12)}` : '');
   const isNow = key === new Date().getFullYear() * 12 + new Date().getMonth();
+  const theme = themeFor(year, month);
   state.monthKey = key;
   state.year = year;
   state.monthNav = { prev: prev != null ? monthHash(prev) : null, next: next != null ? monthHash(next) : null };
@@ -544,7 +550,7 @@ function renderMonth(year, month) {
         : isNow ? `<span class="eyebrow is-off">${MONTHS[(month + 1) % 12]} ›</span>` : '<span></span>'}
     </nav>
     <div class="month-head">
-      <h1 class="title">${MONTHS[month]}</h1>
+      <div><h1 class="title">${MONTHS[month]}</h1>${theme ? `<p class="month-theme">${theme.name}</p>` : ''}</div>
       <p class="eyebrow">${year}<br>${list.length} ${t.kept(list.length)}</p>
     </div>
     <div class="jar-stage" id="jarStage"><canvas id="bigJar" aria-label="${t.monthJar(MONTHS[month], list.length)}"></canvas></div>
@@ -564,7 +570,7 @@ function renderMonth(year, month) {
            ${slotButton(s)}<p><span>${day}</span><span>${time}</span></p></div>`; }).join('')}</div>`
       : `<div class="empty"><h2>${t.emptyMonthTitle}</h2><p>${t.emptyMonthBody}</p></div>`}`;
 
-  $('#shareJar')?.addEventListener('click', () => openStory('jar', { year, month, skies: list }));
+  $('#shareJar')?.addEventListener('click', () => openStory('jar', { year, month, skies: list, theme: theme?.name }));
   $('#shake')?.addEventListener('click', () => shakeJar(list));
   bindJarSlots(view);
 

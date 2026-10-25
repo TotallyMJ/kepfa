@@ -752,9 +752,10 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   return toBlob(c);
 }
 
-async function storyJar({ year, month, skies, quote }) {
+/** @param theme  the month's theme; it takes the quote's place, so the month's shelf reads as one story */
+async function storyJar({ year, month, skies, quote, theme }) {
   const [c, ctx] = page();
-  const top = masthead(ctx, quote, t.issueLine(month + 1, MONTHS[month], year), { title: MONTHS[month], kicker: t.storyKept(year, skies.length) });
+  const top = masthead(ctx, theme || quote, t.issueLine(month + 1, MONTHS[month], year), { title: MONTHS[month], kicker: t.storyKept(year, skies.length) });
 
   // The month's shelf: every sky in its own jar, newest first, the day under each.
   // Try each column count and keep the one that gives the biggest jars in the space left.

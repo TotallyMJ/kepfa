@@ -41,6 +41,44 @@ export const PROMPTS = [
   'The color of the sky right now.', 'The sky someone else is looking at too.', 'The last sky of your day.',
 ];
 
+// A theme for each month (by month index), so a month's shelf tells one story. Prompts go in date order:
+// the 1st gets the first one. Each stays easy: a phone, yourself or what you carry, any weather.
+// Months without a theme use PROMPTS. Themes start in November 2026 (THEMES_FROM).
+export const THEMES_FROM = { year: 2026, month: 10 };
+export const THEMES = {
+  10: {
+    name: 'Me & the sky',
+    prompts: [
+      'The sky through your fingers.', 'Your hand reaching for the sky.', 'Your shadow and a bit of sky.',
+      'The sky above your shoes.', 'The sky resting in your palm.', 'The sky over your shoulder.',
+      'Your silhouette against a bright sky.', 'The sky in your sunglasses or a window.', 'The sky behind your drink.',
+      'The sky over your lunch.', 'Your thumbs-up against the sky.', 'The sky framed by your two hands.',
+      'The sky from flat on your back.', 'The sky above your front door.', 'Your finger pointing at the sky.',
+      'The sky with your sleeve in it.', 'The sky behind your keys.', 'The sky from your usual seat.',
+      'The sky as you step outside.', 'The sky on your way home.', 'The sky with your bag in the shot.',
+      'The sky as you look back over your shoulder.', 'The sky through a circle of your fingers.', 'The sky with your favorite color in the shot.',
+      'The sky you’d send to a friend right now.', 'Your reflection, with the sky in the window.', 'The sky straight above your head.',
+      'Your hand on a wall, with the sky above.', 'The first sky you see today, with you in it.', 'The sky from your bed or sofa, through a window.',
+    ],
+  },
+  11: {
+    name: 'Lights & sky',
+    prompts: [
+      'The sky as the streetlights come on.', 'A lit window against the evening sky.', 'The sky with a lamp in the shot.',
+      'The sky over a lit-up sign.', 'Sunlight through a curtain.', 'The brightest spot in today’s sky.',
+      'Car lights under the evening sky.', 'The sky with any string of lights.', 'The sky through a glowing window.',
+      'Your phone light held up to the night sky.', 'The sky over a lit bridge or road.', 'The sky over a lit shop.',
+      'The moon, or where it should be.', 'The day’s last light.', 'The day’s first light.',
+      'Sunlight on your hand, sky above.', 'A light by the window, the sky outside.', 'The sky lit by the city at night.',
+      'The brightest cloud you can find.', 'The sky beside a traffic light.', 'Light through leaves, sky behind.',
+      'The sky above a lit doorway.', 'The sky through a glass of water.', 'The sky with a plane light or a star in it.',
+      'The sky above anything lit up for the holidays.', 'The bluest moment after sunset.', 'The sky with a glowing screen in the corner.',
+      'The sky over a lamp post.', 'The sun peeking past something.', 'The sky as the lights go off in the morning.',
+      'The last light of the year.',
+    ],
+  },
+};
+
 // Written for Kepfa; one is drawn at random per share, without repeats until all 30 are used.
 export const QUOTES = [
   'Some people collect stamps. We collect skies.', 'The sky is free. Keep a little.',
