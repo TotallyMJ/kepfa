@@ -5,6 +5,7 @@ import { livePile, loadThumbs, forgetThumb, paperIndex } from './pile.js';
 import { foldStage, rollNote, unrollNote, noteScroll, skipNote, MOTION, reduceMotion } from './fold.js';
 import { sunTimes, guessPlace } from './sun.js';
 import { placeNear } from './places.js';
+import { album, checkStamps } from './stamps.js';
 import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE } from './strings.js';
@@ -202,6 +203,7 @@ function parseRoute() {
     return { name: 'month', year: y, month: m - 1 };
   }
   if (a === 'months') return { name: 'months' };
+  if (a === 'stamps') return { name: 'stamps' };
   // The Jars tab opens on the month you're in.
   if (a === 'jars') { const now = new Date(); return { name: 'month', year: now.getFullYear(), month: now.getMonth() }; }
   return { name: 'shelf' };
@@ -216,10 +218,11 @@ function monthKeys() {
 }
 const monthHash = (k) => `#/month/${Math.floor(k / 12)}-${pad2((k % 12) + 1)}`;
 
-/** Month | Year at the top of the Jars tab. Switching (and turning months) replaces the page, so back leaves the tab. */
+/** Month | Year | Stamps at the top of the Jars tab. Switching (and turning months) replaces the page, so back leaves the tab. */
 const jarsSwitch = (on) => `<nav class="seg" aria-label="${t.jarsView}">
     <a href="${state.monthKey != null ? monthHash(state.monthKey) : '#/jars'}" data-replace${on === 'month' ? ' aria-current="page"' : ''}>${t.viewMonth}</a>
     <a href="#/months" data-replace${on === 'year' ? ' aria-current="page"' : ''}>${t.viewYear}</a>
+    <a href="#/stamps" data-replace${on === 'stamps' ? ' aria-current="page"' : ''}>${t.viewStamps}</a>
   </nav>`;
 
 function render() {
@@ -233,6 +236,7 @@ function render() {
   });
   if (route.name === 'month') renderMonth(route.year, route.month);
   else if (route.name === 'months') renderMonths();
+  else if (route.name === 'stamps') renderStamps();
   else renderShelf();
   if (location.hash !== state.lastRoute) {
     window.scrollTo(0, 0);
@@ -486,6 +490,57 @@ function renderMonths() {
   redraw();
   // The folded photos show once their thumbnails are in; until then each is the colour of its sky.
   loadThumbs(all).then(() => { if (state.redraw === redraw) redraw(); });
+}
+
+// ---------- the stamp album ----------
+
+/** What the stamp rules need from the app: where the sun is, and which months have a theme. */
+const stampCtx = () => ({ place: sunPlace(), hasTheme: (y, m) => !!themeFor(y, m) });
+
+/** A postage stamp printed from one of your skies: perforated edge, cream border, ink grain, its name in italic. */
+function stampSvg({ id, href, name, n, w = 86 }) {
+  const W = 100, H = 124, r = 3.2, step = 9.6;
+  let holes = '';
+  for (let x = 4.8; x <= W; x += step) holes += `<circle cx="${x}" cy="0" r="${r}"/><circle cx="${x}" cy="${H}" r="${r}"/>`;
+  for (let y = 5.4; y <= H; y += step) holes += `<circle cx="0" cy="${y}" r="${r}"/><circle cx="${W}" cy="${y}" r="${r}"/>`;
+  // Ids carry the stamp's own id so two stamps on a page never borrow each other's mask or grain.
+  return `<svg class="stamp" style="width:${w}px;height:${(w * H) / W}px" viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs>
+    <mask id="sm-${id}"><rect width="${W}" height="${H}" fill="#fff"/><g fill="#000">${holes}</g></mask>
+    <clipPath id="sc-${id}"><rect x="8" y="8" width="${W - 16}" height="${H - 40}"/></clipPath>
+    <filter id="sg-${id}"><feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="2" seed="${n}"/><feColorMatrix values="0 0 0 0 .2  0 0 0 0 .16  0 0 0 0 .1  0 0 0 .22 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+    <filter id="sp-${id}"><feColorMatrix type="matrix" values=".92 .06 .02 0 .02  .04 .9 .06 0 .02  .02 .08 .86 0 .03  0 0 0 1 0"/></filter></defs>
+    <g mask="url(#sm-${id})"><rect width="${W}" height="${H}" fill="#FBF7EE"/>
+      <image href="${href}" x="8" y="8" width="${W - 16}" height="${H - 40}" preserveAspectRatio="xMidYMid slice" clip-path="url(#sc-${id})" filter="url(#sp-${id})"/>
+      <rect width="${W}" height="${H}" fill="#000" filter="url(#sg-${id})"/>
+      <text x="13" y="21" font-family="Cormorant Garamond" font-size="11" font-weight="500" fill="#FBF7EE">${n}</text>
+      <text x="${W / 2}" y="${H - 18}" text-anchor="middle" font-family="Cormorant Garamond" font-style="italic" font-size="12" fill="#2a2420">${esc(name)}</text>
+      <text x="${W / 2}" y="${H - 8}" text-anchor="middle" font-family="IBM Plex Mono" font-size="5.2" letter-spacing="1.6" fill="#8A8277">KEPFA</text>
+    </g></svg>`;
+}
+
+/** The album: three stamps to a row, each tucked behind a glassine strip; the ones still to come show a hint. */
+function renderStamps() {
+  const list = album(state.skies, stampCtx());
+  const real = state.skies.filter((s) => !s.sample);
+  const byId = new Map(real.map((s) => [s.id, s]));
+  // A stamp keeps the sky that earned it; if that sky was deleted, it borrows the latest one.
+  const skyFor = (st) => byId.get(st.got.sky) || real[real.length - 1];
+  const cell = (st) => {
+    const { name, hint } = t.stamps[st.id];
+    const sky = st.got && skyFor(st);
+    const got = st.got ? fmt.shelf(st.got.at)[0] : '';
+    return `<div class="stamp-cell" role="listitem" aria-label="${esc(t.stampLabel(name, got))}">
+      ${sky ? stampSvg({ id: st.id, href: photoUrl(sky), name, n: st.need }) : `<div class="stamp-empty">${hint}</div>`}
+      <p class="stamp-cap">${esc(name)}<small>${got || `${st.have} / ${st.need}`}</small></p></div>`;
+  };
+  view.innerHTML = `
+    ${jarsSwitch('stamps')}
+    <div class="month-head">
+      <div><h1 class="title">${t.stampAlbum}</h1><p class="month-theme">${t.stampAlbumSub}</p></div>
+      <p class="eyebrow">${t.stampsOf(list.filter((st) => st.got).length, list.length)}</p>
+    </div>
+    <div class="album" role="list">${chunk(list, 3).map((row) => `<div class="album-row">${row.map(cell).join('')}</div>`).join('')}</div>`;
+  state.redraw = null;
 }
 
 // ---------- one month's jar ----------
@@ -1014,7 +1069,7 @@ async function review(blob, { takenAt, source, live = null }) {
   el.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t.reading}</p></div>`;
   if (draft?.url) URL.revokeObjectURL(draft.url);
   try {
-    draft = { ...(await prepareImage(blob)), id: newId(), takenAt, source, live };
+    draft = { ...(await prepareImage(blob)), id: newId(), takenAt, source, live, front: source === 'camera' && facing === 'user' };
   } catch {
     draft = null;
     el.innerHTML = `<div class="loading"><p>${t.cantOpen}</p>
@@ -1141,6 +1196,7 @@ async function saveDraft() {
     photo: draft.photo,
     thumb: draft.thumb,
     live: draft.live,   // the Live sky clip, or null for a photo
+    front: draft.front, // taken with the front camera (Me & the sky)
     sample: false,
     createdAt: Date.now(),
   };
@@ -1155,6 +1211,7 @@ async function saveDraft() {
   const daysBefore = keptDays();
   state.skies.push(sky);
   sortSkies();
+  checkStamps(state.skies, stampCtx());
   state.viaPrompt = false;
   // This sky finished a round when it added a new day and that day is the round's last.
   const daysNow = keptDays();
@@ -1842,6 +1899,7 @@ async function init() {
   // Every jar on screen is drawn from these layers; without them jars fall back to a plain outline.
   try { await loadJar(); } catch { /* outline jars */ }
   state.skies = await store.all();
+  checkStamps(state.skies, stampCtx());
   if (!(await store.persistent())) toast(t.notPersistent);
 
   // First visit, or a shelf that still only holds an older batch of samples: lay out a fresh sample shelf.

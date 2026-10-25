@@ -307,7 +307,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-6); }
 .section-head .section-title { margin: 0; }
 /* The Jars tab: Month | Year, then the months on either side. */
-.seg { display: grid; grid-template-columns: 1fr 1fr; width: 200px; margin: var(--s-2) auto 0; padding: 3px; border-radius: 999px; background: rgba(127, 120, 110, .14); }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); width: 264px; margin: var(--s-2) auto 0; padding: 3px; border-radius: 999px; background: rgba(127, 120, 110, .14); }
 .seg a { min-height: 32px; display: grid; place-items: center; border-radius: 999px; font-size: var(--t-sm); color: var(--ink-soft); text-decoration: none; }
 .seg a[aria-current] { background: var(--paper); color: var(--ink); font-weight: 500; box-shadow: 0 1px 3px rgba(30, 28, 25, .18); }
 .seg + .masthead { margin-top: var(--s-3); }
@@ -319,6 +319,47 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .month-head .title { margin: 0; line-height: .9; }
 .month-theme { margin: var(--s-2) 0 0; font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: var(--ink-soft); }
 .month-head .eyebrow { margin: 0 0 4px; text-align: right; line-height: 1.7; }
+
+/* ---------- stamp album ---------- */
+/* A stockbook: three stamps to a row, each tucked behind a glassine strip that catches the light. */
+.album { margin-top: var(--s-5); display: flex; flex-direction: column; gap: 30px; }
+.album-row { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); justify-items: center; }
+.album-row::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--gutter-l) * -1); right: calc(var(--gutter-r) * -1);
+  top: 80px; height: 34px;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .28) 34%, transparent 46%, transparent 64%, rgba(255, 255, 255, .2) 72%, transparent 80%),
+    linear-gradient(rgba(255, 255, 255, .5), rgba(255, 255, 255, .14) 4px, rgba(255, 255, 255, .1) 70%, rgba(255, 255, 255, .2));
+  border-top: 1px solid rgba(255, 255, 255, .95);
+  border-bottom: 1px solid rgba(255, 255, 255, .5);
+  box-shadow: 0 -1px 0 rgba(30, 28, 25, .1), 0 4px 6px -5px rgba(30, 28, 25, .18);
+}
+/* On a dark page the same strip would glow; it only needs a faint sheen. */
+@media (prefers-color-scheme: dark) { .album-row::after { opacity: .3; } }
+.stamp-cell { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.stamp { display: block; stroke: none; stroke-width: 0; filter: drop-shadow(0 1px 1px rgba(30, 28, 25, .2)) drop-shadow(0 5px 8px rgba(30, 28, 25, .14)); }
+.stamp-cell:nth-child(1) .stamp { transform: rotate(-2.5deg); }
+.stamp-cell:nth-child(2) .stamp { transform: rotate(1.5deg); }
+.stamp-cell:nth-child(3) .stamp { transform: rotate(-1deg); }
+.stamp-empty {
+  width: 86px; height: 106px;
+  box-sizing: border-box;
+  display: grid; place-items: center;
+  padding: 6px 10px 30px;
+  border: 1.2px dashed var(--ink-soft);
+  border-radius: 3px;
+  opacity: .7;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+.stamp-cap { position: relative; z-index: 3; margin: 10px 0 0; font-family: var(--f-display); font-weight: 500; font-size: 17px; line-height: 1.1; text-align: center; }
+.stamp-cap small { display: block; margin-top: 3px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .06em; color: var(--ink-soft); }
 
 .title { margin: var(--s-4) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xxl); line-height: 1.1; }
 .section-title { margin: var(--s-6) 0 var(--s-3); font-family: var(--f-display); font-weight: 500; font-size: var(--t-lg); }
