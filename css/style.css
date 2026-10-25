@@ -578,19 +578,25 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   40%, 60% { transform: rotate(8deg) translateY(-4px); }
 }
 
+/* A month by its numbers: three centred cells, the values in the display serif, small-caps labels under them. */
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: var(--s-5);
+  margin-top: var(--s-6);
+  padding: var(--s-4) 0;
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
 }
-.stat { padding: var(--s-3) 0; min-width: 0; }
-.stat + .stat { border-left: 1px solid var(--rule); padding-left: var(--s-3); }
-.stat b { display: flex; align-items: center; gap: var(--s-2); font-weight: 400; font-size: var(--t-body); line-height: 1.3; }
-.stat b.num { font-family: var(--f-display); font-size: var(--t-xl); line-height: 1; }
-.stat span { display: block; margin-top: var(--s-1); font-size: var(--t-cap); color: var(--ink-soft); }
-.swatch { display: inline-block; width: 14px; height: 14px; flex: none; }
+.stat { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 0 var(--s-2); text-align: center; }
+.stat + .stat { border-left: 1px solid var(--rule); }
+.stat b { height: 36px; display: flex; align-items: baseline; justify-content: center; font-family: var(--f-display); font-size: var(--t-xl); font-weight: 500; line-height: 1; font-variant-numeric: lining-nums; }
+.stat b small { margin-left: 2px; font-size: var(--t-body); font-weight: 400; color: var(--ink-soft); }
+.stat b.word { align-items: center; font-size: calc(var(--t-xl) - 3px); font-style: italic; }
+/* The month's colours as dabs of paint (paintDab in js/app.js). */
+.stat b.dabs { align-items: center; gap: 3px; }
+.stat b.dabs svg { width: 23px; height: 23px; flex: none; }
+.stat b.dabs path { stroke: none; }
+.stat span { margin-top: var(--s-2); font-size: var(--t-cap); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; }
 
 .mini-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-4) var(--s-3); }
 .mini { display: flex; flex-direction: column; align-items: center; gap: var(--s-1); min-width: 0; }

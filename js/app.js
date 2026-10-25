@@ -1,5 +1,5 @@
 import { store, newId } from './store.js';
-import { prepareImage, hexToRgb, dominant, hex, mix } from './sky.js';
+import { prepareImage, hexToRgb, dominant } from './sky.js';
 import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, photoPoint, JAR_RATIO } from './jar.js';
 import { livePile, loadThumbs, forgetThumb, paperIndex } from './pile.js';
 import { foldStage, rollNote, unrollNote, noteScroll, skipNote, MOTION, reduceMotion } from './fold.js';
@@ -459,14 +459,50 @@ function renderMonths() {
 
 // ---------- one month's jar ----------
 
+/** Dawn, Morning, … for a time of day, by that month's own sunrise and sunset where you are. */
+function partOfDay(year, month, min) {
+  const place = sunPlace();
+  const sun = sunTimes(new Date(year, month, 15), place.lat, place.lon);
+  const at = (d) => d.getHours() * 60 + d.getMinutes();
+  const rise = sun ? at(sun.sunrise) : 360, set = sun ? at(sun.sunset) : 1080;
+  if (min < rise - 45 || min >= set + 45) return t.dayParts.night;
+  if (min < rise + 45) return t.dayParts.dawn;
+  if (min < 660) return t.dayParts.morning;
+  if (min < 840) return t.dayParts.midday;
+  if (min < set - 60) return t.dayParts.afternoon;
+  return t.dayParts.sunset;
+}
+
+/** A dab of paint: a wobbly round edge, roughened, with a little brush grain. The same seed gives the same dab. */
+function paintDab(color, seed) {
+  let s = seed;
+  const rnd = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  const n = 18, r = 44, ph1 = rnd() * 6, ph2 = rnd() * 6, pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const k = 1 + Math.sin(a * 2 + ph1) * 0.05 + Math.sin(a * 3 + ph2) * 0.035 + (rnd() - 0.5) * 0.03;
+    pts.push([50 + Math.cos(a) * r * k, 50 + Math.sin(a) * r * k]);
+  }
+  // A smooth closed curve through the midpoints, with each point as the control.
+  const mid = (p, q) => `${((p[0] + q[0]) / 2).toFixed(1)} ${((p[1] + q[1]) / 2).toFixed(1)}`;
+  const d = `M${mid(pts[n - 1], pts[0])}` + pts.map((p, i) => ` Q${p[0].toFixed(1)} ${p[1].toFixed(1)} ${mid(p, pts[(i + 1) % n])}`).join('');
+  const id = `dab${seed}`;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><defs>
+    <filter id="${id}" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="${seed}" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3"/></filter>
+    <filter id="${id}g"><feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" seed="${seed + 3}"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .14 0"/><feComposite in2="SourceGraphic" operator="in"/></filter></defs>
+    <g filter="url(#${id})"><path d="${d}" fill="${color}"/><path d="${d}" fill="#000" filter="url(#${id}g)"/></g></svg>`;
+}
+
 function renderMonth(year, month) {
   const list = skiesIn(year, month);
   const days = daysIn(year, month);
+  const daysWithSky = new Set(list.map((s) => new Date(s.takenAt).getDate())).size;
   const minutes = list.map((s) => { const d = new Date(s.takenAt); return d.getHours() * 60 + d.getMinutes(); }).sort((a, b) => a - b);
-  const favorite = minutes.length ? fmt.minutes(minutes[Math.floor(minutes.length / 2)]) : '';
-  const monthColor = list.length
-    ? hex(list.map((s) => hexToRgb(dominant(s.palette).hex)).reduce((acc, c, i) => mix(acc, c, 1 / (i + 1))))
-    : '';
+  const skyOclock = minutes.length ? partOfDay(year, month, minutes[Math.floor(minutes.length / 2)]) : '';
+  // Four of the month's colours (each sky's main one), spread from light to dark.
+  const lum = (h) => { const [r, g, b] = hexToRgb(h); return 0.3 * r + 0.59 * g + 0.11 * b; };
+  const tones = [...new Set(list.map((s) => dominant(s.palette).hex))].sort((a, b) => lum(b) - lum(a));
+  const colors = tones.length <= 4 ? tones : [0, 1, 2, 3].map((i) => tones[Math.round((i * (tones.length - 1)) / 3)]);
 
   view.innerHTML = `
     <header class="page-head">
@@ -482,9 +518,9 @@ function renderMonth(year, month) {
            <button type="button" class="btn primary share" id="shareJar">${ICON.share}${t.shareMonth(MONTHS[month])}</button>
          </div>
          <div class="stats">
-           <div class="stat"><b class="num">${list.length}</b><span>${t.daysOf(days)}</span></div>
-           <div class="stat"><b class="mono">${favorite}</b><span>${t.favoriteTime}</span></div>
-           <div class="stat"><b class="mono"><i class="swatch" style="background:${monthColor}"></i>${monthColor.slice(1).toUpperCase()}</b><span>${t.monthColor}</span></div>
+           <div class="stat"><b>${daysWithSky}<small>/${days}</small></b><span>${t.statDays}</span></div>
+           <div class="stat"><b class="word">${skyOclock}</b><span>${t.skyOclock}</span></div>
+           <div class="stat"><b class="dabs">${colors.map((c, i) => paintDab(c, i + 1)).join('')}</b><span>${t.statColors}</span></div>
          </div>
          <h2 class="section-title">${t.thisMonth}</h2>
          <div class="mini-grid">${list.slice().reverse().map((s) => { const [day, time] = fmt.shelf(s.takenAt); return `<div class="mini">
