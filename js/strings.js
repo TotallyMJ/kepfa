@@ -43,7 +43,7 @@ export const PROMPTS = [
 
 // A theme for each month (by month index), so a month's shelf tells one story. Prompts go in date order:
 // the 1st gets the first one. Each stays easy: a phone, yourself or what you carry, any weather.
-// Months without a theme use PROMPTS. Themes start in November 2026 (THEMES_FROM).
+// Every month has one now; PROMPTS stays for the months before themes started in November 2026 (THEMES_FROM).
 export const THEMES_FROM = { year: 2026, month: 10 };
 export const THEMES = {
   0: {
@@ -139,6 +139,71 @@ export const THEMES = {
       'The sky in a tiny puddle.', 'The sky through a ring of tape.', 'The sky through a keyring.',
       'The sky through a curled leaf.', 'The sky in a raindrop on glass.', 'The sky through a gap in a shutter.',
       'A sliver of sky between buildings.', 'The sky through a pinhole you make in paper.', 'June’s smallest sky.',
+    ],
+  },
+  // Walking, waiting or riding as a passenger: never one to take while driving.
+  6: {
+    name: 'On the move',
+    prompts: [
+      'The sky on your way out the door.', 'The sky from the back seat.', 'The sky as you walk, without stopping.',
+      'The sky at a stop, waiting.', 'The sky from a bridge you cross.', 'The sky at the end of your street.',
+      'The sky over the road ahead, as a passenger.', 'The sky blurred by speed.', 'The sky from the highest step or bridge on your way.',
+      'The sky at a crossing, while you wait.', 'The sky halfway through your journey.', 'The sky as you arrive somewhere.',
+      'The sky above the ride you take.', 'The sky over a station or stop.', 'The sky from an escalator going up.',
+      'The sky on a shortcut.', 'The sky from a new route.', 'The sky as you turn a corner.',
+      'The sky over a long straight road.', 'The sky above your feet, walking.', 'The sky from a bike or scooter, stopped.',
+      'The sky at your first stop of the day.', 'The sky on a walk with no destination.', 'The sky behind something that just left.',
+      'The sky from the window seat.', 'The sky over a busy road, from the pavement.', 'The sky over a quiet path.',
+      'The sky from a bench on your way.', 'The sky right before you go inside.', 'The sky on the way back.',
+      'July’s last trip.',
+    ],
+  },
+  7: {
+    name: 'Lines',
+    prompts: [
+      'The sky crossed by wires.', 'A contrail, or any straight edge across the sky.', 'The sky above a roofline.',
+      'The sky split by a pole.', 'The sky over railings, lined up.', 'The sky along a straight road.',
+      'The sky above the lines of a staircase.', 'The sky divided by a building’s edge.', 'The sky behind a row of trees.',
+      'The sky with a fence’s lines.', 'The sky above stripes on the road or an awning.', 'The sky between parallel wires.',
+      'The sky cut diagonally.', 'The sky above a line of cars.', 'The sky with an antenna or a satellite dish.',
+      'The sky meeting the horizon.', 'The sky resting on a wall’s top line.', 'The sky through a grid of windows or tiles.',
+      'The sky along a power line to its end.', 'The sky with a curve in it.', 'The sky above a zigzag.',
+      'The sky over a row of lamp posts.', 'The sky with lines in its clouds, or none.', 'The sky with a shadow line.',
+      'The sky above a striped shirt or towel.', 'The sky where two lines cross.', 'The sky above a ladder or a rack.',
+      'The sky with one perfectly straight line.', 'The sky above a long row of things.', 'The sky divided in half.',
+      'August’s last line.',
+    ],
+  },
+  8: {
+    name: 'Sky & table',
+    prompts: [
+      'The sky behind your breakfast.', 'The sky above your coffee or tea.', 'The sky with a plate on the table.',
+      'The sky over a street-food stall.', 'The sky with a piece of fruit on the table.', 'The sky over an outdoor table.',
+      'The sky behind a glass of something cold.', 'The sky above a dessert.', 'The sky from where you eat.',
+      'The sky with your cutlery in the shot.', 'The sky above a market’s tables.', 'The sky over a shared meal.',
+      'The sky behind a bowl of noodles or rice.', 'The sky with your snack in hand.', 'The sky behind a bottle of water.',
+      'The sky from a café seat.', 'The sky over your lunch box.', 'The sky behind a mug, steaming or not.',
+      'The sky with a napkin or tablecloth in the shot.', 'The sky behind ice in a glass.', 'The sky above your kitchen window.',
+      'The sky as you cook.', 'The sky with a menu.', 'The sky over a table set for two.',
+      'The sky behind something sweet.', 'The sky with an empty plate.', 'The sky over leftovers.',
+      'The sky with a straw in your drink.', 'The sky behind a juice or smoothie.', 'The sky at September’s last meal.',
+    ],
+  },
+  // Mornings and evenings in turn; each also works on a gray day.
+  9: {
+    name: 'Golden hours',
+    prompts: [
+      'The sky in the first light.', 'The sky ten minutes before sunset.', 'Golden light on a wall, with the sky.',
+      'Your shadow at its longest.', 'The sky as the sun rises behind something.', 'The sky as the sun sets behind something.',
+      'Warm light on a tree, with the sky.', 'The sky right after sunrise.', 'The sky right after sunset.',
+      'Golden light through a window.', 'The sky facing away from the sunset.', 'The pinkest part of the evening sky.',
+      'Golden hour from your window.', 'Long shadows on the street, with the sky.', 'The sky as the sun touches a roof.',
+      'Golden hour on a gray day.', 'The sky from your favorite sunset spot.', 'Gold on a building’s face.',
+      'The morning sky before the city wakes.', 'The sun’s last sliver.', 'The sky with the sun in it.',
+      'Light glowing through a leaf.', 'The evening glow on clouds, or on nothing at all.', 'A tree or roof in silhouette at golden hour.',
+      'Golden hour on your way home.', 'The color the sky turns after gold.', 'Golden light on your street.',
+      'The sky as the sun climbs.', 'The quietest golden hour.', 'The sky where the sun just was.',
+      'October’s last golden hour.',
     ],
   },
   10: {
