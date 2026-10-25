@@ -473,7 +473,6 @@ export const t = {
   },
 
   // Every image that leaves the app says where it came from and where to go.
-  footerLine: 'Keep the sky in a jar',
   site: SITE,
   issueLine: (n, month, year) => `No. ${n} · ${month} ${year}`,
   ticketLine: (day) => `Sky homework, day ${day}. Handed in.`,

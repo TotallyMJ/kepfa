@@ -187,10 +187,7 @@ function tentCard(ctx, cx, y, w, month, count) {
 function footer(ctx) {
   ctx.fillStyle = INK;
   ctx.fillRect(MARGIN, H - 112, W - MARGIN * 2, 2);
-  const name = 'KEPFA · ';
-  text(ctx, name, MARGIN, H - 74, { font: `600 25px ${SANS}`, color: INK, align: 'left', spacing: 6 });
-  ctx.font = `600 25px ${SANS}`;
-  smallCaps(ctx, t.footerLine, MARGIN + ctx.measureText(name).width + name.length * 6, H - 74, 'left');
+  text(ctx, 'KEPFA', MARGIN, H - 74, { font: `600 25px ${SANS}`, color: INK, align: 'left', spacing: 6 });
   text(ctx, t.site, W - MARGIN, H - 74, { font: `500 25px ${MONO}`, color: INK, align: 'right' });
 }
 
