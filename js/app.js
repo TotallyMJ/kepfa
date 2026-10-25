@@ -1403,6 +1403,10 @@ function showLetter() {
   doneStars(el, '.letter-close, .letter, .postcard, .postcard-hint, .letter-ps, .done-actions > *', 0.6);
   el.querySelectorAll('.postcard-words').forEach((w) => {
     const max = +w.dataset.max, field = w.dataset.field;
+    // Thai grows to 16px from the first touch, before the keyboard opens, so iPhone doesn't zoom in.
+    const editing = () => w.classList.add('is-editing');
+    w.addEventListener('pointerdown', editing);
+    w.addEventListener('focus', editing);
     // Short enough to stay on the card; Enter just finishes.
     w.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); w.blur(); } });
     w.addEventListener('input', () => {
@@ -1410,16 +1414,22 @@ function showLetter() {
         w.textContent = w.textContent.slice(0, max);
         getSelection().collapse(w, w.childNodes.length);
       }
-      w.className = `postcard-words ${handClass(w.textContent)}`;
+      w.classList.toggle('is-thai', handClass(w.textContent).includes('is-thai'));
     });
     w.addEventListener('blur', () => {
       const words = w.textContent.replace(/\s+/g, ' ').trim();
       if (!words) w.textContent = field === 'card' ? copy.card : t.letterToWho;
+      w.classList.toggle('is-thai', handClass(w.textContent).includes('is-thai'));
+      w.classList.remove('is-editing');
       writeCard(st.id, { [field]: words });
     });
   });
   // Tapping the pen writes too.
-  el.querySelectorAll('.postcard .pen').forEach((p) => p.addEventListener('click', () => p.previousElementSibling.focus()));
+  el.querySelectorAll('.postcard .pen').forEach((p) => p.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    p.previousElementSibling.classList.add('is-editing');
+    p.previousElementSibling.focus();
+  }));
   // The postcard is shared with the words on it now, rewritten or not.
   $('#letterShare').addEventListener('click', () => {
     const words = (field) => el.querySelector(`[data-field="${field}"]`).textContent.trim();
