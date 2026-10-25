@@ -4,7 +4,7 @@
 import { drawJar, jarPoint, JAR_RATIO } from './jar.js';
 import { loadThumbs, ROLLS, paperIndex } from './pile.js';
 import { loadImage } from './sky.js';
-import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG } from './strings.js';
+import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG, CHALLENGE_SIZE } from './strings.js';
 
 const isThai = (s) => /[฀-๿]/.test(s);
 
@@ -495,17 +495,17 @@ function ringText(ctx, str, cx, cy, r, font) {
 }
 
 /** The red KEPT postmark: two rings, the month round the edge, the day in the middle. A thin cream glow keeps it legible on dark photos. */
-function postmark(ctx, cx, cy, size, takenAt) {
-  const d = new Date(takenAt), k = size / 104;
+function postmark(ctx, cx, cy, size, { ring, word, center }) {
+  const k = size / 104;
   const ink = () => {
     ctx.strokeStyle = ctx.fillStyle = '#C8352A';
     ctx.lineWidth = 3 * k;
     ctx.beginPath(); ctx.arc(0, 0, 47 * k, 0, Math.PI * 2); ctx.stroke();
     ctx.lineWidth = 1.6 * k;
     ctx.beginPath(); ctx.arc(0, 0, 29 * k, 0, Math.PI * 2); ctx.stroke();
-    ringText(ctx, t.keptRing(MONTHS[d.getMonth()], d.getFullYear()), 0, 0, 37.5 * k, `600 ${8.6 * k}px ${MONO}`);
-    text(ctx, t.keptWord, 0, -1 * k, { font: `600 ${9 * k}px ${MONO}`, color: '#C8352A', spacing: 2 * k });
-    text(ctx, String(d.getDate()), 0, 15 * k, { font: `500 ${19 * k}px ${SERIF}`, color: '#C8352A' });
+    ringText(ctx, ring, 0, 0, 37.5 * k, `600 ${8.6 * k}px ${MONO}`);
+    text(ctx, word, 0, -1 * k, { font: `600 ${9 * k}px ${MONO}`, color: '#C8352A', spacing: 2 * k });
+    text(ctx, center, 0, 15 * k, { font: `500 ${19 * k}px ${SERIF}`, color: '#C8352A' });
   };
   ctx.save();
   ctx.translate(cx, cy);
@@ -576,7 +576,8 @@ async function storySingle(sky, showPlace, quote, challenge) {
   release();
 
   // KEPT, stamped across the print's left edge.
-  postmark(ctx, W / 2 - pw / 2 - pw * 0.04, py + ph * 0.5, pw * 0.55, sky.takenAt);
+  postmark(ctx, W / 2 - pw / 2 - pw * 0.04, py + ph * 0.5, pw * 0.55,
+    { ring: t.keptRing(MONTHS[d.getMonth()], d.getFullYear()), word: t.keptWord, center: String(d.getDate()) });
 
   let y = py + ph + below;
   if (prompt) {
@@ -691,10 +692,129 @@ async function storyYear({ year, skies, quote }) {
   return toBlob(c);
 }
 
+// Stickers for the finished challenge, in the colours of the star paper; the last one is holographic.
+const STAR_INKS = ['#FF5A36', '#FFC12E', '#22C3F0', '#B5E42A', 'holo'];
+
+/** A small seeded random, so the same round always scatters its stars the same way. */
+function seeded(a) {
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let x = Math.imul(a ^ (a >>> 15), 1 | a);
+    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A soft five-point star sticker centred on x,y. */
+function star(ctx, x, y, r, turn, ink) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(turn);
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = (i * Math.PI) / 5 - Math.PI / 2, rr = i % 2 ? r * 0.48 : r;
+    ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  if (ink === 'holo') {
+    const g = ctx.createLinearGradient(-r, -r, r, r);
+    g.addColorStop(0, '#F7A8C8');
+    g.addColorStop(0.5, '#9FD8F5');
+    g.addColorStop(1, '#F6E58D');
+    ctx.fillStyle = g;
+  } else ctx.fillStyle = ink;
+  ctx.shadowColor = 'rgba(30, 28, 25, .18)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 3;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = ctx.fillStyle;
+  ctx.lineWidth = r * 0.22;
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Text with a halo of paper behind it, so it reads over the stars. */
+function haloText(ctx, str, x, y, opts) {
+  ctx.save();
+  ctx.shadowColor = PAPER;
+  ctx.shadowBlur = 26;
+  for (let i = 0; i < 3; i++) text(ctx, str, x, y, opts);
+  ctx.restore();
+}
+
+/** A finished round: every day's sky on one stamped sheet, on grid paper scattered with star stickers. */
+async function storyDone({ round, skies }) {
+  const [c, ctx] = page();
+  const rand = seeded(round * 7919);
+  // Scattered evenly, like stickers on a page: one chance per cell of a loose grid, jittered inside it.
+  const across = 7, down = 13, cw = W / across, ch = (H - 140) / down;
+  for (let r = 0; r < down; r++) {
+    for (let col = 0; col < across; col++) {
+      if (rand() > 0.72) continue;
+      star(ctx, (col + 0.15 + rand() * 0.7) * cw, (r + 0.15 + rand() * 0.7) * ch, 16 + rand() * 16, rand() * Math.PI, STAR_INKS[Math.floor(rand() * STAR_INKS.length)]);
+    }
+  }
+
+  const kicker = t.doneKicker(round).toUpperCase();
+  ctx.font = `500 25px ${SANS}`;
+  const kw = ctx.measureText(kicker).width + kicker.length * 5 + 44;
+  ctx.fillStyle = 'rgba(253, 252, 248, .9)';
+  ctx.beginPath(); ctx.roundRect(W / 2 - kw / 2, 110, kw, 56, 8); ctx.fill();
+  smallCaps(ctx, kicker, W / 2, 147, 'center');
+  t.doneTitle.forEach((ln, i) => haloText(ctx, ln, W / 2, 330 + i * 150, { font: `italic 500 150px ${SERIF}` }));
+  haloText(ctx, t.doneLine, W / 2, 590, { font: `italic 54px ${SERIF}`, color: '#3A352F' });
+
+  // The sheet: six across, five down, each day numbered.
+  const sw = 900, pad = 36, gap = 14, cols = 6;
+  const cell = (sw - pad * 2 - gap * (cols - 1)) / cols;
+  const rows = Math.ceil(skies.length / cols);
+  const sh = pad + rows * cell + (rows - 1) * gap + 96;
+  const top = 680;
+  ctx.save();
+  ctx.translate(W / 2, top + sh / 2);
+  ctx.rotate((-1.5 * Math.PI) / 180);
+  ctx.translate(-sw / 2, -sh / 2);
+  ctx.shadowColor = 'rgba(30, 28, 25, .32)';
+  ctx.shadowBlur = 50;
+  ctx.shadowOffsetY = 24;
+  ctx.fillStyle = '#FDFCF8';
+  ctx.beginPath(); ctx.roundRect(0, 0, sw, sh, 8); ctx.fill();
+  ctx.shadowColor = 'transparent';
+  for (let i = 0; i < skies.length; i++) {
+    const x = pad + (i % cols) * (cell + gap), y = pad + Math.floor(i / cols) * (cell + gap);
+    // One thumbnail at a time, cropped square from its middle.
+    const { img, release } = await loadImage(skies[i].thumb);
+    const s = Math.min(img.naturalWidth, img.naturalHeight);
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(x, y, cell, cell, 4); ctx.clip();
+    ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, x, y, cell, cell);
+    ctx.restore();
+    release();
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, .6)';
+    ctx.shadowBlur = 6;
+    text(ctx, String(i + 1), x + 8, y + cell - 10, { font: `22px ${MONO}`, color: '#fff', align: 'left' });
+    ctx.restore();
+  }
+  text(ctx, t.doneRange(fmt.dayLong(skies[0].prompt), fmt.dayLong(skies[skies.length - 1].prompt)).toUpperCase(),
+    sw / 2, sh - 38, { font: `28px ${MONO}`, color: SOFT, spacing: 3 });
+  ctx.restore();
+  const tapeImg = await texture('tape');
+  tapeStrip(ctx, tapeImg, W / 2, top + 4, 230, 3);
+  postmark(ctx, W / 2 + sw / 2 - 30, top + sh - 20, 300,
+    { ring: t.doneStamp, word: t.doneWord, center: `${skies.length}/${CHALLENGE_SIZE}` });
+
+  haloText(ctx, `#${CHALLENGE_TAG}`, W / 2, top + sh + 150, { font: `34px ${MONO}`, color: '#4A443D' });
+  footer(ctx, t.issueNo(round));
+  return toBlob(c);
+}
+
 export async function makeStory(kind, payload) {
   await fontsReady();
   if (kind === 'single') return storySingle(payload.sky, payload.showPlace, payload.quote, payload.challenge);
   if (kind === 'jar') return storyJar(payload);
+  if (kind === 'done') return storyDone(payload);
   return storyYear(payload);
 }
 

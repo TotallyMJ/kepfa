@@ -138,9 +138,12 @@ function promptFor(key) {
 }
 const tagUrl = (tag) => `https://www.instagram.com/explore/tags/${tag.toLowerCase()}/`;
 
+/** How many prompt days have a real sky kept for them. */
+const keptDays = () => new Set(state.skies.filter((s) => s.prompt && !s.sample).map((s) => s.prompt)).size;
+
 /** The 30-sky challenge: one per prompt day, counted in rounds of 30. */
 function challengeProgress() {
-  const n = new Set(state.skies.filter((s) => s.prompt && !s.sample).map((s) => s.prompt)).size;
+  const n = keptDays();
   return { filled: n ? ((n - 1) % CHALLENGE_SIZE) + 1 : 0, round: Math.max(1, Math.ceil(n / CHALLENGE_SIZE)) };
 }
 
@@ -948,9 +951,13 @@ async function saveDraft() {
     toast(t.saveFailed);
     return;
   }
+  const daysBefore = keptDays();
   state.skies.push(sky);
   sortSkies();
   state.viaPrompt = false;
+  // This sky finished a round when it added a new day and that day is the round's last.
+  const daysNow = keptDays();
+  const finished = daysNow > daysBefore && daysNow % CHALLENGE_SIZE === 0 ? daysNow / CHALLENGE_SIZE : 0;
 
   // The send-off: the keyboard goes, the jar comes back into view, the note rolls in, the lid closes.
   const { stage, paper } = draft;
@@ -969,6 +976,8 @@ async function saveDraft() {
   await rolling;
   await stage.lidOn();
   showKept(sky, stage);
+  // A beat on "Kept." first, then the celebration.
+  if (finished) setTimeout(() => { if (!cap.hidden) openCelebration(finished); }, reduceMotion() ? 0 : 900);
 }
 
 /** The same jar, lid on, with what to do next. */
@@ -987,6 +996,51 @@ function showKept(sky, stage) {
   $('#dropJar').append(stage.el);
   $('#dropShare').addEventListener('click', () => openStory('single', { sky }));
   $('#dropOpen').addEventListener('click', () => { closeCapture(); go('#/'); });
+}
+
+// ---------- the challenge, done: every day of a round, looked up ----------
+
+/** The days of a finished round, one sky each (the first kept for that day's prompt), oldest first. */
+function roundSkies(round) {
+  const byDay = new Map();
+  for (const s of state.skies) if (s.prompt && !s.sample && !byDay.has(s.prompt)) byDay.set(s.prompt, s);
+  return [...byDay.keys()].sort().slice((round - 1) * CHALLENGE_SIZE, round * CHALLENGE_SIZE).map((k) => byDay.get(k));
+}
+
+const doneStamp = () => `<svg class="done-stamp" viewBox="0 0 104 104" aria-hidden="true">
+  <defs><path id="doneRing" d="M52 52m-36 0a36 36 0 1 1 72 0a36 36 0 1 1 -72 0"/></defs>
+  <circle cx="52" cy="52" r="47"/><circle cx="52" cy="52" r="29" class="thin"/>
+  <text class="ring"><textPath href="#doneRing">${t.doneStamp}</textPath></text>
+  <text x="52" y="50" class="word">${t.doneWord}</text>
+  <text x="52" y="66" class="score">${CHALLENGE_SIZE}/${CHALLENGE_SIZE}</text></svg>`;
+
+/** Shown once, right after the sky that completes a round is kept: all its days on one sheet, stamped. */
+function openCelebration(round) {
+  const el = $('#celebrate');
+  const skies = roundSkies(round);
+  el.innerHTML = `
+    <span class="done-kicker">${t.doneKicker(round)}</span>
+    <h1 class="done-title">${t.doneTitle.join('<br>')}</h1>
+    <p class="done-line">${t.doneLine}</p>
+    <div class="done-sheet">
+      ${tape('done-tape')}
+      <div class="done-grid">${skies.map((s, i) => `<i style="background-image:url('${photoUrl(s)}')"><span>${i + 1}</span></i>`).join('')}</div>
+      <p class="done-range">${t.doneRange(fmt.dayLong(skies[0].prompt), fmt.dayLong(skies[skies.length - 1].prompt))}</p>
+      ${doneStamp()}
+    </div>
+    <div class="done-actions">
+      <button type="button" class="btn primary share" id="doneShare">${ICON.share}${t.doneShare}</button>
+      <button type="button" class="btn-text" id="doneClose">${t.nextRound(round + 1)}</button>
+    </div>`;
+  el.hidden = false;
+  openLayer('celebrate', closeCelebration);
+  $('#doneShare').addEventListener('click', () => openStory('done', { round, skies }));
+  $('#doneClose').addEventListener('click', closeCelebration);
+}
+
+function closeCelebration() {
+  $('#celebrate').hidden = true;
+  closeLayer('celebrate');
 }
 
 // ---------- viewer: a sky out of its jar, as a polaroid ----------
@@ -1368,7 +1422,8 @@ async function openStory(kind, payload) {
   const wrap = $('#storyModal');
   if (wrap.hidden) openLayer('story', closeStory);
   const art = wrap.querySelector('.sheet');
-  const title = kind === 'single' ? t.shareTitle.single : kind === 'jar' ? t.shareTitle.jar(MONTHS[payload.month]) : t.shareTitle.year(payload.year);
+  const title = kind === 'single' ? t.shareTitle.single : kind === 'jar' ? t.shareTitle.jar(MONTHS[payload.month])
+    : kind === 'done' ? t.shareTitle.done : t.shareTitle.year(payload.year);
   const canShowPlace = kind === 'single' && payload.sky.place;
   // Show place starts off, then keeps whatever you chose last time, on this phone only.
   let placeOn = false;
@@ -1517,6 +1572,7 @@ function bindGlobal() {
     if (e.key !== 'Escape') return;
     if (!$('#confirm').hidden) $('#confirmNo').click();
     else if (!$('#storyModal').hidden) closeStory();
+    else if (!$('#celebrate').hidden) closeCelebration();
     else if (viewer.editing) endEdit(state.detail);
     else if (!$('#sheet').hidden) closeJar();
     else if (!cap.hidden) closeCapture();
