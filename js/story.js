@@ -125,16 +125,16 @@ function masthead(ctx, quote, issue, { title = 'Kepfa', kicker = '' } = {}) {
 
 /** A pale oak shelf w wide whose top is at y: a lit top edge, a slightly darker front, a soft shadow on the page. */
 function shelf(ctx, x, y, w) {
-  const h = 30;
+  const h = 46;   // as in the app: a lit top face (the jars stand at its back, the tent cards at its front), then the front edge
   const shade = ctx.createLinearGradient(0, y + h - 6, 0, y + h + 30);
   shade.addColorStop(0, 'rgba(60, 40, 20, .3)');
   shade.addColorStop(1, 'rgba(60, 40, 20, 0)');
   ctx.fillStyle = shade;
   ctx.fillRect(x + 6, y + h - 6, w - 12, 36);
   const g = ctx.createLinearGradient(0, y, 0, y + h);
-  g.addColorStop(0, '#EFE3CD'); g.addColorStop(0.17, '#EFE3CD');
-  g.addColorStop(0.17, '#D9C6A5'); g.addColorStop(0.45, '#D9C6A5');
-  g.addColorStop(0.45, '#C8B08A'); g.addColorStop(1, '#C3AA82');
+  g.addColorStop(0, '#EFE3CD'); g.addColorStop(0.4, '#E7D8BC');
+  g.addColorStop(0.4, '#D9C6A5'); g.addColorStop(0.58, '#D9C6A5');
+  g.addColorStop(0.58, '#C8B08A'); g.addColorStop(1, '#C3AA82');
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.roundRect(x, y, w, h, 5); ctx.fill();
 }
@@ -183,7 +183,6 @@ function tentCard(ctx, cx, y, w, month, count) {
   text(ctx, count, start + lw + gap, base, { font: `${4.4 * k}px ${MONO}`, color: '#B3261E', align: 'left' });
 }
 
-/** @param number  the footer's right side, e.g. "No. 24" */
 /** The last line of every image: the app's name and where to find it. */
 function footer(ctx) {
   ctx.fillStyle = INK;
@@ -675,7 +674,7 @@ async function storyYear({ year, skies, quote }) {
     // Months with nothing in them stay faint, so the jars that were filled stand out.
     standShadow(ctx, x + bw / 2, y + bh, bw * 0.9);
     drawJar(ctx, { x, y, w: bw, skies: inMonth, ghost: !inMonth.length });
-    tentCard(ctx, x + bw / 2, y + bh + 9, bw * 0.66, MONTHS_SHORT[m], inMonth.length ? String(inMonth.length) : '–');
+    tentCard(ctx, x + bw / 2, y + bh + 13, bw * 0.66, MONTHS_SHORT[m], inMonth.length ? String(inMonth.length) : '–');
   }
 
   // The year as a strip of colors, one sliver per sky.
