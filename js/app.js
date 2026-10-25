@@ -4,6 +4,7 @@ import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, photoPoin
 import { livePile, loadThumbs, forgetThumb, paperIndex } from './pile.js';
 import { foldStage, rollNote, unrollNote, noteScroll, skipNote, MOTION, reduceMotion } from './fold.js';
 import { sunTimes, guessPlace } from './sun.js';
+import { placeNear } from './places.js';
 import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, QUOTES, CHALLENGE_SIZE } from './strings.js';
@@ -862,6 +863,7 @@ async function review(blob, { takenAt, source }) {
     </div>`;
 
   fitPlaceholder($('#noteInput'));
+  if (source === 'camera') suggestPlace($('#placeInput'));
   const stage = foldStage(draft.url, Math.min(150, innerWidth * 0.4), 'open');
   $('#foldSlot').append(stage.el);
   Object.assign(draft, { stage, prompt, paper, counts });
@@ -919,6 +921,18 @@ function fitPlaceholder(input) {
   if (ctx.measureText(input.placeholder).width <= room) return;
   const fits = t.notePrompts.filter((p) => ctx.measureText(p).width <= room);
   if (fits.length) input.placeholder = fits[Math.floor(Math.random() * fits.length)];
+}
+
+/**
+ * A sky taken just now gets the province or city you're in, as a start to edit. Only when location is already
+ * allowed (it never asks), only into an empty field nobody is typing in, and worked out on the phone.
+ */
+async function suggestPlace(input) {
+  try { if ((await navigator.permissions.query({ name: 'geolocation' })).state !== 'granted') return; } catch { return; }
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const name = placeNear(pos.coords.latitude, pos.coords.longitude);
+    if (name && input.isConnected && !input.value && document.activeElement !== input) input.value = name;
+  }, () => {}, { maximumAge: 6e5, timeout: 8000 });
 }
 
 async function saveDraft() {

@@ -26,7 +26,7 @@ export function sunTimes(date, lat, lon) {
 }
 
 // A city for the phone's time zone, so sun times are close before anyone shares a location.
-const CITIES = {
+export const CITIES = {
   'Asia/Bangkok': ['Bangkok', 13.75, 100.5], 'Asia/Ho_Chi_Minh': ['Ho Chi Minh City', 10.8, 106.7], 'Asia/Saigon': ['Ho Chi Minh City', 10.8, 106.7],
   'Asia/Vientiane': ['Vientiane', 17.97, 102.6], 'Asia/Phnom_Penh': ['Phnom Penh', 11.55, 104.9], 'Asia/Yangon': ['Yangon', 16.8, 96.15],
   'Asia/Jakarta': ['Jakarta', -6.2, 106.8], 'Asia/Singapore': ['Singapore', 1.35, 103.8], 'Asia/Kuala_Lumpur': ['Kuala Lumpur', 3.14, 101.7],

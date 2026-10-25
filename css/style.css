@@ -1089,7 +1089,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   position: absolute;
   z-index: 2;
   left: calc(50% - 30px);
-  top: -8px;
+  top: 2px;   /* half on the polaroid, half on the torn edge of the paper */
   width: 60px;
   height: 17px;
   background: url(../assets/tape.webp) center / 100% 100% no-repeat;
@@ -1114,7 +1114,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .pen { width: 14px; height: 14px; margin-left: 6px; vertical-align: -1px; stroke: #8A8277; }
 .polaroid-meta { margin: 6px 0 0; font-family: var(--f-mono); font-size: 10px; color: #6B645B; }
 /* With a note taped over the strip's lower part, the date sits midway between the photo and the tape. */
-.polaroid-meta:only-child { margin: 0 0 12px; }
+.polaroid-meta:only-child { margin: 0 0 2px; }
 /* Close, where-am-I and more, across the top like a photo viewer; paper-coloured on the dim. */
 .viewer-top {
   position: absolute;
@@ -1165,7 +1165,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   min-height: 40px;
   padding: 0;
   border: 0;
-  border-bottom: 1px solid #1E1C19;
+  border-bottom: 1px solid rgba(30, 28, 25, .22);   /* as faint as the paper's own ruled lines */
   border-radius: 0;
   background: transparent;
   color: #1E1C19;
@@ -1173,9 +1173,9 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 }
 .polaroid-input.hand { font-size: 24px; }
 .polaroid-input.hand.is-thai { font-size: var(--t-body); }
-.polaroid-input.place { width: 70%; min-height: 32px; font-family: var(--f-mono); font-size: var(--t-cap); border-bottom-color: #CFC7BB; }
+.polaroid-input.place { width: 70%; min-height: 32px; font-family: var(--f-mono); font-size: var(--t-cap); }
 .polaroid-input::placeholder { color: #8A8277; }
-.polaroid-input:focus-visible { outline: none; border-bottom-width: 2px; }
+.polaroid-input:focus-visible { outline: none; border-bottom-color: rgba(30, 28, 25, .55); }
 
 /* ---------- confirm ---------- */
 .confirm { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 0 var(--s-5); background: var(--scrim); animation: fade var(--t-quick) var(--ease-out) both; }
