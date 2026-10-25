@@ -1377,6 +1377,7 @@ function showLetter() {
   const card = st.got.card || copy.card, to = st.got.to || t.letterToWho;
   el.innerHTML = `
     <canvas class="done-stars" aria-hidden="true"></canvas>
+    <button type="button" class="viewer-icon letter-close" id="letterClose" aria-label="${t.close}">${ICON.close}</button>
     <div class="letter">
       <p class="letter-head"><span class="letter-brand">Kepfa</span><span class="letter-date">${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}</span></p>
       <p class="letter-hi">${t.letterHi}</p>
@@ -1399,7 +1400,7 @@ function showLetter() {
     </div>`;
   el.hidden = false;
   el.scrollTop = 0;
-  doneStars(el, '.letter, .postcard, .postcard-hint, .letter-ps, .done-actions > *', 0.6);
+  doneStars(el, '.letter-close, .letter, .postcard, .postcard-hint, .letter-ps, .done-actions > *', 0.6);
   el.querySelectorAll('.postcard-words').forEach((w) => {
     const max = +w.dataset.max, field = w.dataset.field;
     // Short enough to stay on the card; Enter just finishes.
@@ -1425,6 +1426,7 @@ function showLetter() {
     openStory('stamp', { name: copy.name, need: st.need, at: st.got.at, letter: copy.letter, card: words('card') || copy.card, to: words('to') || t.letterToWho, sky });
   });
   $('#letterNext').addEventListener('click', () => (state.letters.length ? showLetter() : closeLetter()));
+  $('#letterClose').addEventListener('click', closeLetter);
 }
 
 function closeLetter() {

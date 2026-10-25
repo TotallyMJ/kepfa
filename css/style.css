@@ -306,7 +306,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .memory > svg { flex: none; width: 18px; height: 18px; color: var(--ink-soft); }
 /* The next stamp: the same card as the memory, with an empty stamp slot showing how far along it is. */
 .next-stamp { color: inherit; text-decoration: none; }
-.next-slot { flex: none; width: 46px; height: 57px; display: grid; place-items: center; border: 1.2px dashed var(--ink-soft); border-radius: 3px; font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
+.next-slot { flex: none; width: 46px; height: 57px; display: grid; place-items: center; background: var(--paper); border: 1.2px dashed var(--ink-soft); border-radius: 3px; font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
 .next-name { font-family: var(--f-display); font-weight: 500; font-size: 21px; line-height: 1.1; }
 
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-6); }
@@ -357,7 +357,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   padding: 6px 10px 30px;
   border: 1.2px dashed var(--ink-soft);
   border-radius: 3px;
-  opacity: .7;
+  background: var(--paper-raised);
   text-align: center;
   font-size: 11px;
   line-height: 1.35;
@@ -768,7 +768,8 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .postcard {
   position: relative;
   max-width: 300px;
-  height: 196px;
+  aspect-ratio: 300 / 196;
+  flex: none;   /* a short screen scrolls; the card is never squeezed */
   margin-top: 20px;
   box-sizing: border-box;
   border: 5px solid transparent;
@@ -783,10 +784,12 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .postcard p { margin: 0; color: var(--pen); }
 .postcard-msg { position: absolute; left: 0; top: 0; bottom: 0; width: 54%; box-sizing: border-box; padding: 18px 18px 18px 20px; display: flex; align-items: center; justify-content: center; text-align: center; }
 .postcard-words { outline: none; border-radius: 2px; }
-.postcard-words:focus { background: rgba(46, 63, 99, .07); }
+.postcard-msg:focus-within { outline: 1px dashed rgba(46, 63, 99, .4); outline-offset: -8px; }
+.postcard-to:focus-within { outline: 1px dashed rgba(46, 63, 99, .4); outline-offset: 2px; }
+.postcard :focus-within > .pen, .postcard-msg:focus-within .pen { display: none; }
 .postcard .hand:not(.is-thai) { font-size: 21px; line-height: 1.12; }
 .postcard-to .hand:not(.is-thai) { font-size: 18px; }
-.postcard .hand.is-thai { font-size: 13px; line-height: 1.5; }
+.postcard .hand.is-thai { font-size: 16px; line-height: 1.4; }   /* under 16px, iPhone zooms in on tap */
 .postcard-to { position: absolute; left: calc(54% + 14px); right: 12px; bottom: 46px; white-space: nowrap; overflow: hidden; }
 .postcard .pen { display: inline-block; width: 12px; height: 12px; margin-left: 4px; vertical-align: -1px; stroke: #8A8277; fill: none; stroke-width: 1.8; cursor: text; }
 .postcard .stamp { position: absolute; right: 14px; top: 14px; transform: rotate(2deg); }
@@ -798,6 +801,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .letter-ps { margin: 18px 0 0; display: flex; flex-direction: column; align-items: center; }
 .letter-stamp { margin-top: 4px; font-family: var(--f-display); font-style: italic; font-weight: 500; font-size: 32px; line-height: 1.05; }
 .letter-page .done-actions { padding-top: var(--s-5); }
+.letter-close { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 2px); right: 6px; }
 .done-kicker { padding: 4px 10px; border-radius: 3px; background: rgba(253, 252, 248, .88); font-size: var(--t-cap); font-weight: 500; letter-spacing: .2em; text-transform: uppercase; color: #4A443D; }
 .done-title { margin: var(--s-3) 0 0; font-family: var(--f-display); font-style: italic; font-weight: 500; font-size: 46px; line-height: 1; text-shadow: 0 0 18px var(--paper), 0 0 6px var(--paper); }
 .done-line { margin: var(--s-2) 0 0; font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: #3A352F; text-shadow: 0 0 10px var(--paper); }
