@@ -108,7 +108,8 @@ export const t = {
   emptyBody: 'Tap the camera, frame the sky in the jar, keep it.',
   openSky: (when) => `Open the sky from ${when}`,
 
-  months: 'Months',
+  // The Months page heading, magazine style: the second half set in italics.
+  monthsTitle: ['A year', 'of skies'],
   prevYear: 'Previous year',
   nextYear: 'Next year',
   monthJar: (name, n) => `${name}, ${n} ${skies(n)}`,

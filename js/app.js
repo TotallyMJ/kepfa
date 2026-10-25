@@ -421,7 +421,7 @@ function renderMonths() {
           <button type="button" id="nextYear" aria-label="${t.nextYear}" ${y >= now.getFullYear() ? 'disabled' : ''}>${ICON.right}</button>
         </div>
       </div>
-      <h1 class="wordmark">${t.months}</h1>
+      <h1 class="wordmark">${t.monthsTitle[0]} <i>${t.monthsTitle[1]}</i></h1>
     </header>
     ${all.length ? `<button type="button" class="btn primary share share-year" id="shareYear">${ICON.share}${t.shareYear}</button>` : ''}
     ${chunk(shown, 3).map((ms) => `<div class="shelf-row">
