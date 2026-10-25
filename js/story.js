@@ -695,16 +695,6 @@ async function storyYear({ year, skies, quote }) {
 // Stickers for the finished challenge, in the colours of the star paper; the last one is holographic.
 const STAR_INKS = ['#FF5A36', '#FFC12E', '#22C3F0', '#B5E42A', 'holo'];
 
-/** A small seeded random, so the same round always scatters its stars the same way. */
-function seeded(a) {
-  return () => {
-    a = (a + 0x6D2B79F5) | 0;
-    let x = Math.imul(a ^ (a >>> 15), 1 | a);
-    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
-    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** A soft five-point star sticker centred on x,y. */
 function star(ctx, x, y, r, turn, ink) {
   ctx.save();
@@ -734,6 +724,24 @@ function star(ctx, x, y, r, turn, ink) {
   ctx.restore();
 }
 
+/**
+ * Star stickers scattered evenly over a w×h area, fresh every time: one chance per cell of a loose grid,
+ * jittered inside it. `unit` scales the stars (1 at story size); none lands on an `avoid` box {x, y, w, h}.
+ */
+export function scatterStars(ctx, w, h, { unit = 1, avoid = [] } = {}) {
+  const cell = 154 * unit, across = Math.max(1, Math.round(w / cell)), down = Math.max(1, Math.round(h / cell));
+  const cw = w / across, ch = h / down;
+  for (let r = 0; r < down; r++) {
+    for (let col = 0; col < across; col++) {
+      if (Math.random() > 0.72) continue;
+      const x = (col + 0.15 + Math.random() * 0.7) * cw, y = (r + 0.15 + Math.random() * 0.7) * ch;
+      const size = (16 + Math.random() * 16) * unit;
+      if (avoid.some((b) => x > b.x - size && x < b.x + b.w + size && y > b.y - size && y < b.y + b.h + size)) continue;
+      star(ctx, x, y, size, Math.random() * Math.PI, STAR_INKS[Math.floor(Math.random() * STAR_INKS.length)]);
+    }
+  }
+}
+
 /** Text with a halo of paper behind it, so it reads over the stars. */
 function haloText(ctx, str, x, y, opts) {
   ctx.save();
@@ -746,31 +754,29 @@ function haloText(ctx, str, x, y, opts) {
 /** A finished round: every day's sky on one stamped sheet, on grid paper scattered with star stickers. */
 async function storyDone({ round, skies }) {
   const [c, ctx] = page();
-  const rand = seeded(round * 7919);
-  // Scattered evenly, like stickers on a page: one chance per cell of a loose grid, jittered inside it.
-  const across = 7, down = 13, cw = W / across, ch = (H - 140) / down;
-  for (let r = 0; r < down; r++) {
-    for (let col = 0; col < across; col++) {
-      if (rand() > 0.72) continue;
-      star(ctx, (col + 0.15 + rand() * 0.7) * cw, (r + 0.15 + rand() * 0.7) * ch, 16 + rand() * 16, rand() * Math.PI, STAR_INKS[Math.floor(rand() * STAR_INKS.length)]);
-    }
-  }
-
   const kicker = t.doneKicker(round).toUpperCase();
   ctx.font = `500 25px ${SANS}`;
   const kw = ctx.measureText(kicker).width + kicker.length * 5 + 44;
+  // The writing is measured first so no star lands on it.
+  const box = (str, font, cy, up, down) => { ctx.font = font; const w = ctx.measureText(str).width + 30; return { x: (W - w) / 2, y: cy - up, w, h: up + down }; };
+  const avoid = [
+    { x: W / 2 - kw / 2, y: 110, w: kw, h: 56 },
+    ...t.doneTitle.map((ln, i) => box(ln, `italic 500 150px ${SERIF}`, 330 + i * 150, 110, 40)),
+    box(t.doneLine, `italic 54px ${SERIF}`, 590, 44, 16),
+  ];
+  // The sheet: six across, five down, each day numbered; the hashtag sits under it.
+  const sw = 900, pad = 36, gap = 14, cols = 6;
+  const cell = (sw - pad * 2 - gap * (cols - 1)) / cols;
+  const rows = Math.ceil(skies.length / cols);
+  const sh = pad + rows * cell + (rows - 1) * gap + 96;
+  const top = 680, tagY = top + sh + 150;
+  scatterStars(ctx, W, H - 140, { avoid: [...avoid, box(`#${CHALLENGE_TAG}`, `34px ${MONO}`, tagY, 34, 14)] });
   ctx.fillStyle = 'rgba(253, 252, 248, .9)';
   ctx.beginPath(); ctx.roundRect(W / 2 - kw / 2, 110, kw, 56, 8); ctx.fill();
   smallCaps(ctx, kicker, W / 2, 147, 'center');
   t.doneTitle.forEach((ln, i) => haloText(ctx, ln, W / 2, 330 + i * 150, { font: `italic 500 150px ${SERIF}` }));
   haloText(ctx, t.doneLine, W / 2, 590, { font: `italic 54px ${SERIF}`, color: '#3A352F' });
 
-  // The sheet: six across, five down, each day numbered.
-  const sw = 900, pad = 36, gap = 14, cols = 6;
-  const cell = (sw - pad * 2 - gap * (cols - 1)) / cols;
-  const rows = Math.ceil(skies.length / cols);
-  const sh = pad + rows * cell + (rows - 1) * gap + 96;
-  const top = 680;
   ctx.save();
   ctx.translate(W / 2, top + sh / 2);
   ctx.rotate((-1.5 * Math.PI) / 180);
@@ -805,7 +811,7 @@ async function storyDone({ round, skies }) {
   postmark(ctx, W / 2 + sw / 2 - 30, top + sh - 20, 300,
     { ring: t.doneStamp, word: t.doneWord, center: `${skies.length}/${CHALLENGE_SIZE}` });
 
-  haloText(ctx, `#${CHALLENGE_TAG}`, W / 2, top + sh + 150, { font: `34px ${MONO}`, color: '#4A443D' });
+  haloText(ctx, `#${CHALLENGE_TAG}`, W / 2, tagY, { font: `34px ${MONO}`, color: '#4A443D' });
   footer(ctx, t.issueNo(round));
   return toBlob(c);
 }

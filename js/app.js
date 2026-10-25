@@ -4,7 +4,7 @@ import { BOX, INSIDE, INTERIOR, loadJar, jarSvg, drawJar, setupCanvas, photoPoin
 import { livePile, loadThumbs, forgetThumb, paperIndex } from './pile.js';
 import { foldStage, rollNote, unrollNote, noteScroll, skipNote, MOTION, reduceMotion } from './fold.js';
 import { sunTimes, guessPlace } from './sun.js';
-import { makeStory, shareImage, saveImage } from './story.js';
+import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, QUOTES, CHALLENGE_SIZE } from './strings.js';
 
@@ -1019,6 +1019,7 @@ function openCelebration(round) {
   const el = $('#celebrate');
   const skies = roundSkies(round);
   el.innerHTML = `
+    <canvas class="done-stars" aria-hidden="true"></canvas>
     <span class="done-kicker">${t.doneKicker(round)}</span>
     <h1 class="done-title">${t.doneTitle.join('<br>')}</h1>
     <p class="done-line">${t.doneLine}</p>
@@ -1033,9 +1034,23 @@ function openCelebration(round) {
       <button type="button" class="btn-text" id="doneClose">${t.nextRound(round + 1)}</button>
     </div>`;
   el.hidden = false;
+  doneStars(el);
   openLayer('celebrate', closeCelebration);
   $('#doneShare').addEventListener('click', () => openStory('done', { round, skies }));
   $('#doneClose').addEventListener('click', closeCelebration);
+}
+
+/** Star stickers drawn behind the whole screen, freshly scattered, kept off the writing and the buttons. */
+function doneStars(el) {
+  const canvas = el.querySelector('.done-stars');
+  const w = el.clientWidth, h = el.scrollHeight;
+  const ctx = setupCanvas(canvas, w, h);
+  const at = el.getBoundingClientRect();
+  const avoid = [...el.querySelectorAll('.done-kicker, .done-title, .done-line, .done-actions > *')].map((n) => {
+    const r = n.getBoundingClientRect();
+    return { x: r.left - at.left, y: r.top - at.top + el.scrollTop, w: r.width, h: r.height };
+  });
+  scatterStars(ctx, w, h, { unit: 0.42, avoid });
 }
 
 function closeCelebration() {

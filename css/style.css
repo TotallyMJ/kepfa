@@ -586,12 +586,14 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 /* ---------- capture ---------- */
 .capture { position: fixed; inset: 0; z-index: 40; background: var(--camera); color: var(--camera-ink); }
 
-/* A round of the challenge, done: crumpled star paper, every day's sky on one stamped sheet.
+/* A round of the challenge, done: grid paper with star stickers (drawn by doneStars), every day's sky on one stamped sheet.
    Always paper, even in dark mode, like the slips. */
 .celebrate {
   --ink: #1E1C19;
-  --paper: #F4F1EC;
+  --paper: #F1EDE6;
+  --grid: rgba(74, 120, 184, .1);
   position: fixed;
+  isolation: isolate;
   inset: 0;
   z-index: 45;
   overflow-y: auto;
@@ -599,12 +601,16 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   flex-direction: column;
   align-items: center;
   padding: calc(env(safe-area-inset-top, 0px) + 48px) 22px calc(env(safe-area-inset-bottom, 0px) + 24px);
-  background: url(../assets/stars-paper.webp) center / cover, var(--paper);
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px) -1px -1px / 22px 22px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) -1px -1px / 22px 22px,
+    var(--paper);
   color: var(--ink);
   color-scheme: light;
   text-align: center;
   animation: fade var(--t-move) var(--ease-out) both;
 }
+.done-stars { position: absolute; top: 0; left: 0; z-index: -1; pointer-events: none; }
 .done-kicker { padding: 4px 10px; border-radius: 3px; background: rgba(253, 252, 248, .88); font-size: var(--t-cap); font-weight: 500; letter-spacing: .2em; text-transform: uppercase; color: #4A443D; }
 .done-title { margin: var(--s-3) 0 0; font-family: var(--f-display); font-style: italic; font-weight: 500; font-size: 46px; line-height: 1; text-shadow: 0 0 18px var(--paper), 0 0 6px var(--paper); }
 .done-line { margin: var(--s-2) 0 0; font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: #3A352F; text-shadow: 0 0 10px var(--paper); }
