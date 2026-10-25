@@ -197,12 +197,30 @@ function parseRoute() {
     return { name: 'month', year: y, month: m - 1 };
   }
   if (a === 'months') return { name: 'months' };
+  // The Jars tab opens on the month you're in.
+  if (a === 'jars') { const now = new Date(); return { name: 'month', year: now.getFullYear(), month: now.getMonth() }; }
   return { name: 'shelf' };
 }
+
+/** Months that hold skies as year * 12 + month, oldest first; this month too, so there's always one to open. */
+function monthKeys() {
+  const now = new Date();
+  const keys = new Set(state.skies.map((s) => { const d = new Date(s.takenAt); return d.getFullYear() * 12 + d.getMonth(); }));
+  keys.add(now.getFullYear() * 12 + now.getMonth());
+  return [...keys].sort((a, b) => a - b);
+}
+const monthHash = (k) => `#/month/${Math.floor(k / 12)}-${pad2((k % 12) + 1)}`;
+
+/** Month | Year at the top of the Jars tab. Switching (and turning months) replaces the page, so back leaves the tab. */
+const jarsSwitch = (on) => `<nav class="seg" aria-label="${t.jarsView}">
+    <a href="${state.monthKey != null ? monthHash(state.monthKey) : '#/jars'}" data-replace${on === 'month' ? ' aria-current="page"' : ''}>${t.viewMonth}</a>
+    <a href="#/months" data-replace${on === 'year' ? ' aria-current="page"' : ''}>${t.viewYear}</a>
+  </nav>`;
 
 function render() {
   state.live?.stop();
   state.live = null;
+  state.monthNav = null;
   const route = parseRoute();
   const tab = route.name === 'shelf' ? 'shelf' : 'months';
   document.querySelectorAll('.tab').forEach((el) => {
@@ -313,9 +331,15 @@ function renderShelf() {
   const prompt = todayPrompt(now);
   const { filled, round } = challengeProgress();
   const fresh = newDot(filled);
-  const memory = onThisDay();
-  // The home screen holds this month only; the rest live on Months.
-  const thisMonth = skiesIn(now.getFullYear(), now.getMonth()).reverse();
+  // Home is today and this week: the last seven days, newest first, two shelves at most. Everything else is in Jars.
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
+  const week = state.skies.filter((s) => s.takenAt >= weekStart).reverse().slice(0, 6);
+  // The memory waits under the shelf, unless it's already on it.
+  const found = onThisDay();
+  const memory = found && !week.includes(found.sky) ? found : null;
+  // "October's jar ›" opens this month, or the month of the latest sky when this one is still empty.
+  const latest = state.skies[state.skies.length - 1];
+  const jarMonth = skiesIn(now.getFullYear(), now.getMonth()).length || !latest ? now : new Date(latest.takenAt);
   const sun = sunLine();
 
   view.innerHTML = `
@@ -324,8 +348,7 @@ function renderShelf() {
       <h1 class="wordmark">Kepfa</h1>
     </header>
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
-      <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${ICON.pin}${savedPlace()
-        ? `<span>${t.nearYou}</span>` : `<span>${esc(zoneCity())} · <u>${t.notHere}</u></span>`}</button></div>` : ''}
+      <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${ICON.pin}<u>${savedPlace() ? t.nearYou : esc(zoneCity())}</u></button></div>` : ''}
     ${inAppHtml()}
     <section class="prompt is-${skyPhase(now)}">
       <div class="prompt-print">
@@ -348,19 +371,19 @@ function renderShelf() {
       </div>
     </section>
     ${bannerHtml()}
+    <div class="section-head"><h2 class="section-title">${t.thisWeek}</h2>${latest
+      ? `<a class="eyebrow head-link" href="#/month/${jarMonth.getFullYear()}-${pad2(jarMonth.getMonth() + 1)}">${t.monthsJar(MONTHS[jarMonth.getMonth()])}</a>` : ''}</div>
+    ${week.length
+      ? shelfRowsHtml(week)
+      : `<div class="empty">
+           <div class="empty-jar">${jarSvg()}</div>
+           ${state.skies.length ? `<p>${t.weekEmpty}</p>` : `<h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>`}
+         </div>`}
     ${memory ? `<button type="button" class="memory" id="memory" aria-label="${t.openSky(fmt.long(memory.sky.takenAt))}">
       <span class="memory-jar">${jarSvg({ href: photoUrl(memory.sky) })}</span>
       <span class="memory-text"><span class="eyebrow">${memory.label}</span>${memory.sky.note ? `<span class="memory-note ${handClass(memory.sky.note)}">${esc(memory.sky.note)}</span>` : ''}<span class="memory-date">${fmt.shelf(memory.sky.takenAt)[0]}, ${new Date(memory.sky.takenAt).getFullYear()} · ${fmt.shelf(memory.sky.takenAt)[1]}</span></span>
       ${ICON.right}
     </button>` : ''}
-    <div class="section-head"><h2 class="section-title">${MONTHS[now.getMonth()]} <span>${now.getFullYear()}</span></h2><span class="eyebrow">${thisMonth.length} ${t.kept(thisMonth.length)}</span></div>
-    ${thisMonth.length
-      ? shelfRowsHtml(thisMonth)
-      : `<div class="empty">
-           <div class="empty-jar">${jarSvg()}</div>
-           ${state.skies.length ? `<p>${t.monthEmpty(MONTHS[now.getMonth()])}</p>` : `<h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>`}
-         </div>`}
-    ${state.skies.length > thisMonth.length ? `<p class="see-months"><a class="btn-text" href="#/months">${t.seeMonths}</a></p>` : ''}
     <p class="credit">${t.madeBy} <a href="https://vibethebloom.com" target="_blank" rel="noopener">${t.maker}</a> ↗</p>`;
 
   bindJarSlots(view);
@@ -417,6 +440,7 @@ function renderMonths() {
 
   // Three to an oak shelf, each jar with a tent card in front: the month and how many skies (render scrolls to this month).
   view.innerHTML = `
+    ${jarsSwitch('year')}
     <header class="masthead">
       <div class="masthead-meta"><span class="eyebrow">${all.length} ${t.kept(all.length)}</span>
         <div class="year-switch">
@@ -503,11 +527,22 @@ function renderMonth(year, month) {
   const lum = (h) => { const [r, g, b] = hexToRgb(h); return 0.3 * r + 0.59 * g + 0.11 * b; };
   const tones = [...new Set(list.map((s) => dominant(s.palette).hex))].sort((a, b) => lum(b) - lum(a));
   const colors = tones.length <= 4 ? tones : [0, 1, 2, 3].map((i) => tones[Math.round((i * (tones.length - 1)) / 3)]);
+  // The months on either side that hold skies (empty ones are skipped, as on the Year shelves).
+  const key = year * 12 + month, keys = monthKeys();
+  const prev = keys.filter((k) => k < key).pop(), next = keys.find((k) => k > key);
+  const name = (k) => MONTHS[k % 12] + (Math.floor(k / 12) !== year ? ` ${Math.floor(k / 12)}` : '');
+  const isNow = key === new Date().getFullYear() * 12 + new Date().getMonth();
+  state.monthKey = key;
+  state.year = year;
+  state.monthNav = { prev: prev != null ? monthHash(prev) : null, next: next != null ? monthHash(next) : null };
 
   view.innerHTML = `
-    <header class="page-head">
-      <a class="eyebrow back" href="#/months">‹ ${t.backToMonths}</a>
-    </header>
+    ${jarsSwitch('month')}
+    <nav class="month-nav" aria-label="${t.otherMonths}">
+      ${prev != null ? `<a class="eyebrow" href="${monthHash(prev)}" data-replace>‹ ${name(prev)}</a>` : '<span></span>'}
+      ${next != null ? `<a class="eyebrow" href="${monthHash(next)}" data-replace>${name(next)} ›</a>`
+        : isNow ? `<span class="eyebrow is-off">${MONTHS[(month + 1) % 12]} ›</span>` : '<span></span>'}
+    </nav>
     <div class="month-head">
       <h1 class="title">${MONTHS[month]}</h1>
       <p class="eyebrow">${year}<br>${list.length} ${t.kept(list.length)}</p>
@@ -1761,6 +1796,24 @@ function bindGlobal() {
     if (e.gamma != null && !reduceMotion()) state.live?.tilt(e.gamma, e.beta);
   });
   window.addEventListener('hashchange', render);
+  // Month | Year and the month arrows swap the page in place instead of stacking history.
+  view.addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-replace]');
+    if (!a) return;
+    e.preventDefault();
+    location.replace(a.getAttribute('href'));
+  });
+  // On a month's page, a sideways swipe turns to the month before or after; taps and scrolling go through.
+  let sx = 0, sy = 0;
+  view.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+  view.addEventListener('touchend', (e) => {
+    const nav = state.monthNav, p = e.changedTouches[0];
+    if (!nav || !p) return;
+    const dx = p.clientX - sx, dy = p.clientY - sy;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    const to = dx < 0 ? nav.next : nav.prev;
+    if (to) location.replace(to);
+  });
   setInterval(() => { const el = $('#sunLine'); if (el) el.textContent = sunLine(); }, 60000);
 }
 

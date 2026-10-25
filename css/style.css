@@ -123,7 +123,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 
 .sunline {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   column-gap: var(--s-3);
@@ -147,6 +147,9 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   text-transform: inherit;
   color: var(--ink-soft);
 }
+/* One line: the sun time gives way (…) before the place does. */
+.sunline > span:first-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sunline-place { flex: none; }
 .sunline-place svg { width: 14px; height: 14px; flex: none; }
 .sunline-place u { text-underline-offset: 4px; }
 
@@ -259,10 +262,12 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .prompt-tag { display: flex; justify-content: center; min-height: 40px; font-size: var(--t-cap); }
 .prompt-progress { margin-top: var(--s-1); padding-top: var(--s-2); border-top: 1px solid var(--rule); }
 .section-title span, .see-months { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
-.see-months { display: flex; justify-content: center; margin: var(--s-5) 0 0; }
-.see-months .btn-text { color: var(--ink); font-family: var(--f-body); font-size: var(--t-sm); }
+/* A section's way to "see all", on the right of its heading. */
+.head-link { min-height: 44px; display: inline-flex; align-items: center; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.section-head + .shelf-row, .section-head + .empty { margin-top: var(--s-2); }
+.memory { margin-top: var(--s-5); }
 /* The maker's signature at the very end of the shelf: small, quiet, one tap to their site. */
-.credit { margin: var(--s-7) 0 0; text-align: center; font-family: var(--f-mono); font-size: var(--t-cap); letter-spacing: .06em; color: var(--ink-soft); }
+.credit { margin: var(--s-6) 0 0; text-align: center; font-family: var(--f-mono); font-size: var(--t-cap); letter-spacing: .06em; color: var(--ink-soft); }
 .credit a { display: inline-block; min-height: 44px; line-height: 44px; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
 /* Always one row of 30, however narrow the phone. */
 .dots { display: grid; grid-template-columns: repeat(30, minmax(0, 6px)); justify-content: space-between; gap: 2px; margin-top: var(--s-2); }
@@ -296,6 +301,14 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-6); }
 .section-head .section-title { margin: 0; }
+/* The Jars tab: Month | Year, then the months on either side. */
+.seg { display: grid; grid-template-columns: 1fr 1fr; width: 200px; margin: var(--s-2) auto 0; padding: 3px; border-radius: 999px; background: rgba(127, 120, 110, .14); }
+.seg a { min-height: 32px; display: grid; place-items: center; border-radius: 999px; font-size: var(--t-sm); color: var(--ink-soft); text-decoration: none; }
+.seg a[aria-current] { background: var(--paper); color: var(--ink); font-weight: 500; box-shadow: 0 1px 3px rgba(30, 28, 25, .18); }
+.seg + .masthead { margin-top: var(--s-3); }
+.month-nav { display: flex; justify-content: space-between; align-items: center; margin-top: var(--s-2); }
+.month-nav a { min-height: 44px; display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
+.month-nav .is-off { opacity: .35; }
 /* A month's page: its name on the left, the year and how many skies on the right, ruled off like the home shelf. */
 .month-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-3); padding-bottom: var(--s-3); border-bottom: 1px solid var(--ink); }
 .month-head .title { margin: 0; line-height: .9; }
