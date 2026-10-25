@@ -187,14 +187,22 @@ export const t = {
   saved: 'Image saved',
   sharedFallback: 'This device can’t share directly, so the image was saved.',
   storyFailed: 'Couldn’t make the image. Close this and try again.',
-  captionHint: 'We’ll copy a caption with the hashtags. Just paste.',
+  captionHint: 'We’ll copy a caption with the link. Just paste.',
   captionCopied: 'Caption copied. Paste it wherever you post.',
   caption: ({ text, day, kept, tag }) =>
-    `${text}\n${day} · day ${kept} of my ${CHALLENGE_SIZE}-day sky challenge.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #${tag}`,
+    `${text}\n${day} · day ${kept} of my ${CHALLENGE_SIZE}-day sky challenge on Kepfa.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #${tag} #kepfa`,
+  // Every other share gets a caption too, so whoever sees it can find the app.
+  shareCaption: {
+    single: (note) => `${note ? `“${note}”\n` : ''}Kept in a jar with Kepfa.\nStart your own: ${SITE}\n#kepfa`,
+    jar: (month) => `My ${month} in skies, kept with Kepfa.\nStart your own: ${SITE}\n#kepfa`,
+    year: (year) => `My ${year} in skies, kept with Kepfa.\nStart your own: ${SITE}\n#kepfa`,
+    done: () => `${CHALLENGE_SIZE} days, ${CHALLENGE_SIZE} skies. I finished the Kepfa sky challenge.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #kepfa`,
+  },
 
-  footerLine: 'Start your own sky collection',
-  issueLine: (month, year) => `Issue · ${month} ${year}`,
-  issueNo: (n) => `No. ${n}`,
+  // Every image that leaves the app says where it came from and where to go.
+  footerLine: 'Start your own',
+  site: SITE,
+  issueLine: (n, month, year) => `No. ${n} · ${month} ${year}`,
   ticketLine: (day) => `Sky homework, day ${day}. Handed in.`,
   volume: (year) => `Vol. ${year}`,
   keptRing: (month, year) => `KEPT · ${month.toUpperCase()} · ${year} · KEPFA · `,

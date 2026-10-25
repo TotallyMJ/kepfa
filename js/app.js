@@ -1450,7 +1450,7 @@ async function openStory(kind, payload) {
     <div class="story-preview" id="storyPreview"><div class="spinner"></div></div>
     ${canShowPlace ? `<label class="switch"><span>${t.showPlace}</span><input type="checkbox" id="showPlace" ${placeOn ? 'checked' : ''}></label>
       <p class="hint left">${t.showPlaceHint}</p>` : ''}
-    ${challenge ? `<p class="hint left">${t.captionHint}</p>` : ''}
+    <p class="hint left">${t.captionHint}</p>
     <p class="hint left">${t.storyTip}</p>
     <div class="sheet-actions">
       <button type="button" class="btn" id="saveStory" disabled>${t.saveImage}</button>
@@ -1483,9 +1483,14 @@ async function openStory(kind, payload) {
     $('#shareStory').disabled = false;
   };
 
-  // Challenge skies carry a ready caption. Copying starts in the same tap as sharing, since both need the gesture.
-  const copyCaption = () => (challenge && navigator.clipboard
-    ? navigator.clipboard.writeText(t.caption(challenge)).then(() => true, () => false)
+  // Every share carries a ready caption with the app's link; challenge skies add their day and hashtags.
+  // Copying starts in the same tap as sharing, since both need the gesture.
+  const caption = challenge ? t.caption(challenge)
+    : kind === 'single' ? t.shareCaption.single(payload.sky.note)
+      : kind === 'jar' ? t.shareCaption.jar(MONTHS[payload.month])
+        : kind === 'done' ? t.shareCaption.done() : t.shareCaption.year(payload.year);
+  const copyCaption = () => (navigator.clipboard
+    ? navigator.clipboard.writeText(caption).then(() => true, () => false)
     : Promise.resolve(false));
   $('#saveStory').addEventListener('click', async () => {
     const copying = copyCaption();

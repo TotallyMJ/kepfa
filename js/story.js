@@ -184,11 +184,15 @@ function tentCard(ctx, cx, y, w, month, count) {
 }
 
 /** @param number  the footer's right side, e.g. "No. 24" */
-function footer(ctx, number) {
+/** The last line of every image: the app's name and where to find it. */
+function footer(ctx) {
   ctx.fillStyle = INK;
   ctx.fillRect(MARGIN, H - 112, W - MARGIN * 2, 2);
-  smallCaps(ctx, t.footerLine, MARGIN, H - 74, 'left');
-  smallCaps(ctx, number, W - MARGIN, H - 74, 'right');
+  const name = 'KEPFA · ';
+  text(ctx, name, MARGIN, H - 74, { font: `600 25px ${SANS}`, color: INK, align: 'left', spacing: 6 });
+  ctx.font = `600 25px ${SANS}`;
+  smallCaps(ctx, t.footerLine, MARGIN + ctx.measureText(name).width + name.length * 6, H - 74, 'left');
+  text(ctx, t.site, W - MARGIN, H - 74, { font: `500 25px ${MONO}`, color: INK, align: 'right' });
 }
 
 function wrap(ctx, str, maxW, maxLines) {
@@ -521,7 +525,7 @@ function postmark(ctx, cx, cy, size, { ring, word, center }) {
 async function storySingle(sky, showPlace, quote, challenge) {
   const [c, ctx] = page();
   const d = new Date(sky.takenAt);
-  const top = masthead(ctx, quote, fmt.issueDate(d));
+  const top = masthead(ctx, quote, t.issueLine(d.getDate(), MONTHS[d.getMonth()], d.getFullYear()));
   const [paperImg, tapeImg] = await Promise.all(['paper', 'tape'].map(texture));
 
   // The print is the hero, centred and tilted left; a challenge sky makes room for its prompt slip.
@@ -612,13 +616,13 @@ async function storySingle(sky, showPlace, quote, challenge) {
     y += h + 30;
   }
   if (challenge) text(ctx, `#${CHALLENGE_TAG} #${challenge.tag}`, W / 2, y + 40, { font: `32px ${MONO}`, color: '#4A443D' });
-  footer(ctx, t.issueNo(d.getDate()));
+  footer(ctx);
   return toBlob(c);
 }
 
 async function storyJar({ year, month, skies, quote }) {
   const [c, ctx] = page();
-  const top = masthead(ctx, quote, t.issueLine(MONTHS[month], year), { title: MONTHS[month], kicker: t.storyKept(year, skies.length) });
+  const top = masthead(ctx, quote, t.issueLine(month + 1, MONTHS[month], year), { title: MONTHS[month], kicker: t.storyKept(year, skies.length) });
 
   // The month's shelf: every sky in its own jar, newest first, the day under each.
   // Try each column count and keep the one that gives the biggest jars in the space left.
@@ -650,7 +654,7 @@ async function storyJar({ year, month, skies, quote }) {
     }
     y += jh + label;
   }
-  footer(ctx, t.issueNo(month + 1));
+  footer(ctx);
   return toBlob(c);
 }
 
@@ -688,7 +692,7 @@ async function storyYear({ year, skies, quote }) {
     });
   }
   text(ctx, t.stripCaption, W / 2, sy + sh + 46, { font: `26px ${SANS}`, color: SOFT });
-  footer(ctx, t.volume(year));
+  footer(ctx);
   return toBlob(c);
 }
 
@@ -754,7 +758,7 @@ function haloText(ctx, str, x, y, opts) {
 /** A finished round: every day's sky on one stamped sheet, on grid paper scattered with star stickers. */
 async function storyDone({ round, skies }) {
   const [c, ctx] = page();
-  const kicker = t.doneKicker(round).toUpperCase();
+  const kicker = `Kepfa · ${t.doneKicker(round)}`.toUpperCase();
   ctx.font = `500 25px ${SANS}`;
   const kw = ctx.measureText(kicker).width + kicker.length * 5 + 44;
   // The writing is measured first so no star lands on it.
@@ -812,7 +816,7 @@ async function storyDone({ round, skies }) {
     { ring: t.doneStamp, word: t.doneWord, center: `${skies.length}/${CHALLENGE_SIZE}` });
 
   haloText(ctx, `#${CHALLENGE_TAG}`, W / 2, tagY, { font: `34px ${MONO}`, color: '#4A443D' });
-  footer(ctx, t.issueNo(round));
+  footer(ctx);
   return toBlob(c);
 }
 
