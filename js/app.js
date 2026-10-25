@@ -279,11 +279,11 @@ function copyLink() {
 
 function bannerHtml() {
   if (!state.skies.some((s) => s.sample)) return '';
-  return `<div class="banner"><p>${t.sampleBanner}</p><button type="button" class="btn-text" id="clearSamples">${t.clearSamples}</button></div>`;
+  return `<div class="banner samples"><p>${t.sampleBanner}</p><button type="button" class="btn-text" id="clearSamples">${t.clearSamples}</button></div>`;
 }
 
 function slotButton(s) {
-  return `<button type="button" class="jar-slot" data-id="${s.id}" aria-label="${t.openSky(fmt.long(s.takenAt))}">${jarSvg({ href: photoUrl(s) })}</button>`;
+  return `<button type="button" class="jar-slot${s.sample ? ' is-sample' : ''}" data-id="${s.id}" aria-label="${t.openSky(fmt.long(s.takenAt))}">${jarSvg({ href: photoUrl(s) })}</button>`;
 }
 
 function shelfRowsHtml(list) {

@@ -392,6 +392,37 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   color: var(--ink-soft);
 }
 .banner p { margin: 0; flex: 1; min-width: 0; }
+/* The samples card: a clear note under the prompt, with the way out as its only strong line. */
+.banner.samples {
+  margin-top: var(--s-6);   /* the slip's torn edge eats into the gap above, so it gets a step more than below */
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-raised);   /* the same card as "A week ago" just under it */
+  color: var(--ink);
+  box-shadow: 0 8px 16px -10px rgba(30, 28, 25, .25);
+}
+.banner.samples p { font-weight: 500; }
+.banner.samples .btn-text { padding: 0 var(--s-4); border: 1px solid var(--ink); border-radius: 5px; text-decoration: none; font-weight: 500; }
+/* Sample jars carry a strip of masking tape that says so. Not ::after: that one is the hold-to-delete ring. */
+.jar-slot.is-sample::before {
+  content: "sample";
+  position: absolute;
+  z-index: 2;
+  top: 30%;
+  left: 50%;
+  width: 62px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  background: url(../assets/tape.webp) center / 100% 100% no-repeat;
+  transform: translateX(-50%) rotate(-5deg);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  color: #6B645B;
+  pointer-events: none;
+}
 /* Inside Instagram, LINE and the like: the same banner, stacked, with its ways out underneath. */
 .banner.in-app { flex-direction: column; align-items: stretch; gap: 0; margin: var(--s-4) 0 0; padding: var(--s-3) var(--s-4) 0; border-style: solid; line-height: 1.5; }
 .banner.in-app b { color: var(--ink); font-weight: 500; }
