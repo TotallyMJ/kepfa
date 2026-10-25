@@ -153,6 +153,8 @@ export const t = {
 
   closeJar: 'Close the jar',
   skyOf: (i, n) => `${i} / ${n}`,
+  live: 'LIVE',
+  recording: (s) => `Recording · 0:0${s} of 0:03`,
   swipeHint: '‹  Swipe for other skies  ›',
   shareSky: 'Share this sky',
   editNote: 'Edit the note',

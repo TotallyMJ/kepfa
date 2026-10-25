@@ -11,6 +11,7 @@
   --fold-paper: #E9E3D9;
   --flash: #FFFFFF;
   --danger: #9B3B2E;
+  --stamp: #C8352A;   /* the KEPT / DONE postmark red, also Live sky */
   --scrim: rgba(27, 25, 22, .45);
   --camera: #15130F;
   --camera-ink: #EDE6DA;
@@ -698,7 +699,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   bottom: -30px;
   width: 112px;
   height: 112px;
-  color: #C8352A;
+  color: var(--stamp);
   fill: none;
   stroke: currentColor;
   stroke-width: 3;
@@ -757,14 +758,29 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .cam.is-front video { transform: scaleX(-1); }
 /* A white disc in a white ring, so it reads as the shutter on any sky. */
 .shutter {
+  position: relative;
   width: 72px; height: 72px;
   border-radius: 50%;
   border: 4px solid var(--camera-ink);
   background: var(--camera-ink);
   box-shadow: inset 0 0 0 4px rgba(20, 18, 16, .55);
-  transition: transform var(--t-quick) var(--ease-out);
+  transition: transform var(--t-quick) var(--ease-out), background-color var(--t-quick) var(--ease-out);
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .shutter:active { transform: scale(.92); }
+/* Held for a Live sky: it turns the KEPT stamp's red and a ring fills over the three seconds. */
+.shutter-ring { position: absolute; inset: -10px; width: calc(100% + 20px); height: calc(100% + 20px); transform: rotate(-90deg); fill: none; stroke-width: 4; opacity: 0; pointer-events: none; }
+.shutter-ring circle { stroke: rgba(255, 255, 255, .3); }
+.shutter-ring .shutter-progress { stroke: var(--stamp); stroke-linecap: round; stroke-dasharray: 283; stroke-dashoffset: 283; }
+.shutter.is-recording { background: var(--stamp); transform: scale(1.1); }
+.shutter.is-recording .shutter-ring { opacity: 1; }
+.shutter.is-recording .shutter-progress { animation: live-fill 3s linear forwards; }
+@keyframes live-fill { to { stroke-dashoffset: 0; } }
+.rec-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--stamp); vertical-align: 1px; }
+.cam-tip { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-6) + 72px + var(--s-4)); z-index: 2; margin: 0; text-align: center; font-size: var(--t-cap); color: var(--camera-ink); opacity: .85; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
 .cam-fallback {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -1082,7 +1098,11 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   transform-origin: 0 0;
   box-shadow: 0 2px 3px rgba(0, 0, 0, .18), 0 24px 40px -12px rgba(0, 0, 0, .5);
 }
-.polaroid-photo { aspect-ratio: 1; border-radius: 3px; background: #CFC7BB center / cover no-repeat; }
+.polaroid-photo { position: relative; overflow: hidden; aspect-ratio: 1; border-radius: 3px; background: #CFC7BB center / cover no-repeat; }
+/* A Live sky loops over its first frame, with a cream pill in the KEPT stamp's red. */
+.polaroid-live { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.live-badge { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 6px; border-radius: 999px; background: rgba(253, 252, 248, .82); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); color: var(--stamp); font-family: var(--f-mono); font-size: 10px; font-weight: 600; letter-spacing: .14em; }
+.live-badge svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; }
 .polaroid-strip { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 64px; padding: var(--s-2) var(--s-2) var(--s-3); text-align: center; }
 .polaroid-note { display: inline; padding: 0; border: 0; background: none; color: inherit; text-align: center; line-height: 1.05; cursor: text; }
 .polaroid-note .hand, .view-note .hand { font-size: 27px; line-height: 1.05; overflow-wrap: anywhere; }

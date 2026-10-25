@@ -16,6 +16,7 @@ const ICON = {
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M6 11v7.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>',
   save: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>',
+  live: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="1.6" fill="currentColor"/><circle cx="6" cy="6" r="3.6"/><circle cx="6" cy="6" r="5.4" stroke-dasharray="1.2 1.4"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10 11v5.5M14 11v5.5"/></svg>',
 };
 
@@ -56,7 +57,7 @@ function photoUrl(sky, kind = 'thumb') {
 }
 function forgetUrls(id) {
   forgetThumb(id);
-  for (const kind of ['thumb', 'photo']) {
+  for (const kind of ['thumb', 'photo', 'live']) {
     const key = `${id}:${kind}`;
     if (urls.has(key)) { URL.revokeObjectURL(urls.get(key)); urls.delete(key); }
   }
@@ -579,6 +580,10 @@ async function openCapture() {
   camStep.classList.remove('no-camera');
   $('#shutter').hidden = false;
   cap.querySelector('.cam-hint').hidden = false;
+  // "hold for a Live sky" shows until the first one is kept.
+  let tipSeen = false;
+  try { tipSeen = !!localStorage.getItem('kepfa.liveTip'); } catch { /* show it */ }
+  $('#liveTip').hidden = tipSeen || !canRecord();
   layoutCameraFrame();
 
   if (!navigator.mediaDevices?.getUserMedia) return showFallback();
@@ -629,9 +634,11 @@ function showFallback() {
   cap.querySelector('.cam').classList.add('no-camera');
   $('#shutter').hidden = true;
   cap.querySelector('.cam-hint').hidden = true;
+  $('#liveTip').hidden = true;
 }
 
 function stopCamera() {
+  if (rec) endLive();   // closed or flipped mid-recording: the clip is dropped
   stream?.getTracks().forEach((tr) => tr.stop());
   stream = null;
   $('#camVideo').srcObject = null;
@@ -649,25 +656,121 @@ function closeCapture() {
   closeLayer('capture');
 }
 
-async function snap() {
-  const v = $('#camVideo');
-  if (!v.videoWidth) return;
-  // Keep what was framed: map the jar window back through the video's object-fit: cover onto the camera frame.
+/** Keep what was framed: map the jar window back through the video's object-fit: cover onto the camera frame. */
+function camCrop(v) {
   const vw = v.videoWidth, vh = v.videoHeight;
   const s = Math.max(innerWidth / vw, innerHeight / vh);
   const ox = (innerWidth - vw * s) / 2, oy = (innerHeight - vh * s) / 2;
   // A mirrored preview shows the jar window's left edge from the frame's right side; the saved photo reads the right way round.
   const wx = v.closest('.is-front') ? innerWidth - camWindow.x - camWindow.w : camWindow.x;
   const sx = Math.max(0, (wx - ox) / s), sy = Math.max(0, (camWindow.y - oy) / s);
-  const sw = Math.min(vw - sx, camWindow.w / s), sh = Math.min(vh - sy, camWindow.h / s);
+  return { sx, sy, sw: Math.min(vw - sx, camWindow.w / s), sh: Math.min(vh - sy, camWindow.h / s) };
+}
+
+/** What's in the jar right now, as a full-size JPEG. */
+function camShot(v) {
+  const { sx, sy, sw, sh } = camCrop(v);
   const c = document.createElement('canvas');
   c.width = Math.round(sw);
   c.height = Math.round(sh);
   c.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
+}
+
+async function snap() {
+  const v = $('#camVideo');
+  if (!v.videoWidth) return;
   chime([2093], 0);
-  const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
+  const blob = await camShot(v);
   stopCamera();
   review(blob, { takenAt: Date.now(), source: 'camera' });
+}
+
+// ---------- Live sky: hold the shutter for a short, silent loop of what's in the jar ----------
+
+const LIVE_MAX = 3000, LIVE_MIN = 1000, HOLD = 350;
+const canRecord = () => typeof MediaRecorder !== 'undefined' && 'captureStream' in HTMLCanvasElement.prototype;
+let rec = null;   // while recording: { recorder, chunks, start, raf, timer, poster }
+
+/** Starts recording the jar window; its first frame, full size, becomes the sky's photo. */
+function startLive() {
+  const v = $('#camVideo');
+  if (!v.videoWidth || !canRecord()) return false;
+  const { sx, sy, sw, sh } = camCrop(v);
+  const k = Math.min(1, 720 / sw);
+  const c = document.createElement('canvas');
+  c.width = Math.round(sw * k) & ~1;   // even sizes, which video encoders want
+  c.height = Math.round(sh * k) & ~1;
+  const ctx = c.getContext('2d');
+  const mimeType = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find((m) => MediaRecorder.isTypeSupported?.(m));
+  const hint = cap.querySelector('.cam-hint');
+  let shown = 0;
+  rec = { chunks: [], start: performance.now(), poster: camShot(v), hint: hint.textContent };
+  const draw = () => {
+    ctx.drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    const sec = Math.min(LIVE_MAX / 1000, Math.floor((performance.now() - rec.start) / 1000) + 1);
+    if (sec !== shown) { shown = sec; hint.innerHTML = `<span class="rec-dot"></span>${t.recording(sec)}`; }
+    rec.raf = requestAnimationFrame(draw);
+  };
+  draw();
+  rec.recorder = new MediaRecorder(c.captureStream(30), { ...(mimeType && { mimeType }), videoBitsPerSecond: 2500000 });
+  // The last piece arrives as it stops, after rec is cleared, so it goes into this recording's own list.
+  const { chunks } = rec;
+  rec.recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  rec.recorder.start();
+  rec.timer = setTimeout(stopLive, LIVE_MAX);
+  $('#shutter').classList.add('is-recording');
+  return true;
+}
+
+/** Ends the recording (or drops it); returns what was recorded, still to be handed on. */
+async function endLive() {
+  const r = rec;
+  rec = null;
+  clearTimeout(r.timer);
+  const stopped = new Promise((res) => { r.recorder.onstop = res; });
+  r.recorder.stop();
+  await stopped;
+  cancelAnimationFrame(r.raf);
+  $('#shutter').classList.remove('is-recording');
+  cap.querySelector('.cam-hint').textContent = r.hint;
+  return r;
+}
+
+async function stopLive() {
+  if (!rec) return;
+  const r = await endLive();
+  // Let go within a second and it's a photo after all.
+  const live = performance.now() - r.start >= LIVE_MIN && r.chunks.length ? new Blob(r.chunks, { type: r.recorder.mimeType || 'video/webm' }) : null;
+  if (live) { try { localStorage.setItem('kepfa.liveTip', '1'); } catch { /* the tip just shows again */ } }
+  chime([2093], 0);
+  const photo = await r.poster;
+  stopCamera();
+  review(photo, { takenAt: Date.now(), source: 'camera', live });
+}
+
+/** Tap for a photo, hold for a Live sky. A keyboard press is a tap. */
+function bindShutter() {
+  const b = $('#shutter');
+  let hold = 0, pressed = false, recording = false;
+  b.addEventListener('pointerdown', (e) => {
+    pressed = true;
+    b.setPointerCapture?.(e.pointerId);
+    hold = setTimeout(() => { hold = 0; if (pressed) recording = startLive(); }, HOLD);
+  });
+  const up = () => {
+    if (!pressed) return;
+    pressed = false;
+    if (hold) { clearTimeout(hold); hold = 0; snap(); }
+    // Recording ends on letting go, unless it already stopped itself at three seconds.
+    else if (recording) { recording = false; stopLive(); }
+    // A hold where recording can't start is still a photo.
+    else snap();
+  };
+  b.addEventListener('pointerup', up);
+  b.addEventListener('pointercancel', up);
+  b.addEventListener('contextmenu', (e) => e.preventDefault());
+  b.addEventListener('click', (e) => { if (e.detail === 0) snap(); });
 }
 
 // ---------- from the photo library: fit the sky in the jar ----------
@@ -824,13 +927,13 @@ const monthOf = (ms) => { const d = new Date(ms); return MONTHS[d.getMonth()] + 
  * @param from.takenAt  when the sky was taken; null for a library photo that didn't say
  * @param from.source   'camera' or 'library'
  */
-async function review(blob, { takenAt, source }) {
+async function review(blob, { takenAt, source, live = null }) {
   showStep('review');
   const el = cap.querySelector('.review');
   el.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t.reading}</p></div>`;
   if (draft?.url) URL.revokeObjectURL(draft.url);
   try {
-    draft = { ...(await prepareImage(blob)), id: newId(), takenAt, source };
+    draft = { ...(await prepareImage(blob)), id: newId(), takenAt, source, live };
   } catch {
     draft = null;
     el.innerHTML = `<div class="loading"><p>${t.cantOpen}</p>
@@ -956,6 +1059,7 @@ async function saveDraft() {
     palette: draft.palette,
     photo: draft.photo,
     thumb: draft.thumb,
+    live: draft.live,   // the Live sky clip, or null for a photo
     sample: false,
     createdAt: Date.now(),
   };
@@ -1133,7 +1237,9 @@ function openDetail(sky, { from = 0 } = {}) {
     <div class="viewer-stage" id="viewerStage"></div>
     <div class="viewer-stack">
       <div class="polaroid">
-        <div class="polaroid-photo" style="background-image:url('${photoUrl(sky, 'photo')}')" role="img" aria-label="${t.openSky(fmt.long(sky.takenAt))}"></div>
+        <div class="polaroid-photo" style="background-image:url('${photoUrl(sky, 'photo')}')" role="img" aria-label="${t.openSky(fmt.long(sky.takenAt))}">${sky.live ? `
+          <video class="polaroid-live" src="${photoUrl(sky, 'live')}" muted loop playsinline ${reduceMotion() ? '' : 'autoplay'}></video>
+          <span class="live-badge">${ICON.live}${t.live}</span>` : ''}</div>
         <div class="polaroid-strip" id="strip">${stripHtml(sky)}</div>
       </div>
       <div class="viewer-note" id="noteSlot">${noteHtml(sky, { rolled })}</div>
@@ -1575,7 +1681,7 @@ function markSeeded() {
 
 function bindGlobal() {
   $('#openCapture').addEventListener('click', () => { state.viaPrompt = false; openCapture(); });
-  $('#shutter').addEventListener('click', snap);
+  bindShutter();
   $('#camFlip').addEventListener('click', flipCamera);
   $('#fileLibrary').addEventListener('change', picked);
   $('#fileCamera').addEventListener('change', picked);
