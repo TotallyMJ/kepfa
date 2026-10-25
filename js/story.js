@@ -865,14 +865,14 @@ function star(ctx, x, y, r, turn, ink) {
  * Star stickers scattered evenly over a w×h area, fresh every time: one chance per cell of a loose grid,
  * jittered inside it. `unit` scales the stars (1 at story size); none lands on an `avoid` box {x, y, w, h}.
  */
-export function scatterStars(ctx, w, h, { unit = 1, avoid = [] } = {}) {
+export function scatterStars(ctx, w, h, { unit = 1, avoid = [], scale = 1 } = {}) {
   const cell = 154 * unit, across = Math.max(1, Math.round(w / cell)), down = Math.max(1, Math.round(h / cell));
   const cw = w / across, ch = h / down;
   for (let r = 0; r < down; r++) {
     for (let col = 0; col < across; col++) {
       if (Math.random() > 0.72) continue;
       const x = (col + 0.15 + Math.random() * 0.7) * cw, y = (r + 0.15 + Math.random() * 0.7) * ch;
-      const size = (16 + Math.random() * 16) * unit;
+      const size = (16 + Math.random() * 16) * unit * scale;   // scale shrinks the stickers, not their spacing
       if (avoid.some((b) => x > b.x - size && x < b.x + b.w + size && y > b.y - size && y < b.y + b.h + size)) continue;
       star(ctx, x, y, size, Math.random() * Math.PI, STAR_INKS[Math.floor(Math.random() * STAR_INKS.length)]);
     }

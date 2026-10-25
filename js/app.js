@@ -5,7 +5,7 @@ import { livePile, loadThumbs, forgetThumb, paperIndex } from './pile.js';
 import { foldStage, rollNote, unrollNote, noteScroll, skipNote, MOTION, reduceMotion } from './fold.js';
 import { sunTimes, guessPlace } from './sun.js';
 import { placeNear } from './places.js';
-import { album, checkStamps } from './stamps.js';
+import { album, checkStamps, writeCard } from './stamps.js';
 import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE } from './strings.js';
@@ -18,6 +18,7 @@ const ICON = {
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>',
   save: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>',
   live: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="1.6" fill="currentColor"/><circle cx="6" cy="6" r="3.6"/><circle cx="6" cy="6" r="5.4" stroke-dasharray="1.2 1.4"/></svg>',
+  pen: '<svg class="pen" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10 11v5.5M14 11v5.5"/></svg>',
 };
 
@@ -519,18 +520,22 @@ function stampSvg({ id, href, name, n, w = 86 }) {
 }
 
 /** The album: three stamps to a row, each tucked behind a glassine strip; the ones still to come show a hint. */
+/** The sky a stamp is printed from: the one that earned it, or the latest kept if that one was deleted. */
+function stampSky(got) {
+  const real = state.skies.filter((s) => !s.sample);
+  return real.find((s) => s.id === got.sky) || real[real.length - 1];
+}
+
 function renderStamps() {
   const list = album(state.skies, stampCtx());
-  const real = state.skies.filter((s) => !s.sample);
-  const byId = new Map(real.map((s) => [s.id, s]));
-  // A stamp keeps the sky that earned it; if that sky was deleted, it borrows the latest one.
-  const skyFor = (st) => byId.get(st.got.sky) || real[real.length - 1];
   const cell = (st) => {
     const { name, hint } = t.stamps[st.id];
-    const sky = st.got && skyFor(st);
+    const sky = st.got && stampSky(st.got);
     const got = st.got ? fmt.shelf(st.got.at)[0] : '';
+    // An earned stamp opens its letter again.
     return `<div class="stamp-cell" role="listitem" aria-label="${esc(t.stampLabel(name, got))}">
-      ${sky ? stampSvg({ id: st.id, href: photoUrl(sky), name, n: st.need }) : `<div class="stamp-empty">${hint}</div>`}
+      ${sky ? `<button type="button" class="stamp-open" data-stamp="${st.id}" aria-label="${esc(t.openLetter(name))}">${stampSvg({ id: st.id, href: photoUrl(sky), name, n: st.need })}</button>`
+        : `<div class="stamp-empty">${hint}</div>`}
       <p class="stamp-cap">${esc(name)}<small>${got || `${st.have} / ${st.need}`}</small></p></div>`;
   };
   view.innerHTML = `
@@ -540,6 +545,7 @@ function renderStamps() {
       <p class="eyebrow">${t.stampsOf(list.filter((st) => st.got).length, list.length)}</p>
     </div>
     <div class="album" role="list">${chunk(list, 3).map((row) => `<div class="album-row">${row.map(cell).join('')}</div>`).join('')}</div>`;
+  view.querySelectorAll('.stamp-open').forEach((b) => b.addEventListener('click', () => openLetters([b.dataset.stamp])));
   state.redraw = null;
 }
 
@@ -1211,7 +1217,7 @@ async function saveDraft() {
   const daysBefore = keptDays();
   state.skies.push(sky);
   sortSkies();
-  checkStamps(state.skies, stampCtx());
+  const fresh = checkStamps(state.skies, stampCtx());
   state.viaPrompt = false;
   // This sky finished a round when it added a new day and that day is the round's last.
   const daysNow = keptDays();
@@ -1234,8 +1240,14 @@ async function saveDraft() {
   await rolling;
   await stage.lidOn();
   showKept(sky, stage);
-  // A beat on "Kept." first, then the celebration.
-  if (finished) setTimeout(() => { if (!cap.hidden) openCelebration(finished); }, reduceMotion() ? 0 : 900);
+  // A beat on "Kept." first, then the celebration; letters for new stamps follow it, or come on their own.
+  state.letters = fresh;
+  if (finished || fresh.length) {
+    setTimeout(() => {
+      if (cap.hidden) return;
+      if (finished) openCelebration(finished); else openLetters(fresh);
+    }, reduceMotion() ? 0 : 900);
+  }
 }
 
 /** The same jar, lid on, with what to do next. */
@@ -1299,21 +1311,105 @@ function openCelebration(round) {
 }
 
 /** Star stickers drawn behind the whole screen, freshly scattered, kept off the writing and the buttons. */
-function doneStars(el) {
+function doneStars(el, keepOff = '.done-kicker, .done-title, .done-line, .done-actions > *', scale = 1) {
   const canvas = el.querySelector('.done-stars');
   const w = el.clientWidth, h = el.scrollHeight;
   const ctx = setupCanvas(canvas, w, h);
   const at = el.getBoundingClientRect();
-  const avoid = [...el.querySelectorAll('.done-kicker, .done-title, .done-line, .done-actions > *')].map((n) => {
+  const avoid = [...el.querySelectorAll(keepOff)].map((n) => {
     const r = n.getBoundingClientRect();
     return { x: r.left - at.left, y: r.top - at.top + el.scrollTop, w: r.width, h: r.height };
   });
-  scatterStars(ctx, w, h, { unit: 0.42, avoid });
+  scatterStars(ctx, w, h, { unit: 0.42, avoid, scale });
 }
 
 function closeCelebration() {
   $('#celebrate').hidden = true;
   closeLayer('celebrate');
+  // Stamps earned with the same sky wait their turn; the letter opens once the history step is back.
+  const next = state.letters || [];
+  if (next.length) { if (unwinding) afterUnwind = () => openLetters(next); else openLetters(next); }
+}
+
+// ---------- a letter from the sky: one for each new stamp ----------
+
+/** The postmark over the stamp: KEPFA and the day on the ring, the count in the middle, wavy cancel lines. */
+const postmark = (at, n) => { const d = new Date(at); return `<svg class="postmark" viewBox="0 0 140 70" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+  <circle cx="44" cy="35" r="26"/><circle cx="44" cy="35" r="19" stroke-width="1.2"/>
+  <defs><path id="pmTop" d="M23.4 35 a20.6 20.6 0 0 1 41.2 0"/><path id="pmBottom" d="M19.8 35 a24.2 24.2 0 0 0 48.4 0"/></defs>
+  <g class="postmark-ring"><text><textPath href="#pmTop" startOffset="50%">KEPFA</textPath></text>
+    <text><textPath href="#pmBottom" startOffset="50%">${d.getDate()} ${MONTHS_SHORT[d.getMonth()].toUpperCase()} ${d.getFullYear()}</textPath></text>
+    <circle cx="21.5" cy="35" r=".9"/><circle cx="66.5" cy="35" r=".9"/></g>
+  <text class="postmark-count" x="44.1" y="38.6">${n}/${n}</text>
+  ${[0, 1, 2, 3].map((i) => `<path d="M74 ${20 + i * 10} q8 -5 16 0 t16 0 t16 0 t16 0"/>`).join('')}</svg>`; };
+
+/** Opens the letters for these stamps, one after another (if one is already open, these follow it). */
+function openLetters(ids) {
+  const el = $('#letter');
+  state.letters = ids.slice();
+  if (!el.hidden) return;
+  openLayer('letter', closeLetter);
+  showLetter();
+}
+
+function showLetter() {
+  const el = $('#letter');
+  const id = state.letters.shift();
+  const st = album(state.skies, stampCtx()).find((x) => x.id === id);
+  if (!st?.got) { closeLetter(); return; }
+  const copy = t.stamps[st.id];
+  const sky = stampSky(st.got);
+  const d = new Date(st.got.at);
+  const card = st.got.card || copy.card, to = st.got.to || t.letterToWho;
+  el.innerHTML = `
+    <canvas class="done-stars" aria-hidden="true"></canvas>
+    <div class="letter">
+      <p class="letter-head"><span class="letter-brand">Kepfa</span><span class="letter-date">${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}</span></p>
+      <p class="letter-hi">${t.letterHi}</p>
+      <p class="letter-body">${copy.letter}</p>
+      <p class="letter-sign">${t.letterSign}</p>
+    </div>
+    <div class="postcard">
+      <p class="postcard-msg"><span><span class="postcard-words ${handClass(card)}" contenteditable="plaintext-only" role="textbox" spellcheck="false"
+        aria-label="${t.letterEdit}" data-field="card" data-max="60">${esc(card)}</span>${ICON.pen}</span></p>
+      <p class="postcard-to"><span class="hand">${t.letterTo}</span> <span class="postcard-words ${handClass(to)}" contenteditable="plaintext-only" role="textbox" spellcheck="false"
+        aria-label="${t.letterEditTo}" data-field="to" data-max="12">${esc(to)}</span>${ICON.pen}</p>
+      ${sky ? stampSvg({ id: `card-${st.id}`, href: photoUrl(sky), name: copy.name, n: st.need, w: 62 }) : ''}
+      ${postmark(st.got.at, st.need)}
+    </div>
+    <p class="postcard-hint">${t.letterTap}</p>
+    <p class="letter-ps"><span class="eyebrow">${t.letterPS}</span><span class="letter-stamp">${copy.name}</span></p>
+    <div class="done-actions"><button type="button" class="btn-text" id="letterNext">${t.letterNext}</button></div>`;
+  el.hidden = false;
+  el.scrollTop = 0;
+  doneStars(el, '.letter, .postcard, .postcard-hint, .letter-ps, .done-actions > *', 0.6);
+  el.querySelectorAll('.postcard-words').forEach((w) => {
+    const max = +w.dataset.max, field = w.dataset.field;
+    // Short enough to stay on the card; Enter just finishes.
+    w.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); w.blur(); } });
+    w.addEventListener('input', () => {
+      if (w.textContent.length > max) {
+        w.textContent = w.textContent.slice(0, max);
+        getSelection().collapse(w, w.childNodes.length);
+      }
+      w.className = `postcard-words ${handClass(w.textContent)}`;
+    });
+    w.addEventListener('blur', () => {
+      const words = w.textContent.replace(/\s+/g, ' ').trim();
+      if (!words) w.textContent = field === 'card' ? copy.card : t.letterToWho;
+      writeCard(st.id, { [field]: words });
+    });
+  });
+  // Tapping the pen writes too.
+  el.querySelectorAll('.postcard .pen').forEach((p) => p.addEventListener('click', () => p.previousElementSibling.focus()));
+  $('#letterNext').addEventListener('click', () => (state.letters.length ? showLetter() : closeLetter()));
+}
+
+function closeLetter() {
+  document.activeElement?.blur();
+  $('#letter').hidden = true;
+  state.letters = [];
+  closeLayer('letter');
 }
 
 // ---------- viewer: a sky out of its jar, as a polaroid ----------
@@ -1840,6 +1936,7 @@ function bindGlobal() {
     if (e.key !== 'Escape') return;
     if (!$('#confirm').hidden) $('#confirmNo').click();
     else if (!$('#storyModal').hidden) closeStory();
+    else if (!$('#letter').hidden) closeLetter();
     else if (!$('#celebrate').hidden) closeCelebration();
     else if (viewer.editing) endEdit(state.detail);
     else if (!$('#sheet').hidden) closeJar();

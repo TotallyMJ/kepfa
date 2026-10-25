@@ -122,6 +122,14 @@ export function checkStamps(allSkies, ctx) {
   return had ? fresh : [];
 }
 
+/** Keeps what the owner wrote on a stamp's postcard ({ card, to }), next to when it was earned. */
+export function writeCard(id, words) {
+  const book = earned();
+  if (!book?.[id]) return;
+  book[id] = { ...book[id], ...words };
+  try { localStorage.setItem(KEY, JSON.stringify(book)); } catch { /* the default words show again */ }
+}
+
 /** Every stamp with where it stands: earned (when, and with which sky) or how far along. */
 export function album(allSkies, ctx) {
   const skies = allSkies.filter((s) => !s.sample);
