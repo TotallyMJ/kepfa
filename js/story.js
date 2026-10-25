@@ -279,15 +279,16 @@ function tag(ctx, bx, by, bw, label) {
   const thai = isThai(label);
   const stitch = 12 * k;
   const pad = stitch + 18 * k;   // the writing keeps clear of the stitched line on both sides
-  let size = (thai ? 40 : 60) * k, w = 190 * k, lines;
+  let size = (thai ? 40 : 60) * k, lines;
+  const w = 190 * k;
   const font = () => (thai ? `${size}px ${SANS}` : `${size}px ${HAND}`);
-  // Wider for longer names, then smaller writing, until it fits in three lines.
+  // The card keeps its shape: a longer name wraps and the writing gets smaller, until it fits in three lines.
   for (;;) {
     ctx.font = font();
     lines = wrap(ctx, label, w - pad * 2, 3);
     const fits = lines.join(' ').length >= label.trim().length - 1 && lines.every((ln) => ctx.measureText(ln).width <= w - pad * 2);
-    if (fits || (w >= 300 * k && size <= (thai ? 30 : 44) * k)) break;
-    if (w < 300 * k) w += 10 * k; else size -= 2 * k;
+    if (fits || size <= (thai ? 24 : 34) * k) break;
+    size -= 2 * k;
   }
   const lh = size * (thai ? 1.35 : 0.95);
   const h = Math.max(320 * k, 120 * k + lines.length * lh);
@@ -504,11 +505,10 @@ function jarContents(month, img) {
   c.height = INSIDE.h;
   const x = c.getContext('2d');
   x.translate(-INSIDE.x, -INSIDE.y);
-  const pile = pileFor(month);
-  drawPile(x, pile);
-  const top = Math.min(...pile.map((p) => p.y));
-  const s = INSIDE.w * 0.46, b = s * 0.07;
-  x.translate(INSIDE.x + INSIDE.w * 0.52, top - s * 0.2);
+  drawPile(x, pileFor(month));
+  // Always low in the jar, under the label and in front of the pile, so it shows however full the month is.
+  const s = INSIDE.w * 0.4, b = s * 0.07;
+  x.translate(INSIDE.x + INSIDE.w * 0.5, INSIDE.y + INSIDE.h * 0.72);
   x.rotate(-0.22);
   x.shadowColor = 'rgba(30, 28, 25, .35)';
   x.shadowBlur = 14;
@@ -570,11 +570,11 @@ function jamLabel(ctx, bw, bh, month, year, tagged) {
     x.beginPath(); x.ellipse(0, 0, w / 2 - 9, h / 2 - 8, 0, a0, a0 + 0.085); x.stroke();
   }
   x.globalAlpha = 1;
-  // The writing, inked into the paper so the grain shows through.
-  x.globalCompositeOperation = 'multiply';
+  // The writing, a touch see-through so the grain shows (plain drawing: iPhone Safari can drop text drawn with blend modes).
+  x.globalAlpha = 0.92;
   text(x, month, 0, h * 0.1, { font: `${h * 0.48}px ${HAND}`, color: '#2a2420' });
   text(x, String(year), 0, h * 0.34, { font: `600 ${h * 0.13}px ${MONO}`, color: '#B3261E', spacing: 3 });
-  x.globalCompositeOperation = 'source-over';
+  x.globalAlpha = 1;
   // It wraps round the jar: darker toward both sides, a soft highlight just left of centre.
   const round = x.createLinearGradient(-w / 2, 0, w / 2, 0);
   round.addColorStop(0, 'rgba(60, 40, 20, .28)'); round.addColorStop(0.18, 'rgba(60, 40, 20, 0)');
@@ -627,15 +627,22 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
 
   // The print is the hero, centred and tilted left; a challenge sky makes room for its prompt slip.
   // The note and the prompt are measured first so the whole group can sit centred on the page.
-  const pw = challenge ? 600 : 734;
+  let pw = challenge ? 600 : 734;
   let note = null, prompt = null;
   if (sky.note) {
     // On a torn slip: handwriting for English, the regular face for Thai.
     const thai = isThai(sky.note);
-    const font = thai ? `56px ${SANS}` : `92px ${HAND}`;
-    const lh = thai ? 76 : 82, padX = 64;
-    ctx.font = font;
-    const lines = wrap(ctx, sky.note, W - MARGIN * 2 - padX * 2, 2);
+    const padX = 64;
+    let size = thai ? 56 : 92, font, lines;
+    // Up to three lines; a longer note gets smaller writing instead of being cut off.
+    for (;;) {
+      font = thai ? `${size}px ${SANS}` : `${size}px ${HAND}`;
+      ctx.font = font;
+      lines = wrap(ctx, sky.note, W - MARGIN * 2 - padX * 2, 3);
+      if (lines.join(' ').length >= sky.note.trim().length - 1 || size <= (thai ? 38 : 60)) break;
+      size -= 4;
+    }
+    const lh = size * (thai ? 76 / 56 : 82 / 92);
     const w = Math.min(W - MARGIN * 2, Math.max(...lines.map((ln) => ctx.measureText(ln).width)) + padX * 2);
     note = { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn2.dst[2] * 2 };
   }
@@ -646,8 +653,11 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
     const lines = wrap(ctx, challenge.text, w - 110, 3);
     prompt = { font, lh, lines, w, h: 96 + (lines.length - 1) * lh + 34 };
   }
+  // A long note with a prompt makes the print smaller, so everything stays above the footer.
+  const rest = 90 + (prompt ? prompt.h + 34 : 0) + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
+  pw = Math.min(pw, (H - 112 - top - 60 - rest) / (1.096 + 0.37 * JAR_RATIO * 0.38));
   // Whatever comes under the print starts below the jar that leans on its corner.
-  const below = pw * 0.37 * JAR_RATIO * 0.38 + 50;
+  const below = pw * 0.37 * JAR_RATIO * 0.38 + 90;
   const total = pw * 1.096 + below + (prompt ? prompt.h + 34 : 0) + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
   const py = top + Math.max(60, (H - 112 - top - total) / 2);
   const [{ img, release }] = await Promise.all([loadImage(sky.photo), loadThumbs(month)]);
@@ -680,17 +690,17 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
 
   // A note in the margin, scrapbook style: handwriting and a hand-drawn arrow into the jar.
   const jarLeft = jx + bw * 0.04, jarMid = jy + bh * 0.58;
-  const tx = jarLeft - 34, ty = py + ph + 96;
+  const tx = jarLeft - 70, ty = py + ph + 165;
   ctx.save();
   ctx.translate(tx, ty);
   ctx.rotate((-5 * Math.PI) / 180);
-  text(ctx, t.keptInJar, 0, 0, { font: `84px ${HAND}`, color: '#2a2420', align: 'right' });
+  t.keptInJar.forEach((ln, i, all) => text(ctx, ln, 0, (i - all.length + 1) * 84, { font: `108px ${HAND}`, color: '#2a2420', align: 'right' }));
   ctx.restore();
   ctx.strokeStyle = '#2a2420';
-  ctx.lineWidth = 3.6;
+  ctx.lineWidth = 4;
   ctx.lineCap = ctx.lineJoin = 'round';
-  const sx = tx - 30, sy = ty - 62, ex = jarLeft - 6, ey = jarMid, c2x = ex - 90, c2y = ey - 30;
-  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx + 10, sy - 70, c2x, c2y, ex, ey); ctx.stroke();
+  const sx = tx + 20, sy = ty - 34, ex = jarLeft - 6, ey = jarMid, c2x = ex - 50, c2y = ey + 50;
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx + 40, sy, c2x, c2y, ex, ey); ctx.stroke();
   const ang = Math.atan2(ey - c2y, ex - c2x);
   for (const turn of [-0.45, 0.45]) {
     ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - Math.cos(ang + turn) * 28, ey - Math.sin(ang + turn) * 28); ctx.stroke();

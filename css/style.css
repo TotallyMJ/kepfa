@@ -1024,7 +1024,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
    Tight inside a group, a clear step between groups, every edge in line with the buttons. */
 .story-sheet .switch { margin: 0; padding: 0 2px; border-top: 1px solid var(--rule); }
 .story-sheet .hint { margin: 2px 0 0; font-size: 11.5px; line-height: 1.35; text-align: center; }
-.story-sheet .place-note { padding-bottom: var(--s-3); border-bottom: 1px solid var(--rule); }
+.story-sheet .place-note { padding: 0 2px var(--s-3); text-align: left; border-bottom: 1px solid var(--rule); }
 .story-sheet .sheet-actions { gap: var(--s-3); margin-top: var(--s-4); }
 .story-sheet .sheet-actions .btn { flex: 1 1 0; min-height: 48px; gap: var(--s-2); }
 .story-sheet .sheet-actions svg { width: 18px; height: 18px; }

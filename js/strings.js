@@ -207,7 +207,7 @@ export const t = {
   volume: (year) => `Vol. ${year}`,
   keptRing: (month, year) => `KEPT · ${month.toUpperCase()} · ${year} · KEPFA · `,
   keptWord: 'KEPT',
-  keptInJar: 'kept in a jar',
+  keptInJar: ['my sky,', 'kept in here'],
   storyKept: (y, n) => `${y} · ${n} ${skies(n)} kept`,
   stripCaption: 'Every sky you kept, in order',
 };
