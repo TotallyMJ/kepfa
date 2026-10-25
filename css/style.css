@@ -623,7 +623,8 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .done-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
 .done-grid i { position: relative; display: block; aspect-ratio: 1; border-radius: 2px; background: #CFC7BB center / cover no-repeat; }
 .done-grid span { position: absolute; left: 2px; bottom: 1px; font-family: var(--f-mono); font-size: 9px; color: #fff; text-shadow: 0 0 3px rgba(0, 0, 0, .6); }
-.done-range { margin: 10px 0 0; font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; color: #6B645B; }
+/* Left-aligned, so the stamp on the corner never sits on the dates. */
+.done-range { margin: 10px 0 0 2px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; color: #6B645B; text-align: left; }
 .done-stamp {
   position: absolute;
   right: -26px;
