@@ -617,6 +617,72 @@ function postmark(ctx, cx, cy, size, { ring, word, center }) {
  * @param challenge  {text, day, tag} when the sky was kept for that day's prompt
  * @param month      every sky kept that month, for the pile in the jar
  */
+/** The handwritten note's slip, measured: up to three lines, the writing shrinking rather than cut off. */
+function measureNote(ctx, sky) {
+  if (!sky.note) return null;
+  // On a torn slip: handwriting for English, the regular face for Thai.
+  const thai = isThai(sky.note);
+  const padX = 64;
+  let size = thai ? 56 : 92, font, lines;
+  // Up to three lines; a longer note gets smaller writing instead of being cut off.
+  for (;;) {
+    font = thai ? `${size}px ${SANS}` : `${size}px ${HAND}`;
+    ctx.font = font;
+    lines = wrap(ctx, sky.note, W - MARGIN * 2 - padX * 2, 3);
+    if (lines.join(' ').length >= sky.note.trim().length - 1 || size <= (thai ? 38 : 60)) break;
+    size -= 4;
+  }
+  const lh = size * (thai ? 76 / 56 : 82 / 92);
+  const w = Math.min(W - MARGIN * 2, Math.max(...lines.map((ln) => ctx.measureText(ln).width)) + padX * 2);
+  return { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn2.dst[2] * 2 };
+}
+
+/** The day's prompt on a small pale-blue ticket, measured; null for a sky that wasn't for the challenge.
+   Smaller than the note and above it; it grows with its lines. */
+function measurePrompt(ctx, challenge) {
+  if (!challenge) return null;
+  const w = 560, lh = 52, font = `500 44px ${SERIF}`;
+  ctx.font = font;
+  const lines = wrap(ctx, challenge.text, w - 110, 3);
+  return { font, lh, lines, w, h: 96 + (lines.length - 1) * lh + 34 };
+}
+
+/** Under the hero, top down from y: the prompt's ticket, the note's slip, then the challenge hashtags. */
+function drawUnder(ctx, y, { sky, challenge, prompt, note, paperImg }) {
+  if (prompt) {
+    const { font, lh, lines, w, h } = prompt;
+    ctx.save();
+    ctx.translate(W / 2, y + h / 2);
+    ctx.rotate((2 * Math.PI) / 180);
+    ctx.translate(-w / 2, -h / 2);
+    ctx.shadowColor = 'rgba(30, 28, 25, .28)';
+    ctx.shadowBlur = 28;
+    ctx.shadowOffsetY = 12;
+    ctx.fillStyle = '#DCE7F0';
+    ctx.beginPath(); ctx.roundRect(0, 0, w, h, 6); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    // A perforated tear line near the left end, like a ticket stub.
+    ctx.strokeStyle = '#9FB4C8';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath(); ctx.moveTo(30, 18); ctx.lineTo(30, h - 18); ctx.stroke();
+    ctx.setLineDash([]);
+    text(ctx, t.ticketLine(challenge.kept).toUpperCase(), 64, 44, { font: `500 20px ${SANS}`, color: '#2C4A8C', align: 'left', spacing: 4 });
+    lines.forEach((ln, i) => text(ctx, ln, 64, 96 + i * lh, { font, color: '#1F2F55', align: 'left' }));
+    ctx.restore();
+    y += h + 34;
+  }
+  if (note) {
+    // The note's slip is the sky's own paper colour, torn top and bottom and tilted against the print, as in the app.
+    const { font, lh, lines, w, h } = note;
+    slip(ctx, paperImg, 'torn2', W / 2, y, w, h, 2, () => {
+      lines.forEach((ln, i) => text(ctx, ln, w / 2, 30 + SLIPS.torn2.dst[2] * 0.6 + lh * 0.78 + i * lh, { font }));
+    }, ROLLS[paperIndex(sky.id)]);
+    y += h + 30;
+  }
+  if (challenge) text(ctx, `#${CHALLENGE_TAG} #${challenge.tag}`, W / 2, y + 40, { font: `32px ${MONO}`, color: '#4A443D' });
+}
+
 async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   const [c, ctx] = page();
   const d = new Date(sky.takenAt);
@@ -626,31 +692,7 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   // The print is the hero, centred and tilted left; a challenge sky makes room for its prompt slip.
   // The note and the prompt are measured first so the whole group can sit centred on the page.
   let pw = challenge ? 600 : 734;
-  let note = null, prompt = null;
-  if (sky.note) {
-    // On a torn slip: handwriting for English, the regular face for Thai.
-    const thai = isThai(sky.note);
-    const padX = 64;
-    let size = thai ? 56 : 92, font, lines;
-    // Up to three lines; a longer note gets smaller writing instead of being cut off.
-    for (;;) {
-      font = thai ? `${size}px ${SANS}` : `${size}px ${HAND}`;
-      ctx.font = font;
-      lines = wrap(ctx, sky.note, W - MARGIN * 2 - padX * 2, 3);
-      if (lines.join(' ').length >= sky.note.trim().length - 1 || size <= (thai ? 38 : 60)) break;
-      size -= 4;
-    }
-    const lh = size * (thai ? 76 / 56 : 82 / 92);
-    const w = Math.min(W - MARGIN * 2, Math.max(...lines.map((ln) => ctx.measureText(ln).width)) + padX * 2);
-    note = { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn2.dst[2] * 2 };
-  }
-  if (challenge) {
-    // The day's prompt on a small pale-blue ticket, smaller than the note and above it; it grows with its lines.
-    const w = 560, lh = 52, font = `500 44px ${SERIF}`;
-    ctx.font = font;
-    const lines = wrap(ctx, challenge.text, w - 110, 3);
-    prompt = { font, lh, lines, w, h: 96 + (lines.length - 1) * lh + 34 };
-  }
+  const note = measureNote(ctx, sky), prompt = measurePrompt(ctx, challenge);
   // A long note with a prompt makes the print smaller, so everything stays above the footer.
   const rest = 90 + (prompt ? prompt.h + 34 : 0) + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
   pw = Math.min(pw, (H - 112 - top - 60 - rest) / (1.096 + 0.37 * JAR_RATIO * 0.38));
@@ -712,39 +754,41 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   postmark(ctx, W / 2 - pw / 2 - pw * 0.04, py + ph * 0.5, pw * 0.55,
     { ring: t.keptRing(MONTHS[d.getMonth()], d.getFullYear()), word: t.keptWord, center: String(d.getDate()) });
 
-  let y = py + ph + below;
-  if (prompt) {
-    const { font, lh, lines, w, h } = prompt;
-    ctx.save();
-    ctx.translate(W / 2, y + h / 2);
-    ctx.rotate((2 * Math.PI) / 180);
-    ctx.translate(-w / 2, -h / 2);
-    ctx.shadowColor = 'rgba(30, 28, 25, .28)';
-    ctx.shadowBlur = 28;
-    ctx.shadowOffsetY = 12;
-    ctx.fillStyle = '#DCE7F0';
-    ctx.beginPath(); ctx.roundRect(0, 0, w, h, 6); ctx.fill();
-    ctx.shadowColor = 'transparent';
-    // A perforated tear line near the left end, like a ticket stub.
-    ctx.strokeStyle = '#9FB4C8';
-    ctx.lineWidth = 4;
-    ctx.setLineDash([8, 8]);
-    ctx.beginPath(); ctx.moveTo(30, 18); ctx.lineTo(30, h - 18); ctx.stroke();
-    ctx.setLineDash([]);
-    text(ctx, t.ticketLine(challenge.kept).toUpperCase(), 64, 44, { font: `500 20px ${SANS}`, color: '#2C4A8C', align: 'left', spacing: 4 });
-    lines.forEach((ln, i) => text(ctx, ln, 64, 96 + i * lh, { font, color: '#1F2F55', align: 'left' }));
-    ctx.restore();
-    y += h + 34;
-  }
-  if (note) {
-    // The note's slip is the sky's own paper colour, torn top and bottom and tilted against the print, as in the app.
-    const { font, lh, lines, w, h } = note;
-    slip(ctx, paperImg, 'torn2', W / 2, y, w, h, 2, () => {
-      lines.forEach((ln, i) => text(ctx, ln, w / 2, 30 + SLIPS.torn2.dst[2] * 0.6 + lh * 0.78 + i * lh, { font }));
-    }, ROLLS[paperIndex(sky.id)]);
-    y += h + 30;
-  }
-  if (challenge) text(ctx, `#${CHALLENGE_TAG} #${challenge.tag}`, W / 2, y + 40, { font: `32px ${MONO}`, color: '#4A443D' });
+  drawUnder(ctx, py + ph + below, { sky, challenge, prompt, note, paperImg });
+  footer(ctx);
+  return toBlob(c);
+}
+
+/** One sky, the other way: the jar is the hero, standing tall in the middle of the page with the sky filling it,
+   KEPT inked across its lower corner and the day typed underneath, then the same ticket and note as the polaroid. */
+async function storySingleJar(sky, showPlace, quote, challenge) {
+  const [c, ctx] = page();
+  const d = new Date(sky.takenAt);
+  const top = masthead(ctx, quote, t.issueLine(d.getDate(), MONTHS[d.getMonth()], d.getFullYear()));
+  const paperImg = await texture('paper');
+  const note = measureNote(ctx, sky), prompt = measurePrompt(ctx, challenge);
+  // As big as the page allows once the day, the ticket and the note have their room.
+  const day = 96;
+  const rest = day + (prompt ? prompt.h + 34 : 0) + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
+  const bw = Math.min(600, (H - 112 - top - 120 - rest) / JAR_RATIO), bh = bw * JAR_RATIO;
+  const jx = (W - bw) / 2;
+  const jy = top + Math.max(60, (H - 112 - top - bh - rest) / 2);
+  const { img, release } = await loadImage(sky.photo);
+  standShadow(ctx, W / 2, jy + bh - bw * 0.02, bw * 1.05);
+  // The place tag hangs from its neck, as on the polaroid's jar.
+  const placed = showPlace && sky.place;
+  ctx.save();
+  ctx.translate(jx, jy);
+  if (placed) tagThreadBack(ctx, 0, 0, bw);
+  drawJar(ctx, { x: 0, y: 0, w: bw, image: img });
+  if (placed) tag(ctx, 0, 0, bw, sky.place);
+  ctx.restore();
+  release();
+  // KEPT stamped over the jar's left side, half on the paper so the red reads, as on the polaroid's edge.
+  postmark(ctx, jx - bw * 0.04, jy + bh * 0.7, bw * 0.48,
+    { ring: t.keptRing(MONTHS[d.getMonth()], d.getFullYear()), word: t.keptWord, center: String(d.getDate()) });
+  text(ctx, `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()} · ${fmt.time(d)}`.toUpperCase(), W / 2, jy + bh + 66, { font: `500 28px ${MONO}`, color: SOFT, spacing: 6 });
+  drawUnder(ctx, jy + bh + day, { sky, challenge, prompt, note, paperImg });
   footer(ctx);
   return toBlob(c);
 }
@@ -1148,7 +1192,11 @@ async function storyStamp(p) {
 
 export async function makeStory(kind, payload) {
   await fontsReady();
-  if (kind === 'single') return storySingle(payload.sky, payload.showPlace, payload.quote, payload.challenge, payload.monthSkies);
+  if (kind === 'single') {
+    return payload.style === 'jar'
+      ? storySingleJar(payload.sky, payload.showPlace, payload.quote, payload.challenge)
+      : storySingle(payload.sky, payload.showPlace, payload.quote, payload.challenge, payload.monthSkies);
+  }
   if (kind === 'jar') return storyJar(payload);
   if (kind === 'done') return storyDone(payload);
   if (kind === 'stamp') return storyStamp(payload);

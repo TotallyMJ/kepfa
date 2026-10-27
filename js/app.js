@@ -1922,12 +1922,18 @@ async function openStory(kind, payload) {
   // Show place starts off, then keeps whatever you chose last time, on this phone only.
   let placeOn = false;
   try { placeOn = localStorage.getItem('kepfa.showPlace') === '1'; } catch { /* stays off */ }
+  // One sky shares as a polaroid with a small jar, or as the jar itself full of the sky; the last choice sticks.
+  let style = 'polaroid';
+  try { if (localStorage.getItem('kepfa.shareStyle') === 'jar') style = 'jar'; } catch { /* polaroid */ }
   const challenge = kind === 'single' ? challengeFor(payload.sky) : null;
   // A single sky's jar holds that month's pile.
   const monthSkies = kind === 'single' ? skiesIn(new Date(payload.sky.takenAt).getFullYear(), new Date(payload.sky.takenAt).getMonth()) : null;
   art.innerHTML = `
     <div class="grabber"></div>
     <div class="sheet-head"><span></span><h2>${title}</h2><button type="button" class="viewer-icon" data-close-story aria-label="${t.close}">${ICON.close}</button></div>
+    ${kind === 'single' ? `<div class="seg seg-2" role="radiogroup" aria-label="${t.shareStyle}">
+      ${['polaroid', 'jar'].map((k) => `<button type="button" role="radio" data-style="${k}" aria-checked="${k === style}">${t.shareStyles[k]}</button>`).join('')}
+    </div>` : ''}
     <div class="story-preview" id="storyPreview"><div class="spinner"></div></div>
     ${canShowPlace ? `<label class="switch"><span>${t.showPlace}</span><input type="checkbox" id="showPlace" ${placeOn ? 'checked' : ''}></label>
       <p class="hint place-note">${t.showPlaceHint}</p>` : ''}
@@ -1949,7 +1955,7 @@ async function openStory(kind, payload) {
     $('#shareStory').disabled = true;
     let out;
     try {
-      out = await makeStory(kind, { ...payload, showPlace, quote, challenge, monthSkies });
+      out = await makeStory(kind, { ...payload, showPlace, quote, challenge, monthSkies, style });
     } catch {
       $('#storyPreview').innerHTML = `<p class="hint">${t.storyFailed}</p>`;
       return;
@@ -1983,11 +1989,20 @@ async function openStory(kind, payload) {
     if (how === 'saved') toast(t.sharedFallback);
     else if (await copying) toast(t.captionCopied);
   });
+  let showPlace = !!canShowPlace && placeOn;
+  art.querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.style === style) return;
+    style = b.dataset.style;
+    try { localStorage.setItem('kepfa.shareStyle', style); } catch { /* this time only */ }
+    art.querySelectorAll('[data-style]').forEach((o) => o.setAttribute('aria-checked', String(o === b)));
+    make(showPlace);
+  }));
   $('#showPlace')?.addEventListener('change', (e) => {
+    showPlace = e.target.checked;
     try { localStorage.setItem('kepfa.showPlace', e.target.checked ? '1' : '0'); } catch { /* this time only */ }
-    make(e.target.checked);
+    make(showPlace);
   });
-  make(!!canShowPlace && placeOn);
+  make(showPlace);
 }
 
 function closeStory() {

@@ -480,6 +480,8 @@ export const t = {
   holdHint: 'Hold a jar to delete it',
 
   shareTitle: { single: 'Share this sky', jar: (m) => `Share ${m}’s jar`, year: () => 'Share my year in skies', done: `Share my ${CHALLENGE_SIZE} days`, stamp: 'Share this postcard' },
+  shareStyle: 'Share as',
+  shareStyles: { polaroid: 'Polaroid', jar: 'Jar' },
   showPlace: 'Show place',
   showPlaceHint: 'Stays the way you last set it. No GPS ever leaves with the image.',
   close: 'Close',
