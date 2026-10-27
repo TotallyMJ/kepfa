@@ -350,6 +350,16 @@ export const t = {
   lookFor: 'Look for',
   // What Kepfa is for: at the top of Home, and the short poem that closes it.
   tagline: 'Keep the sky in a jar',
+  // Adding Kepfa to the home screen: a card on Home, and on iPhone the two steps to do it.
+  installEyebrow: 'Keep Kepfa close',
+  installTitle: 'Add to your home screen',
+  installSub: 'opens like an app, in one tap',
+  installLater: 'Not now',
+  installAgain: 'Add Kepfa to your phone',
+  installSheetTitle: 'Add to Home Screen',
+  installStep1: (icon) => `Tap <span class="install-glyph">${icon}</span> Share in your browser’s toolbar`,
+  installStep2: 'Choose “Add to Home Screen”',
+  installSafariNote: 'Skies kept here in Safari stay in Safari. The home screen app starts a jar of its own.',
   poem: ['Look up once a day.', 'Keep the sky you saw.', 'Then go back to your day,', 'a little lighter.'],
   poemSign: 'Kepfa · the art of noticing',
   sameSky: 'Wherever you are today, we’re all under the same sky.',

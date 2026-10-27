@@ -293,6 +293,45 @@ const IN_APP = [[/Instagram/i, 'Instagram'], [/FBAN|FBAV|FB_IAB/, 'Facebook'], [
   [/MicroMessenger/i, 'WeChat'], [/Snapchat/i, 'Snapchat'], [/LinkedInApp/i, 'LinkedIn']]
   .find(([re]) => re.test(navigator.userAgent))?.[1] || '';
 const ANDROID = /Android/i.test(navigator.userAgent);
+// Already on the home screen (iPhone reports it on navigator.standalone), or an iPhone/iPad that can be.
+const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Chrome and Android hand over their own install prompt; Home's card uses it. iPhone gets the two steps instead.
+let installPrompt = null;
+const homeShown = () => !!view.querySelector('.masthead-home');
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; if (homeShown()) render(); });
+window.addEventListener('appinstalled', () => { installPrompt = null; if (homeShown()) render(); });
+const canInstall = () => !STANDALONE && !IN_APP && (!!installPrompt || IOS);
+/** "Not now" puts the card away for 30 days; a small link at the bottom of Home stays. */
+function installSnoozed() {
+  try { return Date.now() - (+localStorage.getItem('kepfa.installLater') || 0) < 30 * 864e5; } catch { return false; }
+}
+
+async function installApp() {
+  if (!installPrompt) { openInstallSheet(); return; }
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => {});
+  installPrompt = null;   // each prompt can be shown once
+  render();
+}
+
+function openInstallSheet() {
+  const wrap = $('#installSheet');
+  wrap.querySelector('.sheet').innerHTML = `
+    <div class="grabber"></div>
+    <div class="sheet-head"><span></span><h2>${t.installSheetTitle}</h2><button type="button" class="viewer-icon" id="installClose" aria-label="${t.close}">${ICON.close}</button></div>
+    <ol class="install-steps"><li>${t.installStep1(ICON.share)}</li><li>${t.installStep2}</li></ol>
+    <p class="hint">${t.installSafariNote}</p>`;
+  wrap.hidden = false;
+  openLayer('install', closeInstallSheet);
+  $('#installClose').addEventListener('click', closeInstallSheet);
+  wrap.querySelector('.overlay-backdrop').onclick = closeInstallSheet;
+}
+
+function closeInstallSheet() {
+  $('#installSheet').hidden = true;
+  closeLayer('install');
+}
 const homeUrl = () => `${location.origin}${location.pathname}`;
 
 function inAppHtml() {
@@ -390,6 +429,14 @@ function renderShelf() {
            <div class="empty-jar">${jarSvg()}</div>
            ${state.skies.length ? `<p>${t.weekEmpty}</p>` : `<h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>`}
          </div>`}
+    ${canInstall() && !installSnoozed() ? `<div class="memory install-card">
+      <button type="button" class="install-open" id="installOpen">
+        <img class="install-icon" src="icons/icon-192.png" alt="">
+        <span class="memory-text"><span class="eyebrow">${t.installEyebrow}</span><span class="next-name">${t.installTitle}</span><span class="memory-date">${t.installSub}</span></span>
+        ${ICON.right}
+      </button>
+      <button type="button" class="btn-text install-later" id="installLater">${t.installLater}</button>
+    </div>` : ''}
     ${next ? `<a class="memory next-stamp" href="#/stamps">
       <span class="next-slot">${next.have}/${next.need}</span>
       <span class="memory-text"><span class="eyebrow">${t.nextStamp}</span><span class="next-name">${esc(t.stamps[next.id].name)}</span>
@@ -402,10 +449,17 @@ function renderShelf() {
       ${ICON.right}
     </button>` : ''}
     <section class="poem"><p>${t.poem.join('<br>')}</p><span class="eyebrow">${t.poemSign}</span></section>
+    ${canInstall() && installSnoozed() ? `<p class="install-again"><button type="button" class="btn-text" id="installAgain">${t.installAgain}</button></p>` : ''}
     <p class="credit">${t.madeBy} <a href="https://vibethebloom.com" target="_blank" rel="noopener">${t.maker}</a> ↗</p>`;
 
   bindJarSlots(view);
   $('#memory')?.addEventListener('click', () => openDetail(memory.sky));
+  $('#installOpen')?.addEventListener('click', installApp);
+  $('#installAgain')?.addEventListener('click', installApp);
+  $('#installLater')?.addEventListener('click', () => {
+    try { localStorage.setItem('kepfa.installLater', String(Date.now())); } catch { /* it shows again next time */ }
+    render();
+  });
   $('#clearSamples')?.addEventListener('click', clearSamples);
   $('#copyLink')?.addEventListener('click', copyLink);
   $('#setPlace')?.addEventListener('click', askLocation);
@@ -1970,6 +2024,7 @@ function bindGlobal() {
     if (e.key !== 'Escape') return;
     if (!$('#confirm').hidden) $('#confirmNo').click();
     else if (!$('#storyModal').hidden) closeStory();
+    else if (!$('#installSheet').hidden) closeInstallSheet();
     else if (!$('#letter').hidden) closeLetter();
     else if (!$('#celebrate').hidden) closeCelebration();
     else if (viewer.editing) endEdit(state.detail);

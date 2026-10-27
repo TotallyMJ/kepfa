@@ -9,7 +9,9 @@
 <meta name="theme-color" content="#1B1916" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kepfa">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans+Thai:wght@400;500&family=IBM+Plex+Sans:wght@400;500&family=Reenie+Beanie&display=swap">
@@ -81,6 +83,11 @@
 
 <section id="celebrate" class="celebrate" hidden aria-label="Challenge complete"></section>
 <section id="letter" class="celebrate letter-page" hidden aria-label="A letter from the sky"></section>
+
+<div id="installSheet" class="overlay" hidden>
+  <div class="overlay-backdrop"></div>
+  <article class="sheet install-sheet" role="dialog" aria-modal="true" aria-label="Add to Home Screen"></article>
+</div>
 
 <div id="storyModal" class="overlay" hidden>
   <div class="overlay-backdrop" data-close-story></div>
