@@ -507,7 +507,6 @@ export const t = {
   // Every image that leaves the app says where it came from and where to go.
   site: SITE,
   issueLine: (n, month, year) => `No. ${n} · ${month} ${year}`,
-  ticketLine: (day) => `Sky homework, day ${day}. Handed in.`,
   volume: (year) => `Vol. ${year}`,
   keptRing: (month, year) => `KEPT · ${month.toUpperCase()} · ${year} · KEPFA · `,
   keptWord: 'KEPT',
