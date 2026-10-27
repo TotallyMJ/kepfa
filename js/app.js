@@ -8,6 +8,7 @@ import { placeNear } from './places.js';
 import { album, checkStamps, writeCard } from './stamps.js';
 import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
+import { sunPhase, skyKind, lastWeather, currentWeather, skyLayers } from './weather.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE } from './strings.js';
 
 const ICON = {
@@ -358,40 +359,31 @@ function slotButton(s) {
   return `<button type="button" class="jar-slot${s.sample ? ' is-sample' : ''}" data-id="${s.id}" aria-label="${t.openSky(fmt.long(s.takenAt))}">${jarSvg({ href: photoUrl(s) })}</button>`;
 }
 
-/** Today's jar before it's kept: empty and faded, waiting at the front of the shelf. A tap opens the camera. */
-const todaySlot = () => `<button type="button" class="today-slot" id="todayJar" aria-label="${t.todayJar}">${jarSvg()}<span class="today-cam">${ICON.camera}</span></button>`;
-
-/** A shelf three jars to a row; a null in the list is today's empty jar. */
 function shelfRowsHtml(list) {
   return chunk(list, 3).map((row) => `
     <div class="shelf-row">
-      <div class="shelf-jars">${row.map((s) => (s ? slotButton(s) : todaySlot())).join('')}</div>
-      <div class="shelf-labels">${row.map((s) => { const [day, time] = s ? fmt.shelf(s.takenAt) : [t.today, t.notYet]; return `<p${s ? '' : ' class="is-today"'}><span>${day}</span><span>${time}</span></p>`; }).join('')}</div>
+      <div class="shelf-jars">${row.map(slotButton).join('')}</div>
+      <div class="shelf-labels">${row.map((s) => { const [day, time] = fmt.shelf(s.takenAt); return `<p><span>${day}</span><span>${time}</span></p>`; }).join('')}</div>
     </div>`).join('');
-}
-
-/** Which sky is out right now, so the prompt sits on a sheet of that colour. */
-function skyPhase(now = new Date()) {
-  const place = sunPlace();
-  const sun = sunTimes(now, place.lat, place.lon);
-  if (!sun) return 'day';
-  if (now < sun.sunrise || now >= sun.sunset) return 'night';
-  if (now < sun.goldenMorningEnd || now >= sun.goldenEveningStart) return 'golden';
-  return 'day';
 }
 
 function renderShelf() {
   const now = new Date();
   const prompt = todayPrompt(now);
-  const { filled, round } = challengeProgress();
+  const { filled } = challengeProgress();
   const fresh = newDot(filled);
   // Home is today and this week: the last seven days, newest first, two shelves at most. Everything else is in Jars.
   const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
   const week = state.skies.filter((s) => s.takenAt >= weekStart).reverse().slice(0, 6);
-  // Until a sky of your own is kept today, an empty jar waits at the front of the shelf (the missed days don't).
+  // Today's jar stays empty however many skies were kept today (they're on the shelf); it only counts them.
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const waiting = !state.skies.some((s) => !s.sample && s.takenAt >= todayStart);
-  const slots = waiting ? [null, ...week.slice(0, 5)] : week;
+  const keptToday = state.skies.filter((s) => !s.sample && s.takenAt >= todayStart).length;
+  // The challenge: today's day of the round (the one just done, or the next), and whether today's is in yet.
+  const doneToday = state.skies.some((s) => !s.sample && s.prompt === prompt.key);
+  const challengeDay = doneToday ? filled : (filled % CHALLENGE_SIZE) + 1;
+  // Behind today's jar, the sky outside right now: painted from the sun's phase and the last weather we know.
+  const place = sunPlace();
+  const weather = lastWeather(place);
   // The memory waits under the shelf, unless it's already on it.
   const found = onThisDay();
   const memory = found && !week.includes(found.sky) ? found : null;
@@ -409,30 +401,38 @@ function renderShelf() {
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
       <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${ICON.pin}<u>${savedPlace() ? t.nearYou : esc(zoneCity())}</u></button></div>` : ''}
     ${inAppHtml()}
-    <section class="prompt is-${skyPhase(now)}">
-      <div class="prompt-print">
-        <div class="prompt-sky"></div>
-        <div class="prompt-sheet-head"><span class="prompt-badge">${t.challengeBadge}</span><span class="prompt-day">${fmt.dayShort(prompt.key)}</span></div>
-      </div>
-      <div class="prompt-pin">
+    <section class="today">
+      <div class="today-print">
         ${tape('tape-top')}
-        <div class="slip torn">
-          <span class="eyebrow">${prompt.theme ? `${MONTHS[now.getMonth()]} · ${prompt.theme}` : t.lookFor}</span>
-          <h2 class="prompt-text">${prompt.text}</h2>
-          <p class="prompt-line">${t.sameSky}</p>
-          <button type="button" class="btn primary prompt-go" id="lookUp">${ICON.camera}${t.lookUp}</button>
-          <a class="btn-text prompt-tag" href="${tagUrl(prompt.tag)}" target="_blank" rel="noopener">${t.seeWho}</a>
-          <div class="prompt-progress">
-            <div class="prompt-head"><span class="eyebrow">${t.challenge(round)}</span><span class="prompt-count">${t.challengeCount(filled)}</span></div>
-            <div class="dots" role="img" aria-label="${t.challengeCount(filled)}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ` class="on${i === fresh ? ' is-new' : ''}"` : ''}></i>`).join('')}</div>
-          </div>
+        <div class="today-photo">
+          <div class="sky-paint" id="skyPaint">${skyPaintInner(now, place, weather)}</div>
+          <button type="button" class="today-jar" id="heroJar" aria-label="${t.todayJar}">${jarSvg()}<span class="today-cam">${ICON.camera}</span></button>
         </div>
+        <p class="today-strip"><span class="hand" id="skyLabel">${skyLabel(now, place, weather)}</span></p>
       </div>
+      <p class="today-cap" id="todayCap">${todayLine(now, place, weather)}</p>
+      ${keptToday ? `<a class="today-count" href="#thisWeek">${t.todayCount(keptToday)} ↓</a>` : ''}
+    </section>
+    <section class="challenge${doneToday ? ' is-done' : ''}">
+      <div class="challenge-head"><span class="eyebrow">${t.challengeBadge}</span><span class="prompt-count">${prompt.theme ? `${MONTHS_SHORT[now.getMonth()]} · ${prompt.theme}` : fmt.dayShort(prompt.key)}</span></div>
+      <div class="challenge-body">
+        <p class="challenge-day"><small>${t.challengeDayWord}</small><b>${pad2(challengeDay)}</b><small>/${CHALLENGE_SIZE}</small></p>
+        <div class="challenge-main">
+          <p class="challenge-ask">${t.lookFor}</p>
+          <p class="challenge-text">${prompt.text}</p>
+          ${doneToday
+            ? `<p class="challenge-done">${t.challengeDone}</p>`
+            : `<button type="button" class="challenge-go" id="takeChallenge">${t.challengeGo} <span aria-hidden="true">→</span></button>`}
+        </div>
+        ${doneToday ? keptStamp(challengeDay) : ''}
+      </div>
+      <div class="dots" role="img" aria-label="${t.challengeCount(filled)}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ` class="on${i === fresh ? ' is-new' : ''}"` : ''}></i>`).join('')}</div>
+      <div class="challenge-foot"><span class="prompt-count">${t.challengeCount(filled)}</span><a class="challenge-link" href="${tagUrl(prompt.tag)}" target="_blank" rel="noopener">${t.seeWho}</a></div>
     </section>
     ${bannerHtml()}
-    <div class="section-head"><h2 class="section-title">${t.thisWeek}</h2>${latest
+    <div class="section-head" id="thisWeek"><h2 class="section-title">${t.thisWeek}</h2>${latest
       ? `<a class="eyebrow head-link" href="#/month/${jarMonth.getFullYear()}-${pad2(jarMonth.getMonth() + 1)}">${t.monthsJar(MONTHS[jarMonth.getMonth()])}</a>` : ''}</div>
-    ${shelfRowsHtml(slots)}
+    ${shelfRowsHtml(week)}
     ${state.skies.length ? '' : `<div class="empty empty-first"><h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p></div>`}
     ${canInstall() && !installSnoozed() ? `<div class="memory install-card">
       <button type="button" class="install-open" id="installOpen">
@@ -470,9 +470,41 @@ function renderShelf() {
   $('#clearSamples')?.addEventListener('click', clearSamples);
   $('#copyLink')?.addEventListener('click', copyLink);
   $('#setPlace')?.addEventListener('click', askLocation);
-  $('#lookUp').addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
-  $('#todayJar')?.addEventListener('click', () => { state.viaPrompt = false; openCapture(); });
+  paintWeather(place);
+  $('#heroJar').addEventListener('click', () => { state.viaPrompt = !doneToday; openCapture(); });
+  $('#takeChallenge')?.addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
+  $('.today-count')?.addEventListener('click', (e) => { e.preventDefault(); $('#thisWeek').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth' }); });
   state.redraw = null;
+}
+
+function skyPaintInner(now, place, weather) {
+  const kind = skyKind(weather?.code);
+  return `<div class="sky-layers is-${sunPhase(now, place)} is-${kind}">${skyLayers(kind)}</div>`;
+}
+function skyLabel(now, place, weather) {
+  const kind = skyKind(weather?.code);
+  const name = kind === 'clear' && sunPhase(now, place) === 'night' ? t.weather.clearNight : t.weather[kind];
+  return `${t.today.toLowerCase()}, ${name.toLowerCase()}${weather ? ` · ${weather.temp}°` : ''}`;
+}
+/** The line under the polaroid: a nudge to tap the jar, in words for the sky that's out right now. */
+function todayLine(now, place, weather) {
+  const kind = skyKind(weather?.code);
+  const phase = sunPhase(now, place);
+  const fair = kind === 'clear' || kind === 'partly';
+  return t.todayLines[fair && phase !== 'day' ? phase : kind];
+}
+/** Once the weather comes in, repaint the sky behind today's jar if it changed. A time zone we don't know only
+   gives a rough longitude, so there's no weather to ask for: the sky stays clear for the time of day. */
+async function paintWeather(place) {
+  if (place.rough) return;
+  const w = await currentWeather(place);
+  const paint = $('#skyPaint');
+  if (!w || !paint) return;
+  const now = new Date();
+  const html = skyPaintInner(now, place, w);
+  if (paint.innerHTML !== html) paint.innerHTML = html;
+  $('#skyLabel').textContent = skyLabel(now, place, w);
+  $('#todayCap').textContent = todayLine(now, place, w);
 }
 
 /** Tap a jar to open it; press and hold for the delete menu. Moving the finger means scrolling, so it cancels. */
@@ -1352,6 +1384,14 @@ function roundSkies(round) {
   for (const s of state.skies) if (s.prompt && !s.sample && !byDay.has(s.prompt)) byDay.set(s.prompt, s);
   return [...byDay.keys()].sort().slice((round - 1) * CHALLENGE_SIZE, round * CHALLENGE_SIZE).map((k) => byDay.get(k));
 }
+
+/** Today's challenge, done: the KEPT postmark in the same red as the round's DONE stamp, with the day in the middle. */
+const keptStamp = (day) => `<svg class="kept-stamp" viewBox="0 0 104 104" aria-hidden="true">
+  <defs><path id="keptRing" d="M52 52m-36 0a36 36 0 1 1 72 0a36 36 0 1 1 -72 0"/></defs>
+  <circle cx="52" cy="52" r="47"/><circle cx="52" cy="52" r="29" class="thin"/>
+  <text class="ring"><textPath href="#keptRing">${t.keptStampRing}</textPath></text>
+  <text x="52" y="50" class="word">${t.keptWord}</text>
+  <text x="52" y="66" class="score">${t.challengeDayWord.toUpperCase()} ${pad2(day)}</text></svg>`;
 
 const doneStamp = () => `<svg class="done-stamp" viewBox="0 0 104 104" aria-hidden="true">
   <defs><path id="doneRing" d="M52 52m-36 0a36 36 0 1 1 72 0a36 36 0 1 1 -72 0"/></defs>
