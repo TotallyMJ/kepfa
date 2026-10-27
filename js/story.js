@@ -633,7 +633,7 @@ function measureNote(ctx, sky) {
   return { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn2.dst[2] * 2 };
 }
 
-/** Under the hero, top down from y: the note's slip, then the challenge hashtags. */
+/** Under the hero, top down from y: the note's slip, then the day's hashtags for a challenge sky. */
 function drawUnder(ctx, y, { sky, challenge, note, paperImg }) {
   if (note) {
     // The note's slip is the sky's own paper colour, torn top and bottom and tilted against the print, as in the app.
@@ -643,7 +643,7 @@ function drawUnder(ctx, y, { sky, challenge, note, paperImg }) {
     }, ROLLS[paperIndex(sky.id)]);
     y += h + 30;
   }
-  if (challenge) text(ctx, `#${CHALLENGE_TAG} #${challenge.tag}`, W / 2, y + 40, { font: `32px ${MONO}`, color: '#4A443D' });
+  if (challenge) text(ctx, `#${challenge.tag} #kepfa`, W / 2, y + 40, { font: `32px ${MONO}`, color: '#4A443D' });
 }
 
 /**
