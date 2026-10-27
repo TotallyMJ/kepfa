@@ -493,8 +493,7 @@ export const t = {
   storyFailed: 'Couldn’t make the image. Close this and try again.',
   captionHint: 'We’ll copy a caption with the link. Just paste.',
   captionCopied: 'Caption copied. Paste it wherever you post.',
-  caption: ({ text, day, kept, tag }) =>
-    `${text}\n${day} · day ${kept} of my ${CHALLENGE_SIZE}-day sky challenge on Kepfa.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #${tag} #kepfa`,
+  caption: ({ text, day, tag }) => `${text}\n${day}, kept in a jar with Kepfa.\nYour turn: ${SITE}\n#${tag} #kepfa`,
   // Every other share gets a caption too, so whoever sees it can find the app.
   shareCaption: {
     single: (note) => `${note ? `“${note}”\n` : ''}Kept in a jar with Kepfa.\nStart your own: ${SITE}\n#kepfa`,
