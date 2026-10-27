@@ -355,7 +355,7 @@ export const t = {
   installTitle: 'Add to your home screen',
   installSub: 'opens like an app, in one tap',
   installLater: 'Not now',
-  installAgain: 'Add Kepfa to your phone',
+  installAgain: 'Add Kepfa to your home screen',
   installSheetTitle: 'Add to Home Screen',
   installStep1: (icon) => `Tap <span class="install-glyph">${icon}</span> Share in your browser’s toolbar`,
   installStep2: 'Choose “Add to Home Screen”',

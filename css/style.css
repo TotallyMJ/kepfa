@@ -317,8 +317,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .install-open > svg { flex: none; width: 18px; height: 18px; color: var(--ink-soft); }
 .install-icon { flex: none; width: 46px; height: 46px; border-radius: 11px; }
 .install-later { align-self: flex-end; min-height: 36px; font-size: var(--t-cap); color: var(--ink-soft); }
-.install-again { margin: var(--s-5) 0 0; text-align: center; }
-.install-again .btn-text { font-size: var(--t-sm); }
+/* After "Not now": the same card, slimmed to one line at the very end of Home. */
+.install-again { margin-top: var(--s-6); padding: 10px var(--s-4); gap: var(--s-3); }
+.install-again img { flex: none; width: 30px; height: 30px; border-radius: 7px; }
+.install-again span { flex: 1; font-family: var(--f-display); font-weight: 500; font-size: 18px; }
 .install-steps { margin: 0; padding-left: 1.3em; font-size: var(--t-body); line-height: 1.6; }
 .install-steps li + li { margin-top: var(--s-2); }
 .install-glyph svg { width: 20px; height: 20px; vertical-align: -4px; }

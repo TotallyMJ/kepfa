@@ -449,7 +449,9 @@ function renderShelf() {
       ${ICON.right}
     </button>` : ''}
     <section class="poem"><p>${t.poem.join('<br>')}</p><span class="eyebrow">${t.poemSign}</span></section>
-    ${canInstall() && installSnoozed() ? `<p class="install-again"><button type="button" class="btn-text" id="installAgain">${t.installAgain}</button></p>` : ''}
+    ${canInstall() && installSnoozed() ? `<button type="button" class="memory install-again" id="installAgain">
+      <img src="icons/icon-192.png" alt=""><span>${t.installAgain}</span>${ICON.right}
+    </button>` : ''}
     <p class="credit">${t.madeBy} <a href="https://vibethebloom.com" target="_blank" rel="noopener">${t.maker}</a> ↗</p>`;
 
   bindJarSlots(view);
