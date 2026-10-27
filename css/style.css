@@ -749,7 +749,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .empty { text-align: center; margin-top: var(--s-7); }
 .empty h2 { margin: var(--s-4) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); }
 .empty p { margin: var(--s-1) auto var(--s-5); max-width: 32ch; color: var(--ink-soft); }
-.empty-first { margin-top: var(--s-4); }
+/* This week with nothing on it: the shelf still stands, three empty jars faded on it, one quiet line beneath. */
+.ghost-jar { display: flex; justify-content: center; min-width: 0; }
+.ghost-jar .jar { max-width: 96px; opacity: .3; }
+.shelf-hint { margin: var(--s-2) 0 0; text-align: center; font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); color: var(--ink-soft); }
 
 .year-switch { display: flex; align-items: center; gap: var(--s-1); font-family: var(--f-mono); font-size: var(--t-sm); }
 .year-switch button {
