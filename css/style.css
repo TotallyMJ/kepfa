@@ -301,7 +301,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   background: radial-gradient(circle, #fff3d6 0 10%, rgba(255, 214, 160, .75) 22%, rgba(250, 170, 130, 0) 68%); }
 .is-dawn .sky-sun, .is-dusk .sky-sun { width: 320px; height: 220px; left: 6%; top: 74%;
   background: radial-gradient(ellipse, rgba(255, 200, 160, .75) 0, rgba(255, 170, 140, 0) 65%); }
-.is-night .sky-sun { width: 64px; height: 64px; left: 22%; top: 20%;
+.is-night .sky-sun { width: 64px; height: 64px; left: 4%; top: 4%;
   background: radial-gradient(circle, #f4f1e6 0 18%, rgba(220, 225, 245, .35) 26%, rgba(200, 210, 240, 0) 66%); }
 .is-cloudy .sky-sun, .is-rain .sky-sun, .is-storm .sky-sun, .is-snow .sky-sun { opacity: .25; }
 .is-fog .sky-sun { opacity: .55; filter: blur(6px); }
