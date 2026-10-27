@@ -16,13 +16,13 @@ export const fmt = {
   // Prompt days are keyed 'YYYY-MM-DD'.
   dayShort: (key) => { const [, m, d] = key.split('-').map(Number); return `${d} ${MONTHS_SHORT[m - 1]}`; },
   dayLong: (key) => { const [y, m, d] = key.split('-').map(Number); return `${d} ${MONTHS_SHORT[m - 1]} ${y}`; },
-  // One hashtag per day, written so people can read it: #Kepfa24Oct.
-  dayTag: (key) => { const [, m, d] = key.split('-').map(Number); return `Kepfa${d}${MONTHS_SHORT[m - 1]}`; },
 };
 
 const skies = (n) => (n === 1 ? 'sky' : 'skies');
 
 export const CHALLENGE_TAG = 'kepfachallenge';
+// The one hashtag every share carries and Home links to, so everyone's skies gather in one place.
+export const HASHTAG = 'kepfa';
 export const CHALLENGE_SIZE = 30;
 const SITE = 'kepfa.vibethebloom.com';
 
@@ -382,7 +382,7 @@ export const t = {
   installSafariNote: 'Skies kept here in Safari stay in Safari. The home screen app starts a jar of its own.',
   poem: ['Look up once a day.', 'Keep the sky you saw.', 'Then go back to your day,', 'a little lighter.'],
   poemSign: 'Kepfa · the art of noticing',
-  seeWho: 'Everyone’s sky today ↗',
+  seeWho: 'Everyone’s skies ↗',
   challengeBadge: 'Daily sky challenge',
   challengeCount: (n) => `${n} of ${CHALLENGE_SIZE} days`,
   challengeDayWord: 'Day',
@@ -493,14 +493,14 @@ export const t = {
   storyFailed: 'Couldn’t make the image. Close this and try again.',
   captionHint: 'We’ll copy a caption with the link. Just paste.',
   captionCopied: 'Caption copied. Paste it wherever you post.',
-  caption: ({ text, day, tag }) => `${text}\n${day}, kept in a jar with Kepfa.\nYour turn: ${SITE}\n#${tag} #kepfa`,
+  caption: ({ text, day }) => `${text}\n${day}, kept in a jar with Kepfa.\nYour turn: ${SITE}\n#${HASHTAG}`,
   // Every other share gets a caption too, so whoever sees it can find the app.
   shareCaption: {
-    single: (note) => `${note ? `“${note}”\n` : ''}Kept in a jar with Kepfa.\nStart your own: ${SITE}\n#kepfa`,
-    jar: (month) => `My ${month} in skies, kept with Kepfa.\nStart your own: ${SITE}\n#kepfa`,
-    year: (year) => `My ${year} in skies, kept with Kepfa.\nStart your own: ${SITE}\n#kepfa`,
-    done: () => `${CHALLENGE_SIZE} days, ${CHALLENGE_SIZE} skies. I finished the Kepfa sky challenge.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #kepfa`,
-    stamp: (name) => `The sky sent me a stamp: ${name}.\nStart your own: ${SITE}\n#kepfa`,
+    single: (note) => `${note ? `“${note}”\n` : ''}Kept in a jar with Kepfa.\nStart your own: ${SITE}\n#${HASHTAG}`,
+    jar: (month) => `My ${month} in skies, kept with Kepfa.\nStart your own: ${SITE}\n#${HASHTAG}`,
+    year: (year) => `My ${year} in skies, kept with Kepfa.\nStart your own: ${SITE}\n#${HASHTAG}`,
+    done: () => `${CHALLENGE_SIZE} days, ${CHALLENGE_SIZE} skies. I finished the Kepfa sky challenge.\nYour turn: ${SITE}\n#${CHALLENGE_TAG} #${HASHTAG}`,
+    stamp: (name) => `The sky sent me a stamp: ${name}.\nStart your own: ${SITE}\n#${HASHTAG}`,
   },
 
   // Every image that leaves the app says where it came from and where to go.
