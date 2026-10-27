@@ -53,5 +53,5 @@ export function guessPlace() {
   const hit = CITIES[zone];
   if (hit) return { name: hit[0], lat: hit[1], lon: hit[2] };
   const name = zone.includes('/') ? zone.split('/').pop().replace(/_/g, ' ') : '';
-  return { name, lat: 20, lon: (-new Date().getTimezoneOffset() / 60) * 15 };
+  return { name, lat: 20, lon: (-new Date().getTimezoneOffset() / 60) * 15, rough: true };
 }

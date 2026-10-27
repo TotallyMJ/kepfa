@@ -204,68 +204,166 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 }
 @media (prefers-color-scheme: dark) {
   .slip { filter: brightness(.9) drop-shadow(0 8px 14px rgba(0, 0, 0, .5)); }
-  .prompt .slip.torn { filter: sepia(.12) brightness(.96) saturate(.9) drop-shadow(0 8px 14px rgba(0, 0, 0, .5)); }
   .viewer-body .viewer-note { filter: brightness(.9) drop-shadow(0 8px 14px rgba(0, 0, 0, .5)); }
   .tape { filter: brightness(.9); }
 }
 
-/* Today's prompt, as a collage: a print of the sky outside right now (torn along its top, tilted one way)
-   with the torn paper slip taped over it, tilted the other. The print is the only colour on the page
-   besides the skies themselves, so it reads as the invitation. */
-.prompt { position: relative; margin-top: var(--s-5); padding-top: 64px; }
-.prompt-print {
-  position: absolute;
-  inset: 0 4px 56px 28px;
-  color: #FBF9F5;
-  transform: rotate(2.5deg);
-  filter: drop-shadow(0 10px 14px rgba(20, 22, 50, .4));
+/* Today's jar in the middle of a polaroid of the sky outside right now, painted from the sun's phase and the real
+   weather (js/weather.js), never someone else's photo; the weather is written on its strip by hand. The jar is empty
+   light glass (the camera's own frame) until today's sky is kept; one tap opens the camera. */
+.today { position: relative; margin-top: var(--s-6); display: flex; flex-direction: column; align-items: center; }
+.today-print {
+  position: relative; width: min(318px, 100%);
+  padding: 13px 13px 0; background: var(--polaroid); border-radius: 4px; transform: rotate(-2.2deg);
+  box-shadow: 0 1px 2px rgba(30, 28, 25, .16), 0 18px 30px -14px rgba(30, 28, 25, .45);
 }
-/* Cut to the torn paper's outline (flipped, so the tear runs along the top). The sky itself sits on ::before,
-   flipped back, so it stays the right way up. Browsers without mask-box-image show a clean edge. */
-.prompt-sky {
-  position: absolute;
-  inset: 0;
-  transform: scaleY(-1);
-  -webkit-mask-box-image: url(../assets/paper.webp) 12 12 84 12 stretch;
-  -webkit-mask-box-image-width: 3px 3px 26px 3px;
+.today .tape-top { left: calc(50% - 37px); top: -11px; z-index: 3; }
+.today-photo { position: relative; overflow: hidden; isolation: isolate; aspect-ratio: 1 / 1.04; border-radius: 2px; display: grid; place-items: center; }
+.sky-paint, .sky-layers { position: absolute; inset: 0; }
+.sky-layers > i { position: absolute; display: block; pointer-events: none; }
+.today-strip { margin: 0; min-height: 62px; display: flex; align-items: center; padding: 0 var(--s-2) 4px; color: #2b2925; }
+.today-strip .hand { font-size: 25px; line-height: 1; }
+/* Upright however the polaroid is tilted, and a touch above centre so it sits in the sky, not on the strip. */
+.today-jar { position: relative; z-index: 2; margin-top: -6px; display: flex; padding: 0; border: 0; background: none; transform: rotate(2.2deg); }
+.today-jar .jar { width: 128px; filter: drop-shadow(0 16px 14px rgba(15, 18, 40, .25)); transition: transform var(--t-move) var(--ease-spring); }
+.today-jar:active .jar { transform: translateY(-4px); }
+.today-jar .j-glass, .today-jar .j-body-ink { display: none; }
+.today-jar .j-body-light { display: inline; }
+.today-cam { position: absolute; left: 50%; top: 60%; transform: translate(-50%, -50%); display: grid; color: #FBF9F5; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .35)); pointer-events: none; }
+.today-cam svg { width: 26px; height: 26px; stroke-width: 1.3; }
+/* Fog and snow are near white: the jar goes back to dark glass so it doesn't vanish. */
+.today:has(.is-fog, .is-snow) .today-jar .j-body-ink { display: inline; }
+.today:has(.is-fog, .is-snow) .today-jar .j-body-light { display: none; }
+.today:has(.is-fog, .is-snow) .today-jar .today-cam { color: var(--ink-soft); filter: none; }
+.today-count { margin-top: var(--s-2); min-height: 32px; display: inline-flex; align-items: center; font-family: var(--f-mono); font-size: var(--t-cap); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); text-decoration: none; }
+.today-cap { max-width: 30ch; margin: var(--s-5) auto 0; text-align: center; font-family: var(--f-display); font-style: italic; font-size: 21px; line-height: 1.3; color: var(--ink); text-wrap: balance; }
+
+/* The day's challenge, under the hero: type on the page between two rules, no paper of its own, so the polaroid
+   stays the one picture. A big day number and a dare to accept make it a challenge; done, it gets the KEPT postmark. */
+.challenge { position: relative; margin-top: var(--s-6); padding: var(--s-3) 0 var(--s-2); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.challenge-head, .challenge-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
+.challenge-body { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-4); align-items: start; margin-top: var(--s-3); }
+.challenge-day { margin: 0; display: flex; flex-direction: column; align-items: flex-start; padding-right: var(--s-4); border-right: 1px solid var(--rule); }
+.challenge-day b { font-family: var(--f-display); font-weight: 500; font-size: 64px; line-height: .9; letter-spacing: -.02em; font-variant-numeric: lining-nums; font-feature-settings: "lnum" 1; }
+.challenge-day small { font-family: var(--f-mono); font-size: var(--t-cap); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.challenge-day small:last-child { margin-top: 2px; }
+.challenge-ask { margin: 0; font-family: var(--f-display); font-style: italic; font-size: var(--t-body); color: var(--ink-soft); }
+.challenge-text { margin: 2px 0 0; font-family: var(--f-display); font-weight: 500; font-size: 22px; line-height: 1.2; text-wrap: balance; }
+.challenge-go {
+  margin-top: var(--s-3); min-height: 40px; padding: 0 var(--s-3); display: inline-flex; align-items: center; gap: var(--s-2);
+  border: 1px solid var(--ink); border-radius: 999px; background: none; color: var(--ink);
+  font-family: var(--f-body); font-size: var(--t-sm); font-weight: 500;
 }
-.prompt-sky::before { content: ""; position: absolute; inset: 0; transform: scaleY(-1); }
-.is-day .prompt-sky::before { background: linear-gradient(170deg, #4a78b8 0%, #8fb6e2 55%, #d6e5f2 100%); }
-.is-golden .prompt-sky::before { background: linear-gradient(165deg, #5b6aa8 0%, #9c8fc4 40%, #e9a08a 75%, #f6cf98 100%); }
-.is-night .prompt-sky::before {
+.challenge-go:active { background: var(--ink); color: var(--paper); }
+.challenge-done { margin: var(--s-3) 0 0; font-family: var(--f-display); font-style: italic; font-size: var(--t-body); color: var(--ink-soft); }
+.challenge .dots { margin-top: var(--s-4); }
+.challenge .dots i { border-color: var(--rule); }
+.challenge .dots i.on { background: var(--ink); border-color: var(--ink); }
+.challenge-foot { margin-top: var(--s-1); }
+.challenge-link { min-height: 40px; display: inline-flex; align-items: center; font-size: var(--t-cap); color: var(--ink); text-underline-offset: 3px; }
+/* The KEPT postmark, inked over the corner of today's dare once it's done. */
+.kept-stamp {
+  position: absolute; right: -2px; bottom: -18px; width: 84px; height: 84px;
+  color: var(--stamp); fill: none; stroke: currentColor; stroke-width: 3; opacity: .85;
+  transform: rotate(-12deg); pointer-events: none;
+  animation: pop-in var(--t-pop) var(--ease-spring) 300ms both;
+}
+.kept-stamp .thin { stroke-width: 1.6; }
+.kept-stamp text { fill: currentColor; stroke: none; text-anchor: middle; }
+.kept-stamp .ring { font-family: var(--f-mono); font-size: 8.4px; letter-spacing: 1.6px; text-anchor: start; }
+.kept-stamp .word { font-family: var(--f-mono); font-weight: 600; font-size: 13px; letter-spacing: 2px; }
+.kept-stamp .score { font-family: var(--f-mono); font-size: 8px; letter-spacing: 1px; }
+.challenge-done { padding-right: 84px; text-wrap: balance; line-height: 1.35; }
+
+/* ----- the painted sky: phase sets the light, kind sets the weather ----- */
+.sky-layers { background: var(--sky); }
+.sky-layers::before { content: ""; position: absolute; inset: 0; background: var(--haze, none); }
+.is-dawn   { --sky: linear-gradient(180deg, #34406f 0%, #7a6f9e 38%, #d9a0a6 70%, #f4c9a6 100%); --cloud: #f6dcd2; --cloud-shade: #a88fa8; }
+.is-day    { --sky: linear-gradient(180deg, #3f72b5 0%, #6b9ad2 40%, #a9c8e8 75%, #dbe8f2 100%); --cloud: #ffffff; --cloud-shade: #c3d3e6; }
+.is-golden { --sky: linear-gradient(180deg, #5a6aa6 0%, #a48bb5 34%, #e7a08c 66%, #f7cf98 100%); --cloud: #fbe3cf; --cloud-shade: #c99aa2; }
+.is-dusk   { --sky: linear-gradient(180deg, #1f2752 0%, #4b4878 40%, #a46b85 72%, #e39a7d 100%); --cloud: #c99aa6; --cloud-shade: #5d5480; }
+.is-night  { --sky: linear-gradient(180deg, #0b1129 0%, #18224a 45%, #2c3a6c 80%, #44507f 100%); --cloud: #56608a; --cloud-shade: #262f55; }
+/* Grey weather pulls the colour out and lowers the light. */
+.is-cloudy { --haze: linear-gradient(180deg, rgba(120, 128, 142, .55), rgba(170, 176, 186, .35)); }
+.is-fog    { --haze: linear-gradient(180deg, rgba(200, 204, 210, .55), rgba(225, 226, 228, .8)); }
+.is-rain   { --haze: linear-gradient(180deg, rgba(70, 80, 98, .7), rgba(120, 130, 146, .5)); }
+.is-storm  { --haze: linear-gradient(180deg, rgba(28, 32, 48, .82), rgba(70, 74, 92, .6)); }
+.is-snow   { --haze: linear-gradient(180deg, rgba(190, 198, 212, .55), rgba(232, 236, 242, .6)); }
+.is-night.is-cloudy, .is-night.is-rain, .is-night.is-fog, .is-night.is-snow { --haze: rgba(10, 14, 30, .45); }
+.is-cloudy, .is-rain, .is-storm, .is-snow { --cloud: #e9ecf1; --cloud-shade: #8d96a8; }
+.is-storm { --cloud: #8a90a2; --cloud-shade: #3c4256; }
+.is-night.is-cloudy, .is-night.is-rain, .is-night.is-storm, .is-night.is-snow { --cloud: #3e4668; --cloud-shade: #1c2240; }
+
+/* The sun (or moon): a warm glow, high by day, low and big at golden hour, just under the edge at dawn and dusk. */
+.sky-sun { width: 90px; height: 90px; left: 64%; top: 18%; border-radius: 50%;
+  background: radial-gradient(circle, #fffdf3 0 22%, rgba(255, 246, 214, .7) 30%, rgba(255, 240, 200, 0) 70%); }
+.is-golden .sky-sun { width: 220px; height: 220px; left: 46%; top: 52%;
+  background: radial-gradient(circle, #fff3d6 0 10%, rgba(255, 214, 160, .75) 22%, rgba(250, 170, 130, 0) 68%); }
+.is-dawn .sky-sun, .is-dusk .sky-sun { width: 320px; height: 220px; left: 6%; top: 74%;
+  background: radial-gradient(ellipse, rgba(255, 200, 160, .75) 0, rgba(255, 170, 140, 0) 65%); }
+.is-night .sky-sun { width: 64px; height: 64px; left: 22%; top: 20%;
+  background: radial-gradient(circle, #f4f1e6 0 18%, rgba(220, 225, 245, .35) 26%, rgba(200, 210, 240, 0) 66%); }
+.is-cloudy .sky-sun, .is-rain .sky-sun, .is-storm .sky-sun, .is-snow .sky-sun { opacity: .25; }
+.is-fog .sky-sun { opacity: .55; filter: blur(6px); }
+
+.sky-stars { inset: 0 0 35% 0; opacity: 0;
   background:
-    radial-gradient(1px 1px at 12% 18%, #fff8 50%, transparent), radial-gradient(1.5px 1.5px at 32% 9%, #fffa 50%, transparent),
-    radial-gradient(1px 1px at 58% 22%, #fff7 50%, transparent), radial-gradient(1.5px 1.5px at 82% 12%, #fff9 50%, transparent),
-    radial-gradient(1px 1px at 90% 34%, #fff6 50%, transparent), radial-gradient(1px 1px at 8% 44%, #fff6 50%, transparent),
-    radial-gradient(120% 70% at 70% 0%, #3a4a8a 0%, transparent 60%),
-    linear-gradient(170deg, #141a33 0%, #26305c 55%, #5b5f93 100%);
+    radial-gradient(1px 1px at 12% 22%, #fff 50%, transparent), radial-gradient(1.4px 1.4px at 28% 9%, #fff 50%, transparent),
+    radial-gradient(1px 1px at 41% 30%, #fffb 50%, transparent), radial-gradient(1.6px 1.6px at 57% 14%, #fff 50%, transparent),
+    radial-gradient(1px 1px at 69% 34%, #fff9 50%, transparent), radial-gradient(1.3px 1.3px at 81% 18%, #fff 50%, transparent),
+    radial-gradient(1px 1px at 90% 40%, #fff8 50%, transparent), radial-gradient(1px 1px at 8% 46%, #fff8 50%, transparent),
+    radial-gradient(1.2px 1.2px at 35% 52%, #fff9 50%, transparent), radial-gradient(1px 1px at 74% 56%, #fff7 50%, transparent); }
+.is-night.is-clear .sky-stars, .is-night.is-partly .sky-stars { opacity: 1; animation: twinkle 5s ease-in-out infinite alternate; }
+@keyframes twinkle { to { opacity: .6; } }
+
+/* Clouds: soft cumulus, a row of puffs over a shaded belly, drifting slowly. */
+.sky-cloud {
+  width: 200px; height: 84px;
+  background:
+    radial-gradient(closest-side, var(--cloud) 50%, transparent) 8% 78% / 34% 62% no-repeat,
+    radial-gradient(closest-side, var(--cloud) 50%, transparent) 28% 46% / 38% 88% no-repeat,
+    radial-gradient(closest-side, var(--cloud) 50%, transparent) 52% 22% / 42% 100% no-repeat,
+    radial-gradient(closest-side, var(--cloud) 50%, transparent) 74% 50% / 36% 80% no-repeat,
+    radial-gradient(closest-side, var(--cloud) 50%, transparent) 94% 80% / 28% 56% no-repeat,
+    radial-gradient(closest-side, var(--cloud-shade) 45%, transparent) 50% 100% / 92% 44% no-repeat;
+  filter: blur(2.5px);
+  opacity: .95;
+  animation: drift 70s ease-in-out infinite alternate;
 }
-.is-day .prompt-badge { background: rgba(18, 32, 64, .28); }
-.prompt-sheet-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: 26px var(--s-4) 0; }
-.prompt-badge {
-  padding: 4px var(--s-2);
-  border-radius: 3px;
-  background: rgba(255, 255, 255, .22);
-  font-size: var(--t-cap);
-  font-weight: 500;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-}
-.prompt-sheet-head .prompt-day { font-family: var(--f-mono); font-size: var(--t-cap); }
-.prompt-pin { position: relative; margin-right: 36px; }
-.prompt .tape-top { left: calc(50% - 37px); top: -10px; }
-.prompt .slip { transform: rotate(-1.5deg); padding: var(--s-4) var(--s-3) var(--s-1); }
-/* Warm ivory with a deeper shadow, so the prompt lifts off the page instead of matching it. */
-.prompt .slip.torn { filter: sepia(.12) brightness(1.08) saturate(.9) drop-shadow(0 1px 1px rgba(30, 28, 25, .18)) drop-shadow(0 12px 18px rgba(30, 28, 25, .2)); }
-.prompt-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
-.prompt .slip .eyebrow { color: var(--ink); }
+.sky-cloud.c1 { left: -8%; top: 30%; }
+.sky-cloud.c2 { left: 52%; top: 12%; transform: scale(.75); animation-duration: 90s; animation-delay: -30s; }
+.sky-cloud.c3 { left: 40%; top: 52%; transform: scale(1.1); animation-duration: 80s; animation-delay: -12s; opacity: .8; }
+.sky-cloud.c4 { left: -20%; top: 8%; transform: scale(1.3); animation-delay: -45s; }
+.sky-cloud.c5 { left: 62%; top: 36%; transform: scale(1.2); animation-duration: 95s; }
+.sky-cloud.c6 { left: 8%; top: 62%; transform: scale(1.4); animation-duration: 85s; animation-delay: -20s; opacity: .85; }
+.is-cloudy .sky-cloud, .is-rain .sky-cloud, .is-storm .sky-cloud { filter: blur(5px); }
+.is-fog .sky-cloud { filter: blur(14px); opacity: .6; }
+@keyframes drift { from { translate: -14px 0; } to { translate: 22px 0; } }
+
+.sky-rain { inset: -40px 0 0; opacity: .5;
+  background: repeating-linear-gradient(100deg, transparent 0 11px, rgba(235, 240, 250, .55) 11px 12px, transparent 12px 23px);
+  background-size: 100% 46px;
+  mask-image: linear-gradient(transparent, #000 25%);
+  animation: rain .5s linear infinite; }
+.sky-rain.far { opacity: .3; background-size: 100% 30px; animation-duration: .8s; filter: blur(.6px); }
+@keyframes rain { to { background-position: -8px 46px; } }
+.sky-snow { inset: 0; opacity: .9;
+  background: radial-gradient(2px 2px at 20% 30%, #fff 60%, transparent), radial-gradient(2.5px 2.5px at 70% 10%, #fff 60%, transparent),
+    radial-gradient(1.8px 1.8px at 45% 70%, #fff 60%, transparent), radial-gradient(2.2px 2.2px at 85% 55%, #fff 60%, transparent);
+  background-size: 90px 90px; animation: snow 6s linear infinite; }
+.sky-snow.far { opacity: .5; background-size: 60px 60px; animation-duration: 9s; filter: blur(.5px); }
+@keyframes snow { to { background-position: 18px 90px; } }
+.sky-fog { left: -10%; right: -10%; height: 120px; bottom: 26%; border-radius: 50%; background: rgba(240, 241, 243, .7); filter: blur(22px); animation: drift 40s ease-in-out infinite alternate; }
+.sky-fog.low { bottom: -4%; height: 160px; background: rgba(245, 245, 246, .85); animation-delay: -20s; }
+.sky-flash { inset: 0; background: radial-gradient(60% 40% at 70% 20%, rgba(235, 240, 255, .8), transparent); opacity: 0; animation: flash 9s infinite; }
+@keyframes flash { 0%, 61%, 64%, 66%, 100% { opacity: 0; } 62% { opacity: .9; } 65% { opacity: .5; } }
+
+/* Film grain over all of it, so the paint reads as a print rather than a gradient. */
+.sky-grain { inset: 0; opacity: .22; mix-blend-mode: overlay;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+@media (prefers-reduced-motion: reduce) { .sky-layers > i { animation: none !important; } }
+
 .prompt-count { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); white-space: nowrap; }
-.prompt-text { margin: var(--s-2) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); line-height: 1.12; }
-.prompt-line { margin: var(--s-2) 0 0; font-family: var(--f-display); font-style: italic; font-size: var(--t-lg); line-height: 1.3; color: var(--ink-soft); }
-.prompt-go { width: 100%; gap: var(--s-2); margin-top: var(--s-4); border-radius: 5px; font-size: var(--t-body); }
-.prompt-go svg { width: 18px; height: 18px; }
-.prompt-tag { display: flex; justify-content: center; min-height: 40px; font-size: var(--t-cap); }
-.prompt-progress { margin-top: var(--s-1); padding-top: var(--s-2); border-top: 1px solid var(--rule); }
 .section-title span, .see-months { font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
 /* A section's way to "see all", on the right of its heading. */
 .head-link { min-height: 44px; display: inline-flex; align-items: center; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
@@ -575,7 +673,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .btn.share { gap: var(--s-2); }
 .btn.primary.share-year { width: 100%; margin-top: var(--s-5); }
 
-.jar-slot, .month-slot, .today-slot {
+.jar-slot, .month-slot {
   display: flex;
   justify-content: center;
   padding: 0;
@@ -638,13 +736,6 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 }
 .jar-x svg { position: relative; width: 14px; height: 14px; stroke-width: 2; }
 @keyframes jar-x-in { from { opacity: 0; transform: scale(.3); } }
-/* Today, not kept yet: an empty jar at the front of the shelf, faded like a month to come, with a camera in it. */
-.today-slot { position: relative; }
-.today-slot .jar { max-width: 96px; opacity: .45; transition: transform var(--t-move) var(--ease-spring); }
-.today-slot:active .jar { transform: translateY(-3px); }
-.today-cam { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%); display: grid; color: var(--ink-soft); pointer-events: none; }
-.today-cam svg { width: 22px; height: 22px; }
-.shelf-labels p.is-today { opacity: .7; }
 .month-slot canvas { display: block; }
 .month-slot:disabled { cursor: default; }
 /* A month still to come: its empty jar waits, faded. */
