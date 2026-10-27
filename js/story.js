@@ -613,10 +613,6 @@ function postmark(ctx, cx, cy, size, { ring, word, center }) {
   ctx.restore();
 }
 
-/**
- * @param challenge  {text, day, tag} when the sky was kept for that day's prompt
- * @param month      every sky kept that month, for the pile in the jar
- */
 /** The handwritten note's slip, measured: up to three lines, the writing shrinking rather than cut off. */
 function measureNote(ctx, sky) {
   if (!sky.note) return null;
@@ -637,40 +633,8 @@ function measureNote(ctx, sky) {
   return { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn2.dst[2] * 2 };
 }
 
-/** The day's prompt on a small pale-blue ticket, measured; null for a sky that wasn't for the challenge.
-   Smaller than the note and above it; it grows with its lines. */
-function measurePrompt(ctx, challenge) {
-  if (!challenge) return null;
-  const w = 560, lh = 52, font = `500 44px ${SERIF}`;
-  ctx.font = font;
-  const lines = wrap(ctx, challenge.text, w - 110, 3);
-  return { font, lh, lines, w, h: 72 + (lines.length - 1) * lh + 34 };
-}
-
-/** Under the hero, top down from y: the prompt's ticket, the note's slip, then the challenge hashtags. */
-function drawUnder(ctx, y, { sky, challenge, prompt, note, paperImg }) {
-  if (prompt) {
-    const { font, lh, lines, w, h } = prompt;
-    ctx.save();
-    ctx.translate(W / 2, y + h / 2);
-    ctx.rotate((2 * Math.PI) / 180);
-    ctx.translate(-w / 2, -h / 2);
-    ctx.shadowColor = 'rgba(30, 28, 25, .28)';
-    ctx.shadowBlur = 28;
-    ctx.shadowOffsetY = 12;
-    ctx.fillStyle = '#DCE7F0';
-    ctx.beginPath(); ctx.roundRect(0, 0, w, h, 6); ctx.fill();
-    ctx.shadowColor = 'transparent';
-    // A perforated tear line near the left end, like a ticket stub.
-    ctx.strokeStyle = '#9FB4C8';
-    ctx.lineWidth = 4;
-    ctx.setLineDash([8, 8]);
-    ctx.beginPath(); ctx.moveTo(30, 18); ctx.lineTo(30, h - 18); ctx.stroke();
-    ctx.setLineDash([]);
-    lines.forEach((ln, i) => text(ctx, ln, 64, 72 + i * lh, { font, color: '#1F2F55', align: 'left' }));
-    ctx.restore();
-    y += h + 34;
-  }
+/** Under the hero, top down from y: the note's slip, then the challenge hashtags. */
+function drawUnder(ctx, y, { sky, challenge, note, paperImg }) {
   if (note) {
     // The note's slip is the sky's own paper colour, torn top and bottom and tilted against the print, as in the app.
     const { font, lh, lines, w, h } = note;
@@ -682,22 +646,25 @@ function drawUnder(ctx, y, { sky, challenge, prompt, note, paperImg }) {
   if (challenge) text(ctx, `#${CHALLENGE_TAG} #${challenge.tag}`, W / 2, y + 40, { font: `32px ${MONO}`, color: '#4A443D' });
 }
 
+/**
+ * @param challenge  {tag, …} when the sky was kept for that day's prompt: its hashtags go under the note
+ * @param month      every sky kept that month, for the pile in the jar
+ */
 async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   const [c, ctx] = page();
   const d = new Date(sky.takenAt);
   const top = masthead(ctx, quote, t.issueLine(d.getDate(), MONTHS[d.getMonth()], d.getFullYear()));
   const [paperImg, tapeImg] = await Promise.all(['paper', 'tape'].map(texture));
 
-  // The print is the hero, centred and tilted left; a challenge sky makes room for its prompt slip.
-  // The note and the prompt are measured first so the whole group can sit centred on the page.
-  let pw = challenge ? 600 : 734;
-  const note = measureNote(ctx, sky), prompt = measurePrompt(ctx, challenge);
-  // A long note with a prompt makes the print smaller, so everything stays above the footer.
-  const rest = 90 + (prompt ? prompt.h + 34 : 0) + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
+  // The print is the hero, centred and tilted left. The note is measured first so the whole group can sit centred.
+  let pw = 734;
+  const note = measureNote(ctx, sky);
+  // A long note makes the print smaller, so everything stays above the footer.
+  const rest = 90 + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
   pw = Math.min(pw, (H - 112 - top - 60 - rest) / (1.096 + 0.37 * JAR_RATIO * 0.38));
   // Whatever comes under the print starts below the jar that leans on its corner.
   const below = pw * 0.37 * JAR_RATIO * 0.38 + 90;
-  const total = pw * 1.096 + below + (prompt ? prompt.h + 34 : 0) + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
+  const total = pw * 1.096 + below + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
   const py = top + Math.max(60, (H - 112 - top - total) / 2);
   const [{ img, release }] = await Promise.all([loadImage(sky.photo), loadThumbs(month)]);
   const ph = polaroid(ctx, img, W / 2, py, pw, -3, fmt.time(d));
@@ -753,22 +720,22 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   postmark(ctx, W / 2 - pw / 2 - pw * 0.04, py + ph * 0.5, pw * 0.55,
     { ring: t.keptRing(MONTHS[d.getMonth()], d.getFullYear()), word: t.keptWord, center: String(d.getDate()) });
 
-  drawUnder(ctx, py + ph + below, { sky, challenge, prompt, note, paperImg });
+  drawUnder(ctx, py + ph + below, { sky, challenge, note, paperImg });
   footer(ctx);
   return toBlob(c);
 }
 
 /** One sky, the other way: the jar is the hero, standing tall in the middle of the page with the sky filling it,
-   KEPT inked across its lower corner and the day typed underneath, then the same ticket and note as the polaroid. */
+   KEPT inked across its lower corner and the day typed underneath, then the same note as the polaroid. */
 async function storySingleJar(sky, showPlace, quote, challenge) {
   const [c, ctx] = page();
   const d = new Date(sky.takenAt);
   const top = masthead(ctx, quote, t.issueLine(d.getDate(), MONTHS[d.getMonth()], d.getFullYear()));
   const paperImg = await texture('paper');
-  const note = measureNote(ctx, sky), prompt = measurePrompt(ctx, challenge);
-  // As big as the page allows once the day, the ticket and the note have their room.
+  const note = measureNote(ctx, sky);
+  // As big as the page allows once the day and the note have their room.
   const day = 96;
-  const rest = day + (prompt ? prompt.h + 34 : 0) + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
+  const rest = day + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
   const bw = Math.min(600, (H - 112 - top - 120 - rest) / JAR_RATIO), bh = bw * JAR_RATIO;
   const jx = (W - bw) / 2;
   const jy = top + Math.max(60, (H - 112 - top - bh - rest) / 2);
@@ -787,7 +754,7 @@ async function storySingleJar(sky, showPlace, quote, challenge) {
   postmark(ctx, jx - bw * 0.04, jy + bh * 0.7, bw * 0.48,
     { ring: t.keptRing(MONTHS[d.getMonth()], d.getFullYear()), word: t.keptWord, center: String(d.getDate()) });
   text(ctx, `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()} · ${fmt.time(d)}`.toUpperCase(), W / 2, jy + bh + 66, { font: `500 28px ${MONO}`, color: SOFT, spacing: 6 });
-  drawUnder(ctx, jy + bh + day, { sky, challenge, prompt, note, paperImg });
+  drawUnder(ctx, jy + bh + day, { sky, challenge, note, paperImg });
   footer(ctx);
   return toBlob(c);
 }
