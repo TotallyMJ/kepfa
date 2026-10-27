@@ -260,7 +260,9 @@ export const QUOTES = [
 export const t = {
   kept: (n) => `${skies(n)} kept`,
   thisWeek: 'This week',
-  weekEmpty: 'Nothing kept this week yet.',
+  today: 'Today',
+  notYet: 'not yet',
+  todayJar: 'Today’s jar is empty. Catch today’s sky',
   monthsJar: (month) => `${month}’s jar ›`,
   jarsView: 'Jars view',
   viewMonth: 'Month',

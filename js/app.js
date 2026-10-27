@@ -19,6 +19,7 @@ const ICON = {
   save: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>',
   live: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="1.6" fill="currentColor"/><circle cx="6" cy="6" r="3.6"/><circle cx="6" cy="6" r="5.4" stroke-dasharray="1.2 1.4"/></svg>',
   pen: '<svg class="pen" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10 11v5.5M14 11v5.5"/></svg>',
 };
 
@@ -357,11 +358,15 @@ function slotButton(s) {
   return `<button type="button" class="jar-slot${s.sample ? ' is-sample' : ''}" data-id="${s.id}" aria-label="${t.openSky(fmt.long(s.takenAt))}">${jarSvg({ href: photoUrl(s) })}</button>`;
 }
 
+/** Today's jar before it's kept: empty and faded, waiting at the front of the shelf. A tap opens the camera. */
+const todaySlot = () => `<button type="button" class="today-slot" id="todayJar" aria-label="${t.todayJar}">${jarSvg()}<span class="today-cam">${ICON.camera}</span></button>`;
+
+/** A shelf three jars to a row; a null in the list is today's empty jar. */
 function shelfRowsHtml(list) {
   return chunk(list, 3).map((row) => `
     <div class="shelf-row">
-      <div class="shelf-jars">${row.map(slotButton).join('')}</div>
-      <div class="shelf-labels">${row.map((s) => { const [day, time] = fmt.shelf(s.takenAt); return `<p><span>${day}</span><span>${time}</span></p>`; }).join('')}</div>
+      <div class="shelf-jars">${row.map((s) => (s ? slotButton(s) : todaySlot())).join('')}</div>
+      <div class="shelf-labels">${row.map((s) => { const [day, time] = s ? fmt.shelf(s.takenAt) : [t.today, t.notYet]; return `<p${s ? '' : ' class="is-today"'}><span>${day}</span><span>${time}</span></p>`; }).join('')}</div>
     </div>`).join('');
 }
 
@@ -383,6 +388,10 @@ function renderShelf() {
   // Home is today and this week: the last seven days, newest first, two shelves at most. Everything else is in Jars.
   const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
   const week = state.skies.filter((s) => s.takenAt >= weekStart).reverse().slice(0, 6);
+  // Until a sky of your own is kept today, an empty jar waits at the front of the shelf (the missed days don't).
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const waiting = !state.skies.some((s) => !s.sample && s.takenAt >= todayStart);
+  const slots = waiting ? [null, ...week.slice(0, 5)] : week;
   // The memory waits under the shelf, unless it's already on it.
   const found = onThisDay();
   const memory = found && !week.includes(found.sky) ? found : null;
@@ -411,7 +420,7 @@ function renderShelf() {
           <span class="eyebrow">${prompt.theme ? `${MONTHS[now.getMonth()]} · ${prompt.theme}` : t.lookFor}</span>
           <h2 class="prompt-text">${prompt.text}</h2>
           <p class="prompt-line">${t.sameSky}</p>
-          <button type="button" class="btn primary prompt-go" id="lookUp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>${t.lookUp}</button>
+          <button type="button" class="btn primary prompt-go" id="lookUp">${ICON.camera}${t.lookUp}</button>
           <a class="btn-text prompt-tag" href="${tagUrl(prompt.tag)}" target="_blank" rel="noopener">${t.seeWho}</a>
           <div class="prompt-progress">
             <div class="prompt-head"><span class="eyebrow">${t.challenge(round)}</span><span class="prompt-count">${t.challengeCount(filled)}</span></div>
@@ -423,12 +432,8 @@ function renderShelf() {
     ${bannerHtml()}
     <div class="section-head"><h2 class="section-title">${t.thisWeek}</h2>${latest
       ? `<a class="eyebrow head-link" href="#/month/${jarMonth.getFullYear()}-${pad2(jarMonth.getMonth() + 1)}">${t.monthsJar(MONTHS[jarMonth.getMonth()])}</a>` : ''}</div>
-    ${week.length
-      ? shelfRowsHtml(week)
-      : `<div class="empty">
-           <div class="empty-jar">${jarSvg()}</div>
-           ${state.skies.length ? `<p>${t.weekEmpty}</p>` : `<h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p>`}
-         </div>`}
+    ${shelfRowsHtml(slots)}
+    ${state.skies.length ? '' : `<div class="empty empty-first"><h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p></div>`}
     ${canInstall() && !installSnoozed() ? `<div class="memory install-card">
       <button type="button" class="install-open" id="installOpen">
         <img class="install-icon" src="icons/icon-192.png" alt="">
@@ -466,6 +471,7 @@ function renderShelf() {
   $('#copyLink')?.addEventListener('click', copyLink);
   $('#setPlace')?.addEventListener('click', askLocation);
   $('#lookUp').addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
+  $('#todayJar')?.addEventListener('click', () => { state.viaPrompt = false; openCapture(); });
   state.redraw = null;
 }
 

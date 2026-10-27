@@ -575,7 +575,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .btn.share { gap: var(--s-2); }
 .btn.primary.share-year { width: 100%; margin-top: var(--s-5); }
 
-.jar-slot, .month-slot {
+.jar-slot, .month-slot, .today-slot {
   display: flex;
   justify-content: center;
   padding: 0;
@@ -638,6 +638,13 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 }
 .jar-x svg { position: relative; width: 14px; height: 14px; stroke-width: 2; }
 @keyframes jar-x-in { from { opacity: 0; transform: scale(.3); } }
+/* Today, not kept yet: an empty jar at the front of the shelf, faded like a month to come, with a camera in it. */
+.today-slot { position: relative; }
+.today-slot .jar { max-width: 96px; opacity: .45; transition: transform var(--t-move) var(--ease-spring); }
+.today-slot:active .jar { transform: translateY(-3px); }
+.today-cam { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%); display: grid; color: var(--ink-soft); pointer-events: none; }
+.today-cam svg { width: 22px; height: 22px; }
+.shelf-labels p.is-today { opacity: .7; }
 .month-slot canvas { display: block; }
 .month-slot:disabled { cursor: default; }
 /* A month still to come: its empty jar waits, faded. */
@@ -647,7 +654,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .empty { text-align: center; margin-top: var(--s-7); }
 .empty h2 { margin: var(--s-4) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); }
 .empty p { margin: var(--s-1) auto var(--s-5); max-width: 32ch; color: var(--ink-soft); }
-.empty-jar { width: 80px; margin: 0 auto; }
+.empty-first { margin-top: var(--s-4); }
 
 .year-switch { display: flex; align-items: center; gap: var(--s-1); font-family: var(--f-mono); font-size: var(--t-sm); }
 .year-switch button {
