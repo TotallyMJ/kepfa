@@ -644,7 +644,7 @@ function measurePrompt(ctx, challenge) {
   const w = 560, lh = 52, font = `500 44px ${SERIF}`;
   ctx.font = font;
   const lines = wrap(ctx, challenge.text, w - 110, 3);
-  return { font, lh, lines, w, h: 96 + (lines.length - 1) * lh + 34 };
+  return { font, lh, lines, w, h: 72 + (lines.length - 1) * lh + 34 };
 }
 
 /** Under the hero, top down from y: the prompt's ticket, the note's slip, then the challenge hashtags. */
@@ -667,8 +667,7 @@ function drawUnder(ctx, y, { sky, challenge, prompt, note, paperImg }) {
     ctx.setLineDash([8, 8]);
     ctx.beginPath(); ctx.moveTo(30, 18); ctx.lineTo(30, h - 18); ctx.stroke();
     ctx.setLineDash([]);
-    text(ctx, t.ticketLine(challenge.kept).toUpperCase(), 64, 44, { font: `500 20px ${SANS}`, color: '#2C4A8C', align: 'left', spacing: 4 });
-    lines.forEach((ln, i) => text(ctx, ln, 64, 96 + i * lh, { font, color: '#1F2F55', align: 'left' }));
+    lines.forEach((ln, i) => text(ctx, ln, 64, 72 + i * lh, { font, color: '#1F2F55', align: 'left' }));
     ctx.restore();
     y += h + 34;
   }
