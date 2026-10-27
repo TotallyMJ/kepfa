@@ -432,6 +432,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .seg a { min-height: 32px; display: grid; place-items: center; border-radius: 999px; font-size: var(--t-sm); color: var(--ink-soft); text-decoration: none; }
 .seg a[aria-current] { background: var(--paper); color: var(--ink); font-weight: 500; box-shadow: 0 1px 3px rgba(30, 28, 25, .18); }
 .seg + .masthead { margin-top: var(--s-3); }
+/* Two ways to share one sky, at the top of the share sheet: the same pill switch, buttons instead of links. */
+.seg-2 { grid-template-columns: repeat(2, 1fr); width: 220px; margin: 0 auto var(--s-3); }
+.seg button { min-height: 32px; border: 0; border-radius: 999px; background: none; font: inherit; font-size: var(--t-sm); color: var(--ink-soft); }
+.seg button[aria-checked="true"] { background: var(--paper); color: var(--ink); font-weight: 500; box-shadow: 0 1px 3px rgba(30, 28, 25, .18); }
 .month-nav { display: flex; justify-content: space-between; align-items: center; margin-top: var(--s-2); }
 .month-nav a { min-height: 44px; display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
 .month-nav .is-off { opacity: .35; }
