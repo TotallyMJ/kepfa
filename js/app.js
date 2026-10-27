@@ -432,8 +432,10 @@ function renderShelf() {
     ${bannerHtml()}
     <div class="section-head" id="thisWeek"><h2 class="section-title">${t.thisWeek}</h2>${latest
       ? `<a class="eyebrow head-link" href="#/month/${jarMonth.getFullYear()}-${pad2(jarMonth.getMonth() + 1)}">${t.monthsJar(MONTHS[jarMonth.getMonth()])}</a>` : ''}</div>
-    ${shelfRowsHtml(week)}
-    ${state.skies.length ? '' : `<div class="empty empty-first"><h2>${t.emptyTitle}</h2><p>${t.emptyBody}</p></div>`}
+    ${week.length ? shelfRowsHtml(week) : `<div class="shelf-row shelf-waiting" aria-hidden="true">
+      <div class="shelf-jars">${Array.from({ length: 3 }, () => `<span class="ghost-jar">${jarSvg()}</span>`).join('')}</div>
+      <p class="shelf-hint">${state.skies.length ? t.weekEmpty : t.firstSky}</p>
+    </div>`}
     ${canInstall() && !installSnoozed() ? `<div class="memory install-card">
       <button type="button" class="install-open" id="installOpen">
         <img class="install-icon" src="icons/icon-192.png" alt="">

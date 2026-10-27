@@ -260,6 +260,9 @@ export const QUOTES = [
 export const t = {
   kept: (n) => `${skies(n)} kept`,
   thisWeek: 'This week',
+  // Under an empty This week shelf (its jars faded, waiting): nothing kept anywhere yet, or just not this week.
+  firstSky: 'Your first sky will stand here.',
+  weekEmpty: 'Nothing kept this week yet.',
   today: 'Today',
   todayJar: 'Today’s jar. Open the camera to keep today’s sky',
   // Under today's jar: the sky that's out right now, then the tap. Golden, dawn, dusk and night win on fair days.
@@ -404,8 +407,6 @@ export const t = {
   sampleBanner: 'These skies are samples. Clear them and start your own.',
   clearSamples: 'Clear samples',
   samplesCleared: 'All clear. Your first sky is out there.',
-  emptyTitle: 'No skies yet',
-  emptyBody: 'Tap the camera, frame the sky in the jar, keep it.',
   openSky: (when) => `Open the sky from ${when}`,
 
   // The Months page heading, magazine style: the second half set in italics.
