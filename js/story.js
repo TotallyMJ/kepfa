@@ -4,7 +4,7 @@
 import { drawJar, jarPoint, JAR_RATIO, INSIDE } from './jar.js';
 import { loadThumbs, ROLLS, paperIndex, pileFor, drawPile } from './pile.js';
 import { loadImage } from './sky.js';
-import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG, CHALLENGE_SIZE } from './strings.js';
+import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG, CHALLENGE_SIZE, HASHTAG } from './strings.js';
 
 const isThai = (s) => /[฀-๿]/.test(s);
 
@@ -633,8 +633,8 @@ function measureNote(ctx, sky) {
   return { font, lh, lines, w, h: 40 + lines.length * lh + SLIPS.torn2.dst[2] * 2 };
 }
 
-/** Under the hero, top down from y: the note's slip, then the day's hashtags for a challenge sky. */
-function drawUnder(ctx, y, { sky, challenge, note, paperImg }) {
+/** Under the hero, top down from y: the note's slip, then the hashtag every share carries. */
+function drawUnder(ctx, y, { sky, note, paperImg }) {
   if (note) {
     // The note's slip is the sky's own paper colour, torn top and bottom and tilted against the print, as in the app.
     const { font, lh, lines, w, h } = note;
@@ -643,14 +643,11 @@ function drawUnder(ctx, y, { sky, challenge, note, paperImg }) {
     }, ROLLS[paperIndex(sky.id)]);
     y += h + 30;
   }
-  if (challenge) text(ctx, `#${challenge.tag} #kepfa`, W / 2, y + 40, { font: `32px ${MONO}`, color: '#4A443D' });
+  text(ctx, `#${HASHTAG}`, W / 2, y + 40, { font: `32px ${MONO}`, color: '#4A443D' });
 }
 
-/**
- * @param challenge  {tag, …} when the sky was kept for that day's prompt: its hashtags go under the note
- * @param month      every sky kept that month, for the pile in the jar
- */
-async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
+/** @param month  every sky kept that month, for the pile in the jar */
+async function storySingle(sky, showPlace, quote, month = [sky]) {
   const [c, ctx] = page();
   const d = new Date(sky.takenAt);
   const top = masthead(ctx, quote, t.issueLine(d.getDate(), MONTHS[d.getMonth()], d.getFullYear()));
@@ -660,11 +657,11 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   let pw = 734;
   const note = measureNote(ctx, sky);
   // A long note makes the print smaller, so everything stays above the footer.
-  const rest = 90 + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
+  const rest = 90 + (note ? note.h + 30 : 0) + 60;
   pw = Math.min(pw, (H - 112 - top - 60 - rest) / (1.096 + 0.37 * JAR_RATIO * 0.38));
   // Whatever comes under the print starts below the jar that leans on its corner.
   const below = pw * 0.37 * JAR_RATIO * 0.38 + 90;
-  const total = pw * 1.096 + below + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
+  const total = pw * 1.096 + below + (note ? note.h + 30 : 0) + 60;
   const py = top + Math.max(60, (H - 112 - top - total) / 2);
   const [{ img, release }] = await Promise.all([loadImage(sky.photo), loadThumbs(month)]);
   const ph = polaroid(ctx, img, W / 2, py, pw, -3, fmt.time(d));
@@ -720,14 +717,14 @@ async function storySingle(sky, showPlace, quote, challenge, month = [sky]) {
   postmark(ctx, W / 2 - pw / 2 - pw * 0.04, py + ph * 0.5, pw * 0.55,
     { ring: t.keptRing(MONTHS[d.getMonth()], d.getFullYear()), word: t.keptWord, center: String(d.getDate()) });
 
-  drawUnder(ctx, py + ph + below, { sky, challenge, note, paperImg });
+  drawUnder(ctx, py + ph + below, { sky, note, paperImg });
   footer(ctx);
   return toBlob(c);
 }
 
 /** One sky, the other way: the jar is the hero, standing tall in the middle of the page with the sky filling it,
    KEPT inked across its lower corner and the day typed underneath, then the same note as the polaroid. */
-async function storySingleJar(sky, showPlace, quote, challenge) {
+async function storySingleJar(sky, showPlace, quote) {
   const [c, ctx] = page();
   const d = new Date(sky.takenAt);
   const top = masthead(ctx, quote, t.issueLine(d.getDate(), MONTHS[d.getMonth()], d.getFullYear()));
@@ -735,7 +732,7 @@ async function storySingleJar(sky, showPlace, quote, challenge) {
   const note = measureNote(ctx, sky);
   // As big as the page allows once the day and the note have their room.
   const day = 96;
-  const rest = day + (note ? note.h + 30 : 0) + (challenge ? 60 : 0);
+  const rest = day + (note ? note.h + 30 : 0) + 60;
   const bw = Math.min(600, (H - 112 - top - 120 - rest) / JAR_RATIO), bh = bw * JAR_RATIO;
   const jx = (W - bw) / 2;
   const jy = top + Math.max(60, (H - 112 - top - bh - rest) / 2);
@@ -754,7 +751,7 @@ async function storySingleJar(sky, showPlace, quote, challenge) {
   postmark(ctx, jx - bw * 0.04, jy + bh * 0.7, bw * 0.48,
     { ring: t.keptRing(MONTHS[d.getMonth()], d.getFullYear()), word: t.keptWord, center: String(d.getDate()) });
   text(ctx, `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()} · ${fmt.time(d)}`.toUpperCase(), W / 2, jy + bh + 66, { font: `500 28px ${MONO}`, color: SOFT, spacing: 6 });
-  drawUnder(ctx, jy + bh + day, { sky, challenge, note, paperImg });
+  drawUnder(ctx, jy + bh + day, { sky, note, paperImg });
   footer(ctx);
   return toBlob(c);
 }
@@ -1160,8 +1157,8 @@ export async function makeStory(kind, payload) {
   await fontsReady();
   if (kind === 'single') {
     return payload.style === 'jar'
-      ? storySingleJar(payload.sky, payload.showPlace, payload.quote, payload.challenge)
-      : storySingle(payload.sky, payload.showPlace, payload.quote, payload.challenge, payload.monthSkies);
+      ? storySingleJar(payload.sky, payload.showPlace, payload.quote)
+      : storySingle(payload.sky, payload.showPlace, payload.quote, payload.monthSkies);
   }
   if (kind === 'jar') return storyJar(payload);
   if (kind === 'done') return storyDone(payload);

@@ -9,7 +9,7 @@ import { album, checkStamps, writeCard } from './stamps.js';
 import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
 import { sunPhase, skyKind, lastWeather, currentWeather, skyLayers } from './weather.js';
-import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE } from './strings.js';
+import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE, HASHTAG } from './strings.js';
 
 const ICON = {
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>',
@@ -147,9 +147,9 @@ function promptFor(key) {
   const day = Math.floor(Date.UTC(y, m - 1, d) / 864e5);
   // A themed month takes its prompts in date order; other months cycle the everyday list.
   const theme = themeFor(y, m - 1);
-  return { key, text: theme ? theme.prompts[(d - 1) % theme.prompts.length] : PROMPTS[day % PROMPTS.length], theme: theme?.name || '', tag: fmt.dayTag(key) };
+  return { key, text: theme ? theme.prompts[(d - 1) % theme.prompts.length] : PROMPTS[day % PROMPTS.length], theme: theme?.name || '' };
 }
-const tagUrl = (tag) => `https://www.instagram.com/explore/tags/${tag.toLowerCase()}/`;
+const TAG_URL = `https://www.instagram.com/explore/tags/${HASHTAG}/`;
 
 /** How many prompt days have a real sky kept for them. */
 const keptDays = () => new Set(state.skies.filter((s) => s.prompt && !s.sample).map((s) => s.prompt)).size;
@@ -170,13 +170,10 @@ function newDot(filled) {
   return filled > seen ? filled - 1 : -1;
 }
 
-/** What a challenge share carries: the prompt as it was kept, its day and its hashtag. */
+/** What a challenge share's caption carries: the prompt as it was kept, and its day. */
 function challengeFor(sky) {
   if (!sky.prompt) return null;
-  const p = promptFor(sky.prompt);
-  // Which day of the challenge this sky was, counted up to its own day, so an old share keeps its number.
-  const n = new Set(state.skies.filter((s) => s.prompt && (!s.sample || s.id === sky.id) && s.prompt <= sky.prompt).map((s) => s.prompt)).size;
-  return { text: sky.promptText || p.text, day: fmt.dayLong(sky.prompt), tag: p.tag, kept: ((n - 1) % CHALLENGE_SIZE) + 1 };
+  return { text: sky.promptText || promptFor(sky.prompt).text, day: fmt.dayLong(sky.prompt) };
 }
 
 /** A strip of masking tape; where it sits and how it tilts lives in CSS. */
@@ -427,7 +424,7 @@ function renderShelf() {
         ${doneToday ? keptStamp(challengeDay) : ''}
       </div>
       <div class="dots" role="img" aria-label="${t.challengeCount(filled)}">${Array.from({ length: CHALLENGE_SIZE }, (_, i) => `<i${i < filled ? ` class="on${i === fresh ? ' is-new' : ''}"` : ''}></i>`).join('')}</div>
-      <div class="challenge-foot"><span class="prompt-count">${t.challengeCount(filled)}</span><a class="challenge-link" href="${tagUrl(prompt.tag)}" target="_blank" rel="noopener">${t.seeWho}</a></div>
+      <div class="challenge-foot"><span class="prompt-count">${t.challengeCount(filled)}</span><a class="challenge-link" href="${TAG_URL}" target="_blank" rel="noopener">${t.seeWho}</a></div>
     </section>
     ${bannerHtml()}
     <div class="section-head" id="thisWeek"><h2 class="section-title">${t.thisWeek}</h2>${latest
@@ -1957,7 +1954,7 @@ async function openStory(kind, payload) {
     $('#shareStory').disabled = true;
     let out;
     try {
-      out = await makeStory(kind, { ...payload, showPlace, quote, challenge, monthSkies, style });
+      out = await makeStory(kind, { ...payload, showPlace, quote, monthSkies, style });
     } catch {
       $('#storyPreview').innerHTML = `<p class="hint">${t.storyFailed}</p>`;
       return;
