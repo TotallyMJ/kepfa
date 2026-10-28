@@ -46,9 +46,9 @@ function makeNoise(seed, period) {
     return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
   };
 }
-function fbm(noise, x, y, octaves) {
+function fbm(noise, x, y, octaves, keep = 0.42) {
   let sum = 0, amp = 0.55, f = 1;
-  for (let o = 0; o < octaves; o++) { sum += amp * noise(x * f, y * f); amp *= 0.42; f *= 2; }
+  for (let o = 0; o < octaves; o++) { sum += amp * noise(x * f, y * f); amp *= keep; f *= 2; }
   return sum;   // each octave's lattice still wraps at `period`, and twice the frequency fits twice in it
 }
 
@@ -56,7 +56,7 @@ function fbm(noise, x, y, octaves) {
  * One band of clouds, twice as wide as the sky so it can drift and wrap: density from noise above a coverage
  * threshold, shaped to thin out toward the top, lit by comparing with the density a little toward the light.
  */
-function cloudBand(w, h, { seed, cover, soft, lit, shade, scale, alpha, low, rising }) {
+function cloudBand(w, h, { seed, cover, soft, lit, shade, scale, alpha, low, rising, smoothness = 0 }) {
   const cw = Math.max(64, Math.round(w / 2)), ch = Math.max(32, Math.round(h / 2));
   const c = document.createElement('canvas');
   c.width = cw * 2; c.height = ch;
@@ -67,7 +67,8 @@ function cloudBand(w, h, { seed, cover, soft, lit, shade, scale, alpha, low, ris
   const L = hex(lit), S = hex(shade);
   // A whole number of periods across the band, so it wraps without a seam; `scale` sets how fine the clouds are.
   const kx = (period * Math.max(1, Math.round(scale))) / c.width, ky = (period * scale * 1.6) / c.width;
-  const cut = 0.72 - cover * 0.42, edge = 0.1 * soft;
+  const cut = 0.72 - cover * 0.42 - smoothness * 0.07, edge = 0.1 * soft * (1 + smoothness * 0.5);
+  const octaves = smoothness ? 3 : 4, keep = smoothness ? 0.32 : 0.42;
   for (let y = 0; y < ch; y++) {
     const fy = y / ch;
     // Fair-weather clouds sit in the middle of the sky; heavy weather fills it from the top down.
@@ -75,10 +76,10 @@ function cloudBand(w, h, { seed, cover, soft, lit, shade, scale, alpha, low, ris
       : low ? smooth(0.05, 0.4, fy) * (1 - smooth(0.8, 1, fy)) : 1 - 0.35 * smooth(0.6, 1, fy);
     for (let x = 0; x < c.width; x++) {
       const nx = x * kx, ny = y * ky;
-      const n = fbm(noise, nx, ny, 4) * shape;
+      const n = fbm(noise, nx, ny, octaves, keep) * shape;
       const d = smooth(cut, cut + edge, n);
       if (d <= 0) continue;
-      const above = fbm(noise, nx, ny - 0.18 * scale, 3) * shape;
+      const above = fbm(noise, nx, ny - 0.18 * scale, 3, keep) * shape;
       const light = Math.min(1, Math.max(0, 0.62 + (n - above) * 4 - fy * 0.3));
       const i = (y * c.width + x) * 4;
       img.data[i] = S[0] + (L[0] - S[0]) * light;
@@ -87,7 +88,94 @@ function cloudBand(w, h, { seed, cover, soft, lit, shade, scale, alpha, low, ris
       img.data[i + 3] = 255 * d * alpha;
     }
   }
+  if (smoothness) blur(img, 3, true);
   ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+/** Box-blur an image in place (premultiplied, so soft edges don't darken), wrapping in x like the band does. */
+function blur(img, r, wrapX) {
+  const { width: w, height: h, data } = img;
+  const pm = new Float32Array(data.length);
+  for (let i = 0; i < data.length; i += 4) { const a = data[i + 3] / 255; pm[i] = data[i] * a; pm[i + 1] = data[i + 1] * a; pm[i + 2] = data[i + 2] * a; pm[i + 3] = data[i + 3]; }
+  const tmp = new Float32Array(data.length);
+  const pass = (src, dst, horizontal) => {
+    const n = horizontal ? w : h, lines = horizontal ? h : w;
+    for (let l = 0; l < lines; l++) {
+      for (let c = 0; c < 4; c++) {
+        let sum = 0;
+        const at = (k) => {
+          const kk = horizontal && wrapX ? ((k % n) + n) % n : Math.min(n - 1, Math.max(0, k));
+          return (horizontal ? (l * w + kk) : (kk * w + l)) * 4 + c;
+        };
+        for (let k = -r; k <= r; k++) sum += src[at(k)];
+        for (let k = 0; k < n; k++) {
+          dst[at(k)] = sum / (2 * r + 1);
+          sum += src[at(k + r + 1)] - src[at(k - r)];
+        }
+      }
+    }
+  };
+  for (let it = 0; it < 2; it++) { pass(pm, tmp, true); pass(tmp, pm, false); }
+  for (let i = 0; i < data.length; i += 4) { const a = pm[i + 3] / 255 || 1; data[i] = pm[i] / a; data[i + 1] = pm[i + 1] / a; data[i + 2] = pm[i + 2] / a; data[i + 3] = pm[i + 3]; }
+}
+
+/**
+ * Painted clouds instead of noise: each cumulus a row of soft round puffs on a flat base, shaded underneath and lit
+ * on top, scattered across a band twice as wide as the sky (puffs near an edge are drawn again on the other side
+ * so the band wraps).
+ */
+function puffBand(w, h, { seed, cover, lit, shade, alpha, low }) {
+  const c = document.createElement('canvas');
+  c.width = w * 2; c.height = h;
+  const ctx = c.getContext('2d');
+  const r = rng(seed * 7 + 1);
+  const count = Math.round(3 + cover * 16);
+  const soft = (x, y, rad, col, a) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, rgb(col, a));
+    g.addColorStop(0.45, rgb(col, a * 0.92));
+    g.addColorStop(0.8, rgb(col, a * 0.35));
+    g.addColorStop(1, rgb(col, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.fill();
+  };
+  const clouds = [];
+  for (let i = 0; i < count; i++) {
+    const big = 0.6 + r() * (0.4 + cover);
+    clouds.push({
+      x: r() * c.width,
+      y: low ? h * (0.22 + r() * 0.5) : h * (0.05 + r() * 0.75),
+      wide: w * (0.18 + r() * 0.22) * big,
+    });
+  }
+  clouds.sort((a, b) => a.y - b.y);   // further (higher) clouds first
+  for (const cl of clouds) {
+    const n = 7 + Math.floor(r() * 5);
+    const puffs = Array.from({ length: n }, () => {
+      const t = r();
+      const bump = Math.sin(t * Math.PI);   // tallest in the middle
+      const rad = cl.wide * (0.13 + 0.24 * bump) * (0.75 + r() * 0.5);
+      return { dx: (t - 0.5) * cl.wide, dy: -rad * (0.25 + 0.5 * bump) * (0.7 + r() * 0.6), rad };
+    });
+    for (const shift of [0, -c.width, c.width]) {
+      const x0 = cl.x + shift;
+      if (x0 + cl.wide < 0 || x0 - cl.wide > c.width) continue;
+      // Shade first, a little lower; then the lit tops, a little higher and smaller.
+      puffs.forEach((p) => soft(x0 + p.dx, cl.y + p.dy + p.rad * 0.18, p.rad * 1.1, shade, alpha));
+      puffs.forEach((p) => soft(x0 + p.dx - p.rad * 0.06, cl.y + p.dy - p.rad * 0.14, p.rad * 0.9, lit, alpha));
+      // A flat, soft base: fade out whatever hangs below the cloud's line.
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      const base = cl.y + cl.wide * 0.06;
+      const cut = ctx.createLinearGradient(0, base, 0, base + cl.wide * 0.16);
+      cut.addColorStop(0, 'rgba(0,0,0,0)');
+      cut.addColorStop(1, 'rgba(0,0,0,1)');
+      ctx.fillStyle = cut;
+      ctx.fillRect(x0 - cl.wide, base, cl.wide * 2, cl.wide * 0.5);
+      ctx.restore();
+    }
+  }
   return c;
 }
 
@@ -178,7 +266,7 @@ function grainTile() {
  * snow fall, a storm flashes now and then. Still with reduced motion. Stops by itself once the canvas leaves the page.
  * @returns {{ stop(): void }}
  */
-export function paintSky(canvas, { phase, kind, date = new Date(), still = false }) {
+export function paintSky(canvas, { phase, kind, date = new Date(), still = false, clouds = 'soft' }) {
   const P = PHASES[phase] || PHASES.day;
   const K = KINDS[kind] || KINDS.clear;
   const night = phase === 'night';
@@ -225,9 +313,13 @@ export function paintSky(canvas, { phase, kind, date = new Date(), still = false
   const lit = night ? mix(K.lit || P.lit, '#1d2546', 0.62) : tint(K.lit, P.lit, 0.4);
   const shade = night ? mix(K.shade || P.shade, '#0b1028', 0.55) : tint(K.shade, P.shade, 0.3);
   const fair = kind === 'clear' || kind === 'partly';
-  const bands = [
-    cloudBand(w, h, { seed: seed + 1, cover: K.cover * 0.8, soft: K.soft * 1.6, lit, shade: mix(shade, lit, 0.4), scale: 1.4, alpha: 0.55, low: fair }),
-    cloudBand(w, h, { seed: seed + 2, cover: K.cover, soft: K.soft, lit, shade, scale: 0.9, alpha: kind === 'clear' ? 0.6 : 0.97, low: fair }),
+  const smoothness = clouds === 'soft' ? 1 : 0;
+  const bands = clouds === 'puff' ? [
+    puffBand(w, h, { seed: seed + 1, cover: K.cover * 0.6, lit, shade: mix(shade, lit, 0.45), alpha: 0.55, low: fair }),
+    puffBand(w, h, { seed: seed + 2, cover: K.cover, lit, shade, alpha: kind === 'clear' ? 0.7 : 0.95, low: fair }),
+  ] : [
+    cloudBand(w, h, { seed: seed + 1, cover: K.cover * 0.8, soft: K.soft * 1.6, lit, shade: mix(shade, lit, 0.4), scale: 1.4, alpha: 0.55, low: fair, smoothness }),
+    cloudBand(w, h, { seed: seed + 2, cover: K.cover, soft: K.soft, lit, shade, scale: 0.9, alpha: kind === 'clear' ? 0.6 : 0.97, low: fair, smoothness }),
   ];
   const fogLit = night ? '#3b4568' : warm ? mix('#f5f6f7', P.glow, 0.3) : '#f5f6f7';
   const fogShade = night ? '#283152' : warm ? mix('#dde0e4', P.shade, 0.3) : '#dde0e4';
