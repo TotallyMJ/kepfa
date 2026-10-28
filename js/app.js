@@ -488,9 +488,7 @@ function drawSky(now, place, weather) {
   cv.dataset.sky = `${phase}-${kind}`;
   cv.className = `sky-paint is-${kind} is-${phase}`;
   skyPainter?.stop();
-  // TEMP while choosing a cloud style on the preview: ?clouds=puff paints the round, illustrated clouds.
-  const clouds = new URLSearchParams(location.search).get('clouds') === 'puff' ? 'puff' : 'soft';
-  skyPainter = paintSky(cv, { phase, kind, date: now, still: reduceMotion(), clouds });
+  skyPainter = paintSky(cv, { phase, kind, date: now, still: reduceMotion() });
 }
 function skyLabel(now, place, weather) {
   const kind = skyKind(weather?.code);
