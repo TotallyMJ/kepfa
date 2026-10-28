@@ -403,7 +403,7 @@ function renderShelf() {
       <div class="today-print">
         ${tape('tape-top')}
         <div class="today-photo">
-          <canvas class="sky-paint is-${skyKind(weather?.code)}" id="skyPaint" aria-hidden="true"></canvas>
+          <canvas class="sky-paint" id="skyPaint" aria-hidden="true"></canvas>
           <button type="button" class="today-jar" id="heroJar" aria-label="${t.todayJar}">${jarSvg()}<span class="today-cam">${ICON.camera}</span></button>
         </div>
         <p class="today-strip"><span class="hand" id="skyLabel">${skyLabel(now, place, weather)}</span></p>
@@ -486,7 +486,7 @@ function drawSky(now, place, weather) {
   const kind = skyKind(weather?.code), phase = sunPhase(now, place);
   if (cv.dataset.sky === `${phase}-${kind}`) return;
   cv.dataset.sky = `${phase}-${kind}`;
-  cv.className = `sky-paint is-${kind}`;
+  cv.className = `sky-paint is-${kind} is-${phase}`;
   skyPainter?.stop();
   skyPainter = paintSky(cv, { phase, kind, date: now, still: reduceMotion() });
 }

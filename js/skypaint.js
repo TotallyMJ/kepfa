@@ -219,14 +219,19 @@ export function paintSky(canvas, { phase, kind, date = new Date(), still = false
   }
 
   // Clouds: a high, faint band and a nearer, fuller one, drifting at different speeds.
-  const lit = night ? mix(K.lit || P.lit, '#1d2546', 0.62) : (K.lit || P.lit);
-  const shade = night ? mix(K.shade || P.shade, '#0b1028', 0.55) : (K.shade || P.shade);
+  // Grey weather keeps a little of the hour's colour: warm at dawn, golden hour and dusk; dim and blue at night.
+  const warm = phase === 'dawn' || phase === 'golden' || phase === 'dusk';
+  const tint = (weather, hour, k) => (weather ? (warm ? mix(weather, hour, k) : weather) : hour);
+  const lit = night ? mix(K.lit || P.lit, '#1d2546', 0.62) : tint(K.lit, P.lit, 0.4);
+  const shade = night ? mix(K.shade || P.shade, '#0b1028', 0.55) : tint(K.shade, P.shade, 0.3);
   const fair = kind === 'clear' || kind === 'partly';
   const bands = [
     cloudBand(w, h, { seed: seed + 1, cover: K.cover * 0.8, soft: K.soft * 1.6, lit, shade: mix(shade, lit, 0.4), scale: 1.4, alpha: 0.55, low: fair }),
     cloudBand(w, h, { seed: seed + 2, cover: K.cover, soft: K.soft, lit, shade, scale: 0.9, alpha: kind === 'clear' ? 0.6 : 0.97, low: fair }),
   ];
-  const fog = kind === 'fog' ? cloudBand(w, h, { seed: seed + 3, cover: 0.8, soft: 3, lit: '#f5f6f7', shade: '#dde0e4', scale: 0.6, alpha: 0.9, rising: true }) : null;
+  const fogLit = night ? '#3b4568' : warm ? mix('#f5f6f7', P.glow, 0.3) : '#f5f6f7';
+  const fogShade = night ? '#283152' : warm ? mix('#dde0e4', P.shade, 0.3) : '#dde0e4';
+  const fog = kind === 'fog' ? cloudBand(w, h, { seed: seed + 3, cover: 0.8, soft: 3, lit: fogLit, shade: fogShade, scale: 0.6, alpha: 0.9, rising: true }) : null;
 
   // What falls.
   const drops = (kind === 'rain' || kind === 'storm') ? Array.from({ length: kind === 'storm' ? 160 : 110 }, () => ({ x: r() * w, y: r() * h, z: 0.4 + r() * 0.6 })) : [];
