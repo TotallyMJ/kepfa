@@ -61,16 +61,3 @@ export async function currentWeather(place) {
     return old;
   }
 }
-
-const CLOUDS = { clear: 0, partly: 3, cloudy: 6, fog: 2, rain: 6, storm: 6, snow: 5 };
-
-/** The painted layers; the look lives in CSS under .sky-paint.is-<phase>.is-<kind>. */
-export function skyLayers(kind) {
-  return `<i class="sky-sun"></i><i class="sky-stars"></i>
-    ${Array.from({ length: CLOUDS[kind] }, (_, i) => `<i class="sky-cloud c${i + 1}"></i>`).join('')}
-    ${kind === 'rain' || kind === 'storm' ? '<i class="sky-rain"></i><i class="sky-rain far"></i>' : ''}
-    ${kind === 'snow' ? '<i class="sky-snow"></i><i class="sky-snow far"></i>' : ''}
-    ${kind === 'fog' ? '<i class="sky-fog"></i><i class="sky-fog low"></i>' : ''}
-    ${kind === 'storm' ? '<i class="sky-flash"></i>' : ''}
-    <i class="sky-grain"></i>`;
-}
