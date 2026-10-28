@@ -8,7 +8,8 @@ import { placeNear } from './places.js';
 import { album, checkStamps, writeCard } from './stamps.js';
 import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
-import { sunPhase, skyKind, lastWeather, currentWeather, skyLayers } from './weather.js';
+import { sunPhase, skyKind, lastWeather, currentWeather } from './weather.js';
+import { paintSky } from './skypaint.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE, HASHTAG } from './strings.js';
 
 const ICON = {
@@ -402,7 +403,7 @@ function renderShelf() {
       <div class="today-print">
         ${tape('tape-top')}
         <div class="today-photo">
-          <div class="sky-paint" id="skyPaint">${skyPaintInner(now, place, weather)}</div>
+          <canvas class="sky-paint is-${skyKind(weather?.code)}" id="skyPaint" aria-hidden="true"></canvas>
           <button type="button" class="today-jar" id="heroJar" aria-label="${t.todayJar}">${jarSvg()}<span class="today-cam">${ICON.camera}</span></button>
         </div>
         <p class="today-strip"><span class="hand" id="skyLabel">${skyLabel(now, place, weather)}</span></p>
@@ -469,6 +470,7 @@ function renderShelf() {
   $('#clearSamples')?.addEventListener('click', clearSamples);
   $('#copyLink')?.addEventListener('click', copyLink);
   $('#setPlace')?.addEventListener('click', askLocation);
+  drawSky(now, place, weather);
   paintWeather(place);
   $('#heroJar').addEventListener('click', () => { state.viaPrompt = !doneToday; openCapture(); });
   $('#takeChallenge')?.addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
@@ -476,9 +478,17 @@ function renderShelf() {
   state.redraw = null;
 }
 
-function skyPaintInner(now, place, weather) {
-  const kind = skyKind(weather?.code);
-  return `<div class="sky-layers is-${sunPhase(now, place)} is-${kind}">${skyLayers(kind)}</div>`;
+/** Paint the sky behind today's jar for the sun's phase and the weather, replacing whatever was painted before. */
+let skyPainter = null;
+function drawSky(now, place, weather) {
+  const cv = $('#skyPaint');
+  if (!cv) return;
+  const kind = skyKind(weather?.code), phase = sunPhase(now, place);
+  if (cv.dataset.sky === `${phase}-${kind}`) return;
+  cv.dataset.sky = `${phase}-${kind}`;
+  cv.className = `sky-paint is-${kind}`;
+  skyPainter?.stop();
+  skyPainter = paintSky(cv, { phase, kind, date: now, still: reduceMotion() });
 }
 function skyLabel(now, place, weather) {
   const kind = skyKind(weather?.code);
@@ -500,8 +510,7 @@ async function paintWeather(place) {
   const paint = $('#skyPaint');
   if (!w || !paint) return;
   const now = new Date();
-  const html = skyPaintInner(now, place, w);
-  if (paint.innerHTML !== html) paint.innerHTML = html;
+  drawSky(now, place, w);
   $('#skyLabel').textContent = skyLabel(now, place, w);
   $('#todayCap').textContent = todayLine(now, place, w);
 }
