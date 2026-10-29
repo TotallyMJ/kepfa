@@ -131,6 +131,15 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .account-btn { flex: none; width: 28px; height: 28px; margin-bottom: 1px; display: grid; place-items: center; padding: 0; border: 0; background: none; color: var(--ink-soft); transition: transform var(--t-press) var(--ease-out); }
 .account-btn svg { width: 23px; height: 23px; }
 .account-btn:active { transform: scale(.9); }
+/* One-time coachmark: dims the page, lifts a bright copy of the account icon, and points a tip up at it. */
+.coach { position: fixed; inset: 0; z-index: 70; background: rgba(27, 25, 22, .22); animation: fade var(--t-quick) var(--ease-out) both; }
+.coach-icon { position: fixed; display: grid; place-items: center; color: var(--ink);
+  background: var(--paper); border-radius: 50%; box-shadow: 0 0 0 3px var(--paper), 0 0 0 4px rgba(30, 28, 25, .25); }
+.coach-icon svg { width: 23px; height: 23px; }
+.coach-tip { position: fixed; max-width: 220px; background: var(--ink); color: var(--paper);
+  padding: 10px 13px; border-radius: 8px; font-size: var(--t-sm); line-height: 1.4; box-shadow: 0 10px 24px -8px rgba(0, 0, 0, .45); }
+.coach-tip::before { content: ""; position: absolute; top: -6px; right: 14px; width: 12px; height: 12px; background: var(--ink); transform: rotate(45deg); }
+.coach-cta { display: block; margin-top: 4px; font-family: var(--f-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; opacity: .65; }
 .wordmark { margin: var(--s-1) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xxl); line-height: 1; letter-spacing: -.01em; }
 
 .sunline {

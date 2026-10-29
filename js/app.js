@@ -455,6 +455,24 @@ async function bgSync() {
   } catch { return { ok: false }; } finally { syncing = false; }
 }
 
+/** Once, after the first real sky and while signed out: point a coachmark at the account icon. */
+function showSyncHint() {
+  try { if (localStorage.getItem('kepfa.syncHint')) return; } catch { return; }
+  const btn = $('#accountBtn');
+  if (!btn) return;
+  try { localStorage.setItem('kepfa.syncHint', '1'); } catch { /* it just shows again */ }
+  const r = btn.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'coach';
+  el.innerHTML = `
+    <div class="coach-icon" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">${ICON.account}</div>
+    <div class="coach-tip" style="top:${Math.round(r.bottom + 10)}px;right:${Math.round(innerWidth - r.right)}px">${t.syncHint}<span class="coach-cta">${t.syncHintDismiss}</span></div>`;
+  document.body.appendChild(el);
+  const close = () => { el.remove(); removeEventListener('scroll', close); };
+  el.addEventListener('click', close);
+  addEventListener('scroll', close, { passive: true });
+}
+
 async function exportJar() {
   const skies = realSkies();
   if (!skies.length) { toast(t.safeEmpty); return; }
@@ -661,6 +679,7 @@ function renderShelf() {
   });
   $('#safeOpen')?.addEventListener('click', openSafeSheet);
   $('#accountBtn')?.addEventListener('click', openSafeSheet);
+  if (hasReal && !maybeSignedIn()) showSyncHint();   // one-time nudge to the account icon
   $('#clearSamples')?.addEventListener('click', clearSamples);
   $('#copyLink')?.addEventListener('click', copyLink);
   $('#setPlace')?.addEventListener('click', askLocation);
