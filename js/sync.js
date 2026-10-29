@@ -8,6 +8,8 @@ import { store } from './store.js';
 import { supaClient, session } from './cloud.js';
 
 const PHOTOS = 'photos';
+const LIVE = 'live';
+const STAMPS_KEY = 'kepfa.stamps';
 const TOMB = 'kepfa.tombstones';
 const ms = (iso) => new Date(iso).getTime();
 const iso = (n) => new Date(n).toISOString();
@@ -43,7 +45,13 @@ async function upload(c, uid, sky) {
     { upsert: true, contentType: sky.photo?.type || 'image/jpeg' });
   if (sky.thumb) await c.storage.from(PHOTOS).upload(path(uid, sky.id, 'thumb'), sky.thumb,
     { upsert: true, contentType: sky.thumb.type || 'image/jpeg' });
-  await c.from('skies').upsert(rowOf(uid, sky));
+  const row = rowOf(uid, sky);
+  if (sky.live) {
+    row.live_path = path(uid, sky.id, 'live');
+    await c.storage.from(LIVE).upload(row.live_path, sky.live,
+      { upsert: true, contentType: sky.live.type || 'video/mp4' });
+  }
+  await c.from('skies').upsert(row);
 }
 
 // Metadata changed locally (note, place, date) but the photo is the same, so only the row updates.
@@ -60,12 +68,48 @@ async function download(c, row) {
   if (!photo) return null;   // can't rebuild a sky without its photo; try again next sync
   let thumb = photo;
   if (row.thumb_path) { const t = (await c.storage.from(PHOTOS).download(row.thumb_path)).data; if (t) thumb = t; }
+  let live = null;
+  if (row.live_path) { const lv = (await c.storage.from(LIVE).download(row.live_path)).data; if (lv) live = lv; }
   return {
     id: row.id, takenAt: ms(row.taken_at), note: row.note || '', place: row.place || '',
     prompt: row.prompt || '', promptText: row.prompt_text || '', palette: row.palette,
-    photo, thumb, live: null, front: !!row.front, sample: false,
+    photo, thumb, live, front: !!row.front, sample: false,
     createdAt: ms(row.created_at), updatedAt: ms(row.updated_at),
   };
+}
+
+const localStamps = () => { try { return JSON.parse(localStorage.getItem(STAMPS_KEY)) || null; } catch { return null; } };
+
+// The stamp album is one small object { id: { at, sky, card?, to? } }. Union both sides so a stamp
+// earned (or a postcard written) on any device is kept: earliest earned time, and a written card wins.
+function mergeStamps(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const out = { ...b };
+  for (const [id, e] of Object.entries(a)) {
+    const o = out[id];
+    out[id] = o
+      ? { ...o, ...e, at: Math.min(o.at || e.at, e.at || o.at), card: e.card ?? o.card, to: e.to ?? o.to }
+      : e;
+  }
+  return out;
+}
+
+async function syncStamps(c, uid) {
+  const local = localStamps();
+  const { data: prof } = await c.from('profiles').select('stamps').eq('id', uid).maybeSingle();
+  const cloud = prof?.stamps || null;
+  const merged = mergeStamps(local, cloud);
+  if (!merged) return false;
+  const mergedStr = JSON.stringify(merged);
+  if (JSON.stringify(cloud) !== mergedStr) {
+    await c.from('profiles').update({ stamps: merged, updated_at: new Date().toISOString() }).eq('id', uid);
+  }
+  if (JSON.stringify(local) !== mergedStr) {
+    try { localStorage.setItem(STAMPS_KEY, mergedStr); } catch { /* local keeps what it had */ }
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -111,7 +155,8 @@ export async function syncNow() {
       if (sky) { await store.put(sky); changed = true; }
     }
 
-    return { ok: true, changed };
+    const stampsChanged = await syncStamps(c, uid);
+    return { ok: true, changed: changed || stampsChanged };
   } catch (error) {
     return { ok: false, error };
   }
