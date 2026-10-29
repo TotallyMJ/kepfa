@@ -368,6 +368,7 @@ export const t = {
   safeRestored: (n) => `Restored ${n} ${skies(n)}.`,
   safeEmpty: 'No skies to save yet.',
   safeBad: 'That file isn’t a Kepfa backup.',
+  safeLeadOut: 'Your skies live only on this phone. Sign in to keep them on every device.',
   // Cross-device sync: sign in so the jar follows you to any browser.
   syncHead: 'See your skies anywhere',
   syncBody: 'Sign in to sync your jar across devices.',

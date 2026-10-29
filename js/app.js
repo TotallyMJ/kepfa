@@ -368,23 +368,14 @@ const dataToBlob = (url) => fetch(url).then((r) => r.blob());
 
 function openSafeSheet() {
   const wrap = $('#safeSheet');
-  const n = realSkies().length;
   wrap.querySelector('.sheet').innerHTML = `
     <div class="grabber"></div>
     <div class="sheet-head"><span></span><h2>${t.safeTitle}</h2><button type="button" class="viewer-icon" id="safeClose" aria-label="${t.close}">${ICON.close}</button></div>
-    <p class="hint safe-body">${t.safeBody}</p>
-    <p class="safe-meta" id="safeMeta">${t.safeMeta(n, backupSaved())}</p>
-    <div class="sheet-actions safe-actions">
-      <button type="button" class="btn primary" id="safeSave">${ICON.save}${t.safeSave}</button>
-      <button type="button" class="btn-text" id="safeRestore">${t.safeRestore}</button>
-    </div>
-    <div class="safe-sync" id="safeSync"></div>`;
+    <div class="safe-body" id="safeBody"></div>`;
   wrap.hidden = false;
   openLayer('safe', closeSafeSheet);
   $('#safeClose').addEventListener('click', closeSafeSheet);
   wrap.querySelector('.overlay-backdrop').onclick = closeSafeSheet;
-  $('#safeSave').addEventListener('click', exportJar);
-  $('#safeRestore').addEventListener('click', () => $('#safeFile').click());
   const input = $('#safeFile');
   input.onchange = () => { const f = input.files[0]; input.value = ''; if (f) importJar(f); };
   fillSync();
@@ -395,31 +386,43 @@ function closeSafeSheet() {
   closeLayer('safe');
 }
 
-/** Cross-device sign-in, filled in after the sheet opens so Supabase only loads on demand. */
+/**
+ * Fills the sheet: syncing across devices leads, the file backup (Save a copy / Restore) sits
+ * quietly below it. Built here, not in openSafeSheet, so Supabase loads only when signed in.
+ */
 async function fillSync() {
-  const el = $('#safeSync');
+  const el = $('#safeBody');
   if (!el) return;
-  const toPrivacy = (root) => root.querySelector('.safe-privacy')?.addEventListener('click', (e) => { e.preventDefault(); closeSafeSheet(); go('#/privacy'); });
+  // Save a copy / Restore: a quiet file-backup line shown in both states.
+  const fileRow = `<p class="safe-files"><button type="button" class="btn-text" id="safeSave">${t.safeSave}</button> · <button type="button" class="btn-text" id="safeRestore">${t.safeRestore}</button></p>`;
+  const bindCommon = () => {
+    $('#safeSave')?.addEventListener('click', exportJar);
+    $('#safeRestore')?.addEventListener('click', () => $('#safeFile').click());
+    el.querySelector('.safe-privacy')?.addEventListener('click', (e) => { e.preventDefault(); closeSafeSheet(); go('#/privacy'); });
+  };
   const signedOut = () => {
-    el.innerHTML = `<p class="eyebrow safe-sync-head">${t.syncHead}</p><p class="hint safe-sync-note">${t.syncBody}</p>
-      <button type="button" class="btn safe-sync-btn" id="signInGoogle">${t.syncGoogle}</button>
-      <p class="hint safe-consent">${t.syncConsent} <a href="#/privacy" class="safe-privacy">${t.privacyLink}</a></p>`;
+    el.innerHTML = `<p class="safe-lead">${t.safeLeadOut}</p>
+      <button type="button" class="btn primary safe-sync-btn" id="signInGoogle">${t.syncGoogle}</button>
+      <p class="hint safe-consent">${t.syncConsent} <a href="#/privacy" class="safe-privacy">${t.privacyLink}</a></p>
+      ${fileRow}`;
     $('#signInGoogle').addEventListener('click', () => { toast(t.syncOpening); signInGoogle().catch(() => toast(t.syncFailed)); });
-    toPrivacy(el);
+    bindCommon();
   };
   // Never-signed-in: show the invite without loading Supabase at all.
   if (!maybeSignedIn()) { signedOut(); return; }
   const s = await session();
-  if (!$('#safeSync')) return;   // the sheet closed while we were waiting
+  if (!$('#safeBody')) return;   // the sheet closed while we were waiting
   if (!s) { signedOut(); return; }
   const who = s.user?.email || s.user?.user_metadata?.name || t.letterToWho;
   el.innerHTML = `<p class="safe-sync-who">${t.syncedAs(esc(who))}</p>
     <p class="hint safe-sync-note" id="syncStatus">${t.syncing}</p>
+    ${fileRow}
     <div class="safe-sync-foot">
       <button type="button" class="btn-text danger" id="deleteCloud">${t.deleteCloud}</button>
       <button type="button" class="btn-text" id="signOut">${t.signOut}</button>
     </div>
-    <p class="hint"><a href="#/privacy" class="safe-privacy">${t.privacyLink}</a></p>`;
+    <p class="hint safe-foot-privacy"><a href="#/privacy" class="safe-privacy">${t.privacyLink}</a></p>`;
+  bindCommon();
   $('#signOut').addEventListener('click', async () => { await signOut(); fillSync(); toast(t.signedOut); });
   $('#deleteCloud').addEventListener('click', async () => {
     const yes = await confirmDialog({ title: t.deleteCloudTitle, body: t.deleteCloudBody, no: t.keepIt, yes: t.deleteCloudYes });
@@ -430,7 +433,6 @@ async function fillSync() {
     fillSync();
     toast(t.deleteCloudDone);
   });
-  toPrivacy(el);
   const r = await bgSync();
   const st = $('#syncStatus');
   if (st) st.textContent = r && r.ok === false ? t.syncError : t.syncedOk;

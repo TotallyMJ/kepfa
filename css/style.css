@@ -1405,19 +1405,18 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .sheet-head .viewer-icon svg { width: 22px; height: 22px; }
 .story-sheet h2, .install-sheet h2, .safe-sheet h2 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xl); text-align: center; }
 /* Keep your jar safe: one calm line, a mono status, then the two actions stacked. */
-.safe-sheet .safe-body { margin: 0 auto; max-width: 280px; font-size: var(--t-body); line-height: 1.5; color: var(--ink); }
-.safe-sheet .safe-meta { margin: var(--s-4) 0 0; text-align: center; font-family: var(--f-mono); font-size: var(--t-cap); letter-spacing: .04em; color: var(--ink-soft); }
-.safe-sheet .safe-actions { flex-direction: column; gap: var(--s-3); }
-.safe-sheet .safe-actions .btn.primary { width: 100%; gap: var(--s-2); }
-.safe-sheet .safe-actions .btn svg { width: 18px; height: 18px; }
+/* Syncing leads; the file backup sits quietly under a rule. Everything centered. */
+.safe-sheet .safe-body { text-align: center; }
+.safe-sheet .safe-lead { margin: 0 auto; max-width: 280px; font-size: var(--t-body); line-height: 1.5; color: var(--ink); }
+.safe-sheet .safe-files { margin: var(--s-4) 0 0; padding-top: var(--s-4); border-top: 1px solid var(--rule); font-size: var(--t-sm); color: var(--ink-soft); }
+.safe-sheet .safe-files .btn-text { min-height: 0; color: var(--ink); }
 /* Cross-device sign-in, set off below the file backup by a rule. */
-.safe-sheet .safe-sync { margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--rule); text-align: center; min-height: 44px; }
-.safe-sheet .safe-sync-head { margin: 0; }
-.safe-sheet .safe-sync-note { margin: var(--s-1) 0 var(--s-4); }
-.safe-sheet .safe-sync-btn { width: 100%; }
+.safe-sheet .safe-sync-btn { width: 100%; margin-top: var(--s-4); }
 .safe-sheet .safe-sync-who { margin: 0 0 var(--s-1); font-family: var(--f-display); font-weight: 500; font-size: var(--t-lg); }
+.safe-sheet .safe-sync-note { margin: 0; }
 .safe-sheet .safe-consent { margin-top: var(--s-3); }
-.safe-sheet .safe-sync-foot { display: flex; justify-content: center; gap: var(--s-5); margin-top: var(--s-2); }
+.safe-sheet .safe-sync-foot { display: flex; justify-content: center; gap: var(--s-5); margin-top: var(--s-4); }
+.safe-sheet .safe-foot-privacy { margin-top: var(--s-3); }
 .safe-sheet .safe-privacy { color: var(--ink); }
 
 /* Privacy notice page (#/privacy) */
