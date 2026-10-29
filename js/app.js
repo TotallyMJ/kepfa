@@ -23,6 +23,7 @@ const ICON = {
   pen: '<svg class="pen" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
   camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10 11v5.5M14 11v5.5"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -332,6 +333,108 @@ function closeInstallSheet() {
   $('#installSheet').hidden = true;
   closeLayer('install');
 }
+
+// ---------- keep your jar safe: a local backup, since skies live only on this phone ----------
+const BACKUP_VERSION = 1;
+const realSkies = () => state.skies.filter((s) => !s.sample);
+/** The last-saved date as a short label, or '' if never saved on this phone. */
+function backupSaved() {
+  try { const ms = +localStorage.getItem('kepfa.savedAt'); return ms ? fmt.shelf(ms)[0] : ''; } catch { return ''; }
+}
+const blobToData = (blob) => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(r.result);
+  r.onerror = () => reject(r.error);
+  r.readAsDataURL(blob);
+});
+// Data URLs carry their own mime type, so fetch rebuilds the right Blob with no extra code.
+const dataToBlob = (url) => fetch(url).then((r) => r.blob());
+
+function openSafeSheet() {
+  const wrap = $('#safeSheet');
+  const n = realSkies().length;
+  wrap.querySelector('.sheet').innerHTML = `
+    <div class="grabber"></div>
+    <div class="sheet-head"><span></span><h2>${t.safeTitle}</h2><button type="button" class="viewer-icon" id="safeClose" aria-label="${t.close}">${ICON.close}</button></div>
+    <p class="hint safe-body">${t.safeBody}</p>
+    <p class="safe-meta" id="safeMeta">${t.safeMeta(n, backupSaved())}</p>
+    <div class="sheet-actions safe-actions">
+      <button type="button" class="btn primary" id="safeSave">${ICON.save}${t.safeSave}</button>
+      <button type="button" class="btn-text" id="safeRestore">${t.safeRestore}</button>
+    </div>`;
+  wrap.hidden = false;
+  openLayer('safe', closeSafeSheet);
+  $('#safeClose').addEventListener('click', closeSafeSheet);
+  wrap.querySelector('.overlay-backdrop').onclick = closeSafeSheet;
+  $('#safeSave').addEventListener('click', exportJar);
+  $('#safeRestore').addEventListener('click', () => $('#safeFile').click());
+  const input = $('#safeFile');
+  input.onchange = () => { const f = input.files[0]; input.value = ''; if (f) importJar(f); };
+}
+
+function closeSafeSheet() {
+  $('#safeSheet').hidden = true;
+  closeLayer('safe');
+}
+
+async function exportJar() {
+  const skies = realSkies();
+  if (!skies.length) { toast(t.safeEmpty); return; }
+  const btn = $('#safeSave');
+  if (btn) btn.disabled = true;
+  toast(t.safeSaving, 8000);
+  try {
+    const out = { app: 'kepfa', version: BACKUP_VERSION, savedAt: Date.now(), skies: [], stamps: null };
+    for (const s of skies) {
+      out.skies.push({
+        ...s,
+        photo: await blobToData(s.photo),
+        thumb: s.thumb ? await blobToData(s.thumb) : null,
+        live: s.live ? await blobToData(s.live) : null,
+      });
+    }
+    try { out.stamps = localStorage.getItem('kepfa.stamps'); } catch { /* skip stamps */ }
+    const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+    saveImage(blob, `kepfa-${new Date().toISOString().slice(0, 10)}.json`);
+    try { localStorage.setItem('kepfa.savedAt', String(out.savedAt)); } catch { /* label just won't show */ }
+    const meta = $('#safeMeta');
+    if (meta) meta.textContent = t.safeMeta(skies.length, backupSaved());
+    toast(t.safeSaved(skies.length));
+  } catch {
+    toast(t.saveFailed);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function importJar(file) {
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { toast(t.safeBad); return; }
+  if (!data || data.app !== 'kepfa' || !Array.isArray(data.skies)) { toast(t.safeBad); return; }
+  let n = 0;
+  for (const raw of data.skies) {
+    if (!raw || !raw.id || !raw.photo) continue;
+    try {
+      const photo = await dataToBlob(raw.photo);
+      const sky = {
+        ...raw,
+        photo,
+        thumb: raw.thumb ? await dataToBlob(raw.thumb) : photo,
+        live: raw.live ? await dataToBlob(raw.live) : null,
+        sample: false,
+      };
+      await store.put(sky);
+      forgetUrls(sky.id);   // a re-imported id may carry a new blob
+      n++;
+    } catch { /* skip a broken entry, keep the rest */ }
+  }
+  if (data.stamps) { try { localStorage.setItem('kepfa.stamps', data.stamps); } catch { /* stamps stay as they were */ } }
+  state.skies = await store.all();
+  closeSafeSheet();
+  render();
+  toast(t.safeRestored(n));
+}
+
 const homeUrl = () => `${location.origin}${location.pathname}`;
 
 function inAppHtml() {
@@ -390,6 +493,8 @@ function renderShelf() {
   const jarMonth = skiesIn(now.getFullYear(), now.getMonth()).length || !latest ? now : new Date(latest.takenAt);
   const sun = sunLine();
   const next = nextStamp();
+  // The backup card shows once there's a real sky to lose (samples don't count).
+  const hasReal = state.skies.some((s) => !s.sample);
 
   view.innerHTML = `
     <header class="masthead masthead-home">
@@ -434,14 +539,6 @@ function renderShelf() {
       <div class="shelf-jars">${Array.from({ length: 3 }, () => `<span class="ghost-jar">${jarSvg()}</span>`).join('')}</div>
       <p class="shelf-hint">${state.skies.length ? t.weekEmpty : t.firstSky}</p>
     </div>`}
-    ${canInstall() && !installSnoozed() ? `<div class="memory install-card">
-      <button type="button" class="install-open" id="installOpen">
-        <img class="install-icon" src="icons/icon-192.png" alt="">
-        <span class="memory-text"><span class="eyebrow">${t.installEyebrow}</span><span class="next-name">${t.installTitle}</span><span class="memory-date">${t.installSub}</span></span>
-        ${ICON.right}
-      </button>
-      <button type="button" class="btn-text install-later" id="installLater">${t.installLater}</button>
-    </div>` : ''}
     ${next ? `<a class="memory next-stamp" href="#/stamps">
       <span class="next-slot">${next.have}/${next.need}</span>
       <span class="memory-text"><span class="eyebrow">${t.nextStamp}</span><span class="next-name">${esc(t.stamps[next.id].name)}</span>
@@ -454,8 +551,22 @@ function renderShelf() {
       ${ICON.right}
     </button>` : ''}
     <section class="poem"><p>${t.poem.join('<br>')}</p><span class="eyebrow">${t.poemSign}</span></section>
+    ${canInstall() && !installSnoozed() ? `<div class="memory install-card">
+      <button type="button" class="install-open" id="installOpen">
+        <img class="install-icon" src="icons/icon-192.png" alt="">
+        <span class="memory-text"><span class="eyebrow">${t.installEyebrow}</span><span class="next-name">${t.installTitle}</span><span class="memory-date">${t.installSub}</span></span>
+        ${ICON.right}
+      </button>
+      <button type="button" class="btn-text install-later" id="installLater">${t.installLater}</button>
+    </div>` : ''}
     ${canInstall() && installSnoozed() ? `<button type="button" class="memory install-again" id="installAgain">
       <img src="icons/icon-192.png" alt=""><span>${t.installAgain}</span>${ICON.right}
+    </button>` : ''}
+    ${hasReal ? `<button type="button" class="memory safe-card" id="safeOpen">
+      <span class="next-slot">${ICON.shield}</span>
+      <span class="memory-text"><span class="eyebrow">${t.safeEyebrow}</span><span class="next-name">${t.safeTitle}</span>
+        <span class="memory-date">${backupSaved() ? t.safeCardSaved(backupSaved()) : t.safeCardNew}</span></span>
+      ${ICON.right}
     </button>` : ''}
     <p class="credit">${t.madeBy} <a href="https://vibethebloom.com" target="_blank" rel="noopener">${t.maker}</a> ↗</p>`;
 
@@ -467,6 +578,7 @@ function renderShelf() {
     try { localStorage.setItem('kepfa.installLater', String(Date.now())); } catch { /* it shows again next time */ }
     render();
   });
+  $('#safeOpen')?.addEventListener('click', openSafeSheet);
   $('#clearSamples')?.addEventListener('click', clearSamples);
   $('#copyLink')?.addEventListener('click', copyLink);
   $('#setPlace')?.addEventListener('click', askLocation);

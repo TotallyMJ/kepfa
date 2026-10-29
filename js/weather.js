@@ -31,7 +31,6 @@ export function skyKind(code) {
 }
 
 const round = (n) => Math.round(n * 10) / 10;
-const fahrenheit = () => /-US$/.test(navigator.language || '');
 
 function cached(place) {
   try {
@@ -51,7 +50,7 @@ export async function currentWeather(place) {
   const lat = round(place.lat), lon = round(place.lon);
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
-      + `&current=weather_code,temperature_2m${fahrenheit() ? '&temperature_unit=fahrenheit' : ''}`);
+      + '&current=weather_code,temperature_2m');   // Open-Meteo defaults to Celsius
     if (!res.ok) return old;
     const { current } = await res.json();
     const w = { at: Date.now(), lat, lon, code: current.weather_code, temp: Math.round(current.temperature_2m) };
