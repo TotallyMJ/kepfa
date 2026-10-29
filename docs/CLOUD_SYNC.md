@@ -30,6 +30,8 @@
 - [ ] **1** — เพิ่ม `supabase-js` (CDN) + Google sign-in + UI บัญชี (local-first: เก็บฟ้าได้ก่อนล็อกอิน)
 - [x] **2** — sync engine: metadata + รูป (local-first, reconcile, soft-delete) — `js/sync.js`, ทดสอบ upload/download/soft-delete ครบ
 - [x] **3** — sync คลิป Live + แสตมป์/จดหมาย (profiles.stamps) — ทดสอบ upload/download/merge ครบ
+- [x] **3.5 (PDPA)** — หน้า Privacy (`#/privacy`), บรรทัด consent ตอน sign-in, ปุ่ม Delete my cloud data (ลบ skies+Storage+profile แล้ว sign out) · export มีอยู่แล้ว (Save a copy)
+  - หมายเหตุ: อีเมลติดต่อในหน้า Privacy ตั้งเป็น `mangporr@gmail.com` (แก้ใน `t.privacyContact`) · ลบ "บัญชี" ทั้งก้อน (auth user) ต้องทำ Edge Function แยก (ยังไม่ทำ)
 - [ ] **4** — Apple sign-in + เขียนหัวข้อ "ความเป็นส่วนตัว" ใน README ใหม่
 
 ## ด่านที่เจ้าของต้องทำเอง (ก่อนเฟส 1 ใช้งานได้จริง)

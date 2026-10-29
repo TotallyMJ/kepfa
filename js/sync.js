@@ -113,6 +113,33 @@ async function syncStamps(c, uid) {
 }
 
 /**
+ * Erase everything this owner has in the cloud: every photo and clip in Storage, every sky row and
+ * the stamps on their profile. The skies on this device are left alone. Caller signs out afterwards
+ * so this device won't just sync them back up.
+ */
+export async function deleteCloudData() {
+  const s = await session();
+  if (!s) return { ok: false };
+  let c;
+  try { c = await supaClient(); } catch { return { ok: false }; }
+  const uid = s.user.id;
+  try {
+    for (const bucket of [PHOTOS, LIVE]) {
+      const { data: dirs } = await c.storage.from(bucket).list(uid);
+      for (const d of (dirs || [])) {
+        const { data: files } = await c.storage.from(bucket).list(`${uid}/${d.name}`);
+        const paths = (files || []).map((f) => `${uid}/${d.name}/${f.name}`);
+        if (paths.length) await c.storage.from(bucket).remove(paths);
+      }
+    }
+    await c.from('skies').delete().not('id', 'is', null);
+    await c.from('profiles').update({ stamps: null, saved_at: null }).eq('id', uid);
+    try { localStorage.removeItem(TOMB); } catch { /* fine */ }
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+
+/**
  * Reconcile this device with the cloud once. Returns { ok, changed }, where `changed` means the
  * local store gained, lost or updated a sky and the caller should reload and re-render.
  */

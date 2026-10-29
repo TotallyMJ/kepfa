@@ -10,7 +10,7 @@ import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
 import { sunPhase, skyKind, lastWeather, currentWeather } from './weather.js';
 import { session, signInGoogle, signOut, returningFromOAuth, completeSignIn, maybeSignedIn } from './cloud.js';
-import { syncNow, queueDelete } from './sync.js';
+import { syncNow, queueDelete, deleteCloudData } from './sync.js';
 import { paintSky } from './skypaint.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE, HASHTAG } from './strings.js';
 
@@ -208,6 +208,7 @@ function parseRoute() {
   }
   if (a === 'months') return { name: 'months' };
   if (a === 'stamps') return { name: 'stamps' };
+  if (a === 'privacy') return { name: 'privacy' };
   // The Jars tab opens on the month you're in.
   if (a === 'jars') { const now = new Date(); return { name: 'month', year: now.getFullYear(), month: now.getMonth() }; }
   return { name: 'shelf' };
@@ -234,13 +235,14 @@ function render() {
   state.live = null;
   state.monthNav = null;
   const route = parseRoute();
-  const tab = route.name === 'shelf' ? 'shelf' : 'months';
+  const tab = route.name === 'shelf' || route.name === 'privacy' ? 'shelf' : 'months';
   document.querySelectorAll('.tab').forEach((el) => {
     if (el.dataset.tab === tab) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
   });
   if (route.name === 'month') renderMonth(route.year, route.month);
   else if (route.name === 'months') renderMonths();
   else if (route.name === 'stamps') renderStamps();
+  else if (route.name === 'privacy') renderPrivacy();
   else renderShelf();
   if (location.hash !== state.lastRoute) {
     window.scrollTo(0, 0);
@@ -254,6 +256,17 @@ function go(hash) {
   // A window closed with ✕ is still taking its history step back; move on once it has.
   if (unwinding) { afterUnwind = () => go(hash); return; }
   if (location.hash === hash) render(); else location.hash = hash;
+}
+
+/** The privacy notice (PDPA): what's kept, where, and the owner's choices. Reached from the sync section. */
+function renderPrivacy() {
+  $('#safeSheet').hidden = true;   // in case it was opened from the sheet
+  const last = t.privacy.length - 1;
+  const body = t.privacy.map((s, i) => `${s.h ? `<h2 class="privacy-h">${s.h}</h2>` : ''}<p class="privacy-p">${s.p}${i === last ? `<a href="mailto:${t.privacyContact}">${t.privacyContact}</a>.` : ''}</p>`).join('');
+  view.innerHTML = `
+    <header class="masthead privacy-top"><a class="btn-text privacy-back" href="#/">${ICON.left}${t.privacyBack}</a></header>
+    <article class="privacy"><h1 class="privacy-title">${t.privacyTitle}</h1>${body}</article>
+    <p class="credit">${t.madeBy} <a href="https://vibethebloom.com" target="_blank" rel="noopener">${t.maker}</a> ↗</p>`;
 }
 
 // ---------- back button: each open window is one step in history ----------
@@ -385,10 +398,13 @@ function closeSafeSheet() {
 async function fillSync() {
   const el = $('#safeSync');
   if (!el) return;
+  const toPrivacy = (root) => root.querySelector('.safe-privacy')?.addEventListener('click', (e) => { e.preventDefault(); closeSafeSheet(); go('#/privacy'); });
   const signedOut = () => {
     el.innerHTML = `<p class="eyebrow safe-sync-head">${t.syncHead}</p><p class="hint safe-sync-note">${t.syncBody}</p>
-      <button type="button" class="btn safe-sync-btn" id="signInGoogle">${t.syncGoogle}</button>`;
+      <button type="button" class="btn safe-sync-btn" id="signInGoogle">${t.syncGoogle}</button>
+      <p class="hint safe-consent">${t.syncConsent} <a href="#/privacy" class="safe-privacy">${t.privacyLink}</a></p>`;
     $('#signInGoogle').addEventListener('click', () => { toast(t.syncOpening); signInGoogle().catch(() => toast(t.syncFailed)); });
+    toPrivacy(el);
   };
   // Never-signed-in: show the invite without loading Supabase at all.
   if (!maybeSignedIn()) { signedOut(); return; }
@@ -398,8 +414,22 @@ async function fillSync() {
   const who = s.user?.email || s.user?.user_metadata?.name || t.letterToWho;
   el.innerHTML = `<p class="safe-sync-who">${t.syncedAs(esc(who))}</p>
     <p class="hint safe-sync-note" id="syncStatus">${t.syncing}</p>
-    <button type="button" class="btn-text" id="signOut">${t.signOut}</button>`;
+    <div class="safe-sync-foot">
+      <button type="button" class="btn-text danger" id="deleteCloud">${t.deleteCloud}</button>
+      <button type="button" class="btn-text" id="signOut">${t.signOut}</button>
+    </div>
+    <p class="hint"><a href="#/privacy" class="safe-privacy">${t.privacyLink}</a></p>`;
   $('#signOut').addEventListener('click', async () => { await signOut(); fillSync(); toast(t.signedOut); });
+  $('#deleteCloud').addEventListener('click', async () => {
+    const yes = await confirmDialog({ title: t.deleteCloudTitle, body: t.deleteCloudBody, no: t.keepIt, yes: t.deleteCloudYes });
+    if (!yes) return;
+    const done = await deleteCloudData();
+    if (!done.ok) { toast(t.deleteCloudFail); return; }
+    await signOut();
+    fillSync();
+    toast(t.deleteCloudDone);
+  });
+  toPrivacy(el);
   const r = await bgSync();
   const st = $('#syncStatus');
   if (st) st.textContent = r && r.ok === false ? t.syncError : t.syncedOk;

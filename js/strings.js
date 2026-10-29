@@ -380,6 +380,29 @@ export const t = {
   syncing: 'Syncing your jar…',
   syncedOk: 'Your jar is synced.',
   syncError: 'Couldn’t sync right now.',
+  // Consent shown right at the sign-in button, and the link to the full notice.
+  syncConsent: 'Signing in saves your skies to our server so you can see them on any device.',
+  privacyLink: 'How we handle your data',
+  // Removing everything synced to the cloud (an owner's right to erasure).
+  deleteCloud: 'Delete my cloud data',
+  deleteCloudTitle: 'Delete cloud data?',
+  deleteCloudBody: 'This removes your synced skies, photos and stamps from the server and signs you out. The skies on this device stay. If you’re signed in on another device, sign out there too.',
+  deleteCloudYes: 'Delete',
+  deleteCloudDone: 'Your cloud data was deleted.',
+  deleteCloudFail: 'Couldn’t delete right now. Try again.',
+
+  // The privacy notice, reached from the sync section and at #/privacy.
+  privacyTitle: 'Your data',
+  privacyContact: 'mangporr@gmail.com',
+  privacy: [
+    { h: '', p: 'Kepfa keeps the sky you notice. Without signing in, everything stays on this device — no account, no server. If you sign in to sync across devices, here is what we keep and the choices you have.' },
+    { h: 'What we keep', p: 'Only when you sign in: the skies you keep — their photos, Live clips, notes, place and dates — the stamps you earn, and the email from your Google sign-in, so the jar is known to be yours.' },
+    { h: 'Where it lives', p: 'On Supabase servers, sent over HTTPS. Each person can reach only their own skies. We don’t sell your data, show ads, or share it with anyone.' },
+    { h: 'Location', p: 'If you allow location, a rounded position (about 10 km) is used to guess your place and the weather behind today’s jar. Your exact position never leaves this device, and shared images are redrawn with no GPS in them.' },
+    { h: 'Your choices', p: '“Save a copy” downloads all your skies as one file, anytime. “Delete my cloud data” removes your synced skies, photos and stamps from the server. Not signing in keeps everything on this device only.' },
+    { h: 'Keeping it', p: 'Synced data stays until you delete it. Questions about your data: ' },
+  ],
+  privacyBack: 'Back',
 
   madeBy: 'Made by',
   maker: 'Vibe the Bloom',
