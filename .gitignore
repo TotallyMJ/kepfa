@@ -7,3 +7,7 @@ assets/note.png
 assets/tape.png
 assets/samples/
 _mockups/
+outputs/
+# Secrets must never be committed (Supabase already holds the Google secret).
+client_secret*.json
+*.apps.googleusercontent.com.json
