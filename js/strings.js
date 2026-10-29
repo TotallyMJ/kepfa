@@ -354,6 +354,21 @@ export const t = {
   letterEdit: 'Write your own words',
   letterEditTo: 'Who it’s to',
   openLetter: (name) => `Open the letter for ${name}`,
+  // Keep your jar safe: a local backup, since skies live only on this phone.
+  safeEyebrow: 'Keep it safe',
+  safeTitle: 'Keep your jar safe',
+  safeCardNew: 'only on this phone',
+  safeCardSaved: (date) => `last saved ${date}`,
+  safeBody: 'Your skies live only on this phone. Save a copy so a lost phone never means a lost sky.',
+  safeMeta: (n, date) => `${n} ${skies(n)} · ${date ? `saved ${date}` : 'not saved yet'}`,
+  safeSave: 'Save a copy',
+  safeRestore: 'Restore from a file',
+  safeSaving: 'Saving your jar…',
+  safeSaved: (n) => `Saved ${n} ${skies(n)}.`,
+  safeRestored: (n) => `Restored ${n} ${skies(n)}.`,
+  safeEmpty: 'No skies to save yet.',
+  safeBad: 'That file isn’t a Kepfa backup.',
+
   madeBy: 'Made by',
   maker: 'Vibe the Bloom',
 
