@@ -539,14 +539,6 @@ function renderShelf() {
       <div class="shelf-jars">${Array.from({ length: 3 }, () => `<span class="ghost-jar">${jarSvg()}</span>`).join('')}</div>
       <p class="shelf-hint">${state.skies.length ? t.weekEmpty : t.firstSky}</p>
     </div>`}
-    ${canInstall() && !installSnoozed() ? `<div class="memory install-card">
-      <button type="button" class="install-open" id="installOpen">
-        <img class="install-icon" src="icons/icon-192.png" alt="">
-        <span class="memory-text"><span class="eyebrow">${t.installEyebrow}</span><span class="next-name">${t.installTitle}</span><span class="memory-date">${t.installSub}</span></span>
-        ${ICON.right}
-      </button>
-      <button type="button" class="btn-text install-later" id="installLater">${t.installLater}</button>
-    </div>` : ''}
     ${next ? `<a class="memory next-stamp" href="#/stamps">
       <span class="next-slot">${next.have}/${next.need}</span>
       <span class="memory-text"><span class="eyebrow">${t.nextStamp}</span><span class="next-name">${esc(t.stamps[next.id].name)}</span>
@@ -559,6 +551,14 @@ function renderShelf() {
       ${ICON.right}
     </button>` : ''}
     <section class="poem"><p>${t.poem.join('<br>')}</p><span class="eyebrow">${t.poemSign}</span></section>
+    ${canInstall() && !installSnoozed() ? `<div class="memory install-card">
+      <button type="button" class="install-open" id="installOpen">
+        <img class="install-icon" src="icons/icon-192.png" alt="">
+        <span class="memory-text"><span class="eyebrow">${t.installEyebrow}</span><span class="next-name">${t.installTitle}</span><span class="memory-date">${t.installSub}</span></span>
+        ${ICON.right}
+      </button>
+      <button type="button" class="btn-text install-later" id="installLater">${t.installLater}</button>
+    </div>` : ''}
     ${canInstall() && installSnoozed() ? `<button type="button" class="memory install-again" id="installAgain">
       <img src="icons/icon-192.png" alt=""><span>${t.installAgain}</span>${ICON.right}
     </button>` : ''}
