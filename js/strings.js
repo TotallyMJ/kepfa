@@ -393,7 +393,7 @@ export const t = {
 
   // The privacy notice, reached from the sync section and at #/privacy.
   privacyTitle: 'Your data',
-  privacyContact: 'mangporr@gmail.com',
+  privacyContact: 'kepfa@vibethebloom.com',
   privacy: [
     { h: '', p: 'Kepfa keeps the sky you notice. Without signing in, everything stays on this device — no account, no server. If you sign in to sync across devices, here is what we keep and the choices you have.' },
     { h: 'What we keep', p: 'Only when you sign in: the skies you keep — their photos, Live clips, notes, place and dates — the stamps you earn, and the email from your Google sign-in, so the jar is known to be yours.' },
