@@ -28,7 +28,7 @@
 
 - [x] **0** — สร้าง Supabase project + schema + Storage + RLS
 - [ ] **1** — เพิ่ม `supabase-js` (CDN) + Google sign-in + UI บัญชี (local-first: เก็บฟ้าได้ก่อนล็อกอิน)
-- [ ] **2** — sync engine: metadata + รูป (local-first, reconcile, soft-delete)
+- [x] **2** — sync engine: metadata + รูป (local-first, reconcile, soft-delete) — `js/sync.js`, ทดสอบ upload/download/soft-delete ครบ
 - [ ] **3** — sync คลิป Live + แสตมป์/จดหมาย (profiles.stamps)
 - [ ] **4** — Apple sign-in + เขียนหัวข้อ "ความเป็นส่วนตัว" ใน README ใหม่
 

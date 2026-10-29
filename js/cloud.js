@@ -20,6 +20,17 @@ function client() {
   return clientPromise;
 }
 
+// The lazily-created client, for the sync engine. Importing this does not load Supabase;
+// only calling it does, so callers gate it behind maybeSignedIn() to keep startup local-only.
+export { client as supaClient };
+
+/** A cheap, synchronous guess at whether someone is signed in, read from Supabase's own storage,
+ *  so the app can skip loading Supabase entirely for anyone who never signed in. */
+export const maybeSignedIn = () => {
+  try { return Object.keys(localStorage).some((k) => k.startsWith('sb-') && k.endsWith('-auth-token')); }
+  catch { return false; }
+};
+
 /** The current session, or null (also null offline or when the CDN can't be reached). */
 export async function session() {
   try { const c = await client(); return (await c.auth.getSession()).data.session; }

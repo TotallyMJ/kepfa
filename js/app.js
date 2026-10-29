@@ -9,7 +9,8 @@ import { album, checkStamps, writeCard } from './stamps.js';
 import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
 import { sunPhase, skyKind, lastWeather, currentWeather } from './weather.js';
-import { session, signInGoogle, signOut, returningFromOAuth, completeSignIn } from './cloud.js';
+import { session, signInGoogle, signOut, returningFromOAuth, completeSignIn, maybeSignedIn } from './cloud.js';
+import { syncNow, queueDelete } from './sync.js';
 import { paintSky } from './skypaint.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE, HASHTAG } from './strings.js';
 
@@ -384,18 +385,36 @@ function closeSafeSheet() {
 async function fillSync() {
   const el = $('#safeSync');
   if (!el) return;
-  const s = await session();
-  if (!$('#safeSync')) return;   // the sheet closed while we were waiting
-  if (s) {
-    const who = s.user?.email || s.user?.user_metadata?.name || t.letterToWho;
-    el.innerHTML = `<p class="safe-sync-who">${t.syncedAs(esc(who))}</p>
-      <button type="button" class="btn-text" id="signOut">${t.signOut}</button>`;
-    $('#signOut').addEventListener('click', async () => { await signOut(); fillSync(); toast(t.signedOut); });
-  } else {
+  const signedOut = () => {
     el.innerHTML = `<p class="eyebrow safe-sync-head">${t.syncHead}</p><p class="hint safe-sync-note">${t.syncBody}</p>
       <button type="button" class="btn safe-sync-btn" id="signInGoogle">${t.syncGoogle}</button>`;
     $('#signInGoogle').addEventListener('click', () => { toast(t.syncOpening); signInGoogle().catch(() => toast(t.syncFailed)); });
-  }
+  };
+  // Never-signed-in: show the invite without loading Supabase at all.
+  if (!maybeSignedIn()) { signedOut(); return; }
+  const s = await session();
+  if (!$('#safeSync')) return;   // the sheet closed while we were waiting
+  if (!s) { signedOut(); return; }
+  const who = s.user?.email || s.user?.user_metadata?.name || t.letterToWho;
+  el.innerHTML = `<p class="safe-sync-who">${t.syncedAs(esc(who))}</p>
+    <p class="hint safe-sync-note" id="syncStatus">${t.syncing}</p>
+    <button type="button" class="btn-text" id="signOut">${t.signOut}</button>`;
+  $('#signOut').addEventListener('click', async () => { await signOut(); fillSync(); toast(t.signedOut); });
+  const r = await bgSync();
+  const st = $('#syncStatus');
+  if (st) st.textContent = r && r.ok === false ? t.syncError : t.syncedOk;
+}
+
+// Reconcile with the cloud in the background; re-render if the local jar changed. One at a time.
+let syncing = false;
+async function bgSync() {
+  if (!maybeSignedIn() || syncing) return null;
+  syncing = true;
+  try {
+    const r = await syncNow();
+    if (r && r.changed) { state.skies = await store.all(); sortSkies(); render(); }
+    return r;
+  } catch { return { ok: false }; } finally { syncing = false; }
 }
 
 async function exportJar() {
@@ -1454,6 +1473,7 @@ async function saveDraft() {
     front: draft.front, // taken with the front camera (Me & the sky)
     sample: false,
     createdAt: Date.now(),
+    updatedAt: Date.now(),   // for cloud sync: last change wins
   };
   // Saved before anything moves: if it fails, the lid stays open and nothing is lost.
   try {
@@ -1466,6 +1486,7 @@ async function saveDraft() {
   const daysBefore = keptDays();
   state.skies.push(sky);
   sortSkies();
+  bgSync();   // if signed in, send the new sky to the cloud
   const fresh = checkStamps(state.skies, stampCtx());
   state.viaPrompt = false;
   // This sky finished a round when it added a new day and that day is the round's last.
@@ -1883,7 +1904,7 @@ function startEdit(sky) {
 }
 
 async function saveNote(sky) {
-  const next = { ...sky, note: $('#noteInput').value.trim(), place: $('#placeInput').value.trim() };
+  const next = { ...sky, note: $('#noteInput').value.trim(), place: $('#placeInput').value.trim(), updatedAt: Date.now() };
   try {
     await store.put(next);
   } catch {
@@ -1893,6 +1914,7 @@ async function saveNote(sky) {
   Object.assign(sky, next);
   endEdit(sky);
   render();
+  bgSync();   // push the edit to the cloud
   toast(t.noteSaved);
 }
 
@@ -2003,6 +2025,7 @@ function confirmDialog({ title, body, no, yes }) {
 async function deleteSky(sky) {
   const yes = await confirmDialog({ title: t.deleteTitle, body: t.deleteBody, no: t.keepIt, yes: t.deleteYes });
   if (!yes) return false;
+  queueDelete(sky.id);   // remember it so the next sync soft-deletes it in the cloud too
   try {
     await store.remove(sky.id);
   } catch {
@@ -2012,6 +2035,7 @@ async function deleteSky(sky) {
   state.skies = state.skies.filter((s) => s.id !== sky.id);
   forgetUrls(sky.id);
   render();
+  bgSync();
   toast(t.deleted);
   return true;
 }
@@ -2303,6 +2327,7 @@ async function init() {
     markSeeded();
   }
   render();
+  if (maybeSignedIn()) bgSync();   // signed in: pull this device up to date in the background
 }
 
 init();

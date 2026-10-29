@@ -377,6 +377,9 @@ export const t = {
   signedOut: 'Signed out.',
   syncOpening: 'Opening sign in…',
   syncFailed: 'Couldn’t open sign in.',
+  syncing: 'Syncing your jar…',
+  syncedOk: 'Your jar is synced.',
+  syncError: 'Couldn’t sync right now.',
 
   madeBy: 'Made by',
   maker: 'Vibe the Bloom',
