@@ -379,8 +379,9 @@ export const t = {
   syncOpening: 'Opening sign in…',
   syncFailed: 'Couldn’t open sign in.',
   syncing: 'Syncing your jar…',
-  syncedOk: 'Your jar is synced.',
+  syncedOk: 'Your jar is synced ✓',
   syncError: 'Couldn’t sync right now.',
+  safeFileLabel: 'Keep a copy as a file',
   // Consent shown right at the sign-in button, and the link to the full notice.
   account: 'Your account',
   syncConsent: 'Signing in saves your skies to our server so you can see them on any device.',

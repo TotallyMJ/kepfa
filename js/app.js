@@ -404,7 +404,7 @@ async function fillSync() {
     el.innerHTML = `<p class="safe-lead">${t.safeLeadOut}</p>
       <button type="button" class="btn primary safe-sync-btn" id="signInGoogle">${t.syncGoogle}</button>
       <p class="hint safe-consent">${t.syncConsent} <a href="#/privacy" class="safe-privacy">${t.privacyLink}</a></p>
-      ${fileRow}`;
+      <div class="safe-group"><span class="eyebrow">${t.safeFileLabel}</span>${fileRow}</div>`;
     $('#signInGoogle').addEventListener('click', () => { toast(t.syncOpening); signInGoogle().catch(() => toast(t.syncFailed)); });
     bindCommon();
   };
@@ -416,12 +416,12 @@ async function fillSync() {
   const who = s.user?.email || s.user?.user_metadata?.name || t.letterToWho;
   el.innerHTML = `<p class="safe-sync-who">${t.syncedAs(esc(who))}</p>
     <p class="hint safe-sync-note" id="syncStatus">${t.syncing}</p>
-    ${fileRow}
-    <div class="safe-sync-foot">
-      <button type="button" class="btn-text danger" id="deleteCloud">${t.deleteCloud}</button>
+    <div class="safe-group"><span class="eyebrow">${t.safeFileLabel}</span>${fileRow}${backupSaved() ? `<p class="safe-saved">${t.safeCardSaved(backupSaved())}</p>` : ''}</div>
+    <div class="safe-group safe-account">
       <button type="button" class="btn-text" id="signOut">${t.signOut}</button>
+      <p class="hint safe-foot-privacy"><a href="#/privacy" class="safe-privacy">${t.privacyLink}</a></p>
     </div>
-    <p class="hint safe-foot-privacy"><a href="#/privacy" class="safe-privacy">${t.privacyLink}</a></p>`;
+    <button type="button" class="btn-text safe-delete" id="deleteCloud">${t.deleteCloud}</button>`;
   bindCommon();
   $('#signOut').addEventListener('click', async () => { await signOut(); fillSync(); toast(t.signedOut); });
   $('#deleteCloud').addEventListener('click', async () => {

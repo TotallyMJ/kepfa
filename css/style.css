@@ -1408,16 +1408,22 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 /* Syncing leads; the file backup sits quietly under a rule. Everything centered. */
 .safe-sheet .safe-body { text-align: center; }
 .safe-sheet .safe-lead { margin: 0 auto; max-width: 280px; font-size: var(--t-body); line-height: 1.5; color: var(--ink); }
-.safe-sheet .safe-files { margin: var(--s-4) 0 0; padding-top: var(--s-4); border-top: 1px solid var(--rule); font-size: var(--t-sm); color: var(--ink-soft); }
+.safe-sheet .safe-group { margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--rule); }
+.safe-sheet .safe-group .eyebrow { display: block; }
+.safe-sheet .safe-files { margin: var(--s-2) 0 0; font-size: var(--t-sm); color: var(--ink-soft); }
 .safe-sheet .safe-files .btn-text { min-height: 0; color: var(--ink); }
+.safe-sheet .safe-saved { margin: var(--s-2) 0 0; font-family: var(--f-mono); font-size: var(--t-cap); color: var(--ink-soft); }
 /* Cross-device sign-in, set off below the file backup by a rule. */
 .safe-sheet .safe-sync-btn { width: 100%; margin-top: var(--s-4); }
 .safe-sheet .safe-sync-who { margin: 0 0 var(--s-1); font-family: var(--f-display); font-weight: 500; font-size: var(--t-lg); }
 .safe-sheet .safe-sync-note { margin: 0; }
 .safe-sheet .safe-consent { margin-top: var(--s-3); }
-.safe-sheet .safe-sync-foot { display: flex; justify-content: center; gap: var(--s-5); margin-top: var(--s-4); }
-.safe-sheet .safe-foot-privacy { margin-top: var(--s-3); }
+.safe-sheet .safe-account .btn-text { min-height: 0; }
+.safe-sheet .safe-foot-privacy { margin: var(--s-2) 0 0; }
 .safe-sheet .safe-privacy { color: var(--ink); }
+/* Delete sits alone at the very bottom, small and quiet, so it isn't tapped by mistake. */
+.safe-sheet .safe-delete { display: block; margin: var(--s-5) auto 0; min-height: 0; font-size: 12px; color: var(--ink-soft); text-decoration-color: var(--rule); }
+.safe-sheet .safe-delete:active { color: var(--danger); }
 
 /* Privacy notice page (#/privacy) */
 .privacy-top { display: flex; align-items: center; }
