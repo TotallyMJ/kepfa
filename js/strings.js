@@ -357,6 +357,8 @@ export const t = {
   // Keep your jar safe: a local backup, since skies live only on this phone.
   safeEyebrow: 'Keep it safe',
   safeTitle: 'Keep your jar safe',
+  safeCardSignIn: 'Sign in to see them on every device',
+  safeCardSynced: 'Synced across your devices',
   safeCardNew: 'only on this phone',
   safeCardSaved: (date) => `last saved ${date}`,
   safeBody: 'Your skies live only on this phone. Save a copy so a lost phone never means a lost sky.',

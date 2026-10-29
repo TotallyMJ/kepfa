@@ -646,7 +646,7 @@ function renderShelf() {
     ${hasReal ? `<button type="button" class="memory safe-card" id="safeOpen">
       <span class="next-slot">${ICON.shield}</span>
       <span class="memory-text"><span class="eyebrow">${t.safeEyebrow}</span><span class="next-name">${t.safeTitle}</span>
-        <span class="memory-date">${backupSaved() ? t.safeCardSaved(backupSaved()) : t.safeCardNew}</span></span>
+        <span class="memory-date">${maybeSignedIn() ? t.safeCardSynced : t.safeCardSignIn}</span></span>
       ${ICON.right}
     </button>` : ''}
     <p class="credit">${t.madeBy} <a href="https://vibethebloom.com" target="_blank" rel="noopener">${t.maker}</a> ↗</p>`;
