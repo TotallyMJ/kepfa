@@ -1405,6 +1405,12 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .safe-sheet .safe-actions { flex-direction: column; gap: var(--s-3); }
 .safe-sheet .safe-actions .btn.primary { width: 100%; gap: var(--s-2); }
 .safe-sheet .safe-actions .btn svg { width: 18px; height: 18px; }
+/* Cross-device sign-in, set off below the file backup by a rule. */
+.safe-sheet .safe-sync { margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--rule); text-align: center; min-height: 44px; }
+.safe-sheet .safe-sync-head { margin: 0; }
+.safe-sheet .safe-sync-note { margin: var(--s-1) 0 var(--s-4); }
+.safe-sheet .safe-sync-btn { width: 100%; }
+.safe-sheet .safe-sync-who { margin: 0 0 var(--s-1); font-family: var(--f-display); font-weight: 500; font-size: var(--t-lg); }
 /* The preview shrinks with the screen's height, so the whole sheet fits one phone screen without scrolling. */
 .story-preview {
   height: min(calc(min(58vw, 240px) * 16 / 9), calc(100dvh - 380px));

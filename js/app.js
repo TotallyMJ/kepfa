@@ -9,6 +9,7 @@ import { album, checkStamps, writeCard } from './stamps.js';
 import { makeStory, shareImage, saveImage, scatterStars } from './story.js';
 import { chime } from './sound.js';
 import { sunPhase, skyKind, lastWeather, currentWeather } from './weather.js';
+import { session, signInGoogle, signOut, returningFromOAuth, completeSignIn } from './cloud.js';
 import { paintSky } from './skypaint.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, PROMPTS, THEMES, THEMES_FROM, QUOTES, CHALLENGE_SIZE, HASHTAG } from './strings.js';
 
@@ -361,7 +362,8 @@ function openSafeSheet() {
     <div class="sheet-actions safe-actions">
       <button type="button" class="btn primary" id="safeSave">${ICON.save}${t.safeSave}</button>
       <button type="button" class="btn-text" id="safeRestore">${t.safeRestore}</button>
-    </div>`;
+    </div>
+    <div class="safe-sync" id="safeSync"></div>`;
   wrap.hidden = false;
   openLayer('safe', closeSafeSheet);
   $('#safeClose').addEventListener('click', closeSafeSheet);
@@ -370,11 +372,30 @@ function openSafeSheet() {
   $('#safeRestore').addEventListener('click', () => $('#safeFile').click());
   const input = $('#safeFile');
   input.onchange = () => { const f = input.files[0]; input.value = ''; if (f) importJar(f); };
+  fillSync();
 }
 
 function closeSafeSheet() {
   $('#safeSheet').hidden = true;
   closeLayer('safe');
+}
+
+/** Cross-device sign-in, filled in after the sheet opens so Supabase only loads on demand. */
+async function fillSync() {
+  const el = $('#safeSync');
+  if (!el) return;
+  const s = await session();
+  if (!$('#safeSync')) return;   // the sheet closed while we were waiting
+  if (s) {
+    const who = s.user?.email || s.user?.user_metadata?.name || t.letterToWho;
+    el.innerHTML = `<p class="safe-sync-who">${t.syncedAs(esc(who))}</p>
+      <button type="button" class="btn-text" id="signOut">${t.signOut}</button>`;
+    $('#signOut').addEventListener('click', async () => { await signOut(); fillSync(); toast(t.signedOut); });
+  } else {
+    el.innerHTML = `<p class="eyebrow safe-sync-head">${t.syncHead}</p><p class="hint safe-sync-note">${t.syncBody}</p>
+      <button type="button" class="btn safe-sync-btn" id="signInGoogle">${t.syncGoogle}</button>`;
+    $('#signInGoogle').addEventListener('click', () => { toast(t.syncOpening); signInGoogle().catch(() => toast(t.syncFailed)); });
+  }
 }
 
 async function exportJar() {
@@ -2259,6 +2280,8 @@ async function init() {
     location.replace(u.href);
     return;
   }
+  // Coming back from Google sign-in: finish it and drop the ?code= before the app reads the route.
+  if (returningFromOAuth()) await completeSignIn();
   bindGlobal();
   view.innerHTML = `<div class="loading"><div class="spinner"></div><p>${t.opening}</p></div>`;
 

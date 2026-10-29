@@ -368,6 +368,15 @@ export const t = {
   safeRestored: (n) => `Restored ${n} ${skies(n)}.`,
   safeEmpty: 'No skies to save yet.',
   safeBad: 'That file isn’t a Kepfa backup.',
+  // Cross-device sync: sign in so the jar follows you to any browser.
+  syncHead: 'See your skies anywhere',
+  syncBody: 'Sign in to sync your jar across devices.',
+  syncGoogle: 'Continue with Google',
+  syncedAs: (who) => `Synced as ${who}`,
+  signOut: 'Sign out',
+  signedOut: 'Signed out.',
+  syncOpening: 'Opening sign in…',
+  syncFailed: 'Couldn’t open sign in.',
 
   madeBy: 'Made by',
   maker: 'Vibe the Bloom',
