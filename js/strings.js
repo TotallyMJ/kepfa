@@ -381,6 +381,7 @@ export const t = {
   syncedOk: 'Your jar is synced.',
   syncError: 'Couldn’t sync right now.',
   // Consent shown right at the sign-in button, and the link to the full notice.
+  account: 'Your account',
   syncConsent: 'Signing in saves your skies to our server so you can see them on any device.',
   privacyLink: 'How we handle your data',
   // Removing everything synced to the cloud (an owner's right to erasure).

@@ -124,6 +124,11 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .masthead-home { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-3); }
 .masthead-home .wordmark { margin: 0; }
 .masthead-home .eyebrow { margin-bottom: 6px; text-align: right; line-height: 1.5; }   /* its last line on the wordmark's baseline */
+/* The tagline and a quiet account icon sit together at the right, on the wordmark's baseline. */
+.masthead-right { display: flex; align-items: flex-end; gap: var(--s-3); }
+.account-btn { flex: none; width: 28px; height: 28px; margin-bottom: 1px; display: grid; place-items: center; padding: 0; border: 0; background: none; color: var(--ink-soft); transition: transform var(--t-press) var(--ease-out); }
+.account-btn svg { width: 23px; height: 23px; }
+.account-btn:active { transform: scale(.9); }
 .wordmark { margin: var(--s-1) 0 0; font-family: var(--f-display); font-weight: 500; font-size: var(--t-xxl); line-height: 1; letter-spacing: -.01em; }
 
 .sunline {

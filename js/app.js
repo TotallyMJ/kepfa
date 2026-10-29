@@ -26,6 +26,7 @@ const ICON = {
   camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10 11v5.5M14 11v5.5"/></svg>',
   shield: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
+  account: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.3"/><circle cx="12" cy="9.3" r="3"/><path d="M6.5 18.2a5.7 5.7 0 0 1 11 0"/></svg>',
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -569,7 +570,10 @@ function renderShelf() {
   view.innerHTML = `
     <header class="masthead masthead-home">
       <h1 class="wordmark">Kepfa</h1>
-      <span class="eyebrow">${t.tagline}</span>
+      <div class="masthead-right">
+        <span class="eyebrow">${t.tagline}</span>
+        <button type="button" class="account-btn" id="accountBtn" aria-label="${t.account}">${ICON.account}</button>
+      </div>
     </header>
     ${sun ? `<div class="sunline"><span id="sunLine">${sun}</span>
       <button type="button" class="sunline-place" id="setPlace" aria-label="${t.useLocation}">${ICON.pin}<u>${savedPlace() ? t.nearYou : esc(zoneCity())}</u></button></div>` : ''}
@@ -649,6 +653,7 @@ function renderShelf() {
     render();
   });
   $('#safeOpen')?.addEventListener('click', openSafeSheet);
+  $('#accountBtn')?.addEventListener('click', openSafeSheet);
   $('#clearSamples')?.addEventListener('click', clearSamples);
   $('#copyLink')?.addEventListener('click', copyLink);
   $('#setPlace')?.addEventListener('click', askLocation);
