@@ -11,6 +11,7 @@
   --fold-paper: #E9E3D9;
   --flash: #FFFFFF;
   --danger: #9B3B2E;
+  --ok: #4E7A52;      /* muted sage for a good state, e.g. "synced" */
   --stamp: #C8352A;   /* the KEPT / DONE postmark red, also Live sky */
   --pen: #2E3F63;     /* blue-black ink for handwriting on postcards */
   --scrim: rgba(27, 25, 22, .45);
@@ -68,6 +69,7 @@
     --glare: rgba(255, 255, 255, .22);
     --fold-paper: #3A352F;
     --danger: #E08A7A;
+    --ok: #86B883;
     --scrim: rgba(0, 0, 0, .6);
     --grid: rgba(236, 230, 220, .05);
     color-scheme: dark;
@@ -1417,13 +1419,14 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .safe-sheet .safe-sync-btn { width: 100%; margin-top: var(--s-4); }
 .safe-sheet .safe-sync-who { margin: 0 0 var(--s-1); font-family: var(--f-display); font-weight: 500; font-size: var(--t-lg); }
 .safe-sheet .safe-sync-note { margin: 0; }
+.safe-sheet .safe-sync-note.is-ok { color: var(--ok); }
+.safe-sheet .safe-sync-note.is-error { color: var(--danger); }
 .safe-sheet .safe-consent { margin-top: var(--s-3); }
 .safe-sheet .safe-account .btn-text { min-height: 0; }
 .safe-sheet .safe-foot-privacy { margin: var(--s-2) 0 0; }
 .safe-sheet .safe-privacy { color: var(--ink); }
 /* Delete sits alone at the very bottom, small and quiet, so it isn't tapped by mistake. */
-.safe-sheet .safe-delete { display: block; margin: var(--s-5) auto 0; min-height: 0; font-size: 12px; color: var(--ink-soft); text-decoration-color: var(--rule); }
-.safe-sheet .safe-delete:active { color: var(--danger); }
+.safe-sheet .safe-delete { display: block; margin: var(--s-5) auto 0; min-height: 0; font-size: 12px; color: var(--danger); text-decoration-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 
 /* Privacy notice page (#/privacy) */
 .privacy-top { display: flex; align-items: center; }

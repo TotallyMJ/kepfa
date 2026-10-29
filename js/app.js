@@ -435,7 +435,12 @@ async function fillSync() {
   });
   const r = await bgSync();
   const st = $('#syncStatus');
-  if (st) st.textContent = r && r.ok === false ? t.syncError : t.syncedOk;
+  if (st) {
+    const ok = !(r && r.ok === false);
+    st.textContent = ok ? t.syncedOk : t.syncError;
+    st.classList.toggle('is-ok', ok);
+    st.classList.toggle('is-error', !ok);
+  }
 }
 
 // Reconcile with the cloud in the background; re-render if the local jar changed. One at a time.
