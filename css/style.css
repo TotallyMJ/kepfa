@@ -12,6 +12,7 @@
   --flash: #FFFFFF;
   --danger: #9B3B2E;
   --ok: #4E7A52;      /* muted sage for a good state, e.g. "synced" */
+  --surface: #DCD6CB; /* the warm desk the paper column rests on, wide screens only */
   --stamp: #C8352A;   /* the KEPT / DONE postmark red, also Live sky */
   --pen: #2E3F63;     /* blue-black ink for handwriting on postcards */
   --scrim: rgba(27, 25, 22, .45);
@@ -70,6 +71,7 @@
     --fold-paper: #3A352F;
     --danger: #E08A7A;
     --ok: #86B883;
+    --surface: #131110;
     --scrim: rgba(0, 0, 0, .6);
     --grid: rgba(236, 230, 220, .05);
     color-scheme: dark;
@@ -104,6 +106,25 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   padding-left: var(--gutter-l);
   padding-right: var(--gutter-r);
   padding-block: calc(env(safe-area-inset-top, 0px) + var(--s-5)) calc(env(safe-area-inset-bottom, 0px) + 96px);
+}
+
+/* Wide screens: the paper column becomes a sheet resting on a warm desk, so the space around it reads
+   as a deliberate surface rather than empty page. The grid texture moves onto the sheet. */
+@media (min-width: 760px) {
+  body {
+    background: radial-gradient(140% 100% at 50% -10%, transparent 58%, rgba(30, 28, 25, .07)) var(--surface);
+  }
+  .app {
+    min-height: 100dvh;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) -1px -1px / 22px 22px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) -1px -1px / 22px 22px,
+      var(--paper);
+    box-shadow: 0 0 0 1px rgba(30, 28, 25, .04), 0 32px 70px -34px rgba(30, 28, 25, .32);
+  }
+  /* The bottom bar hugs the sheet, not the whole desk: the paper moves onto the centered inner. */
+  .tabbar { background: transparent; border-top: 0; pointer-events: none; }
+  .tabbar-inner { background: var(--paper); border-top: 1px solid var(--rule); box-shadow: 0 0 0 1px rgba(30, 28, 25, .04); pointer-events: auto; }
 }
 
 /* ---------- type ---------- */
