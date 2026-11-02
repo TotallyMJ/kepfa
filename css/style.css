@@ -488,10 +488,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .btn.light { background: var(--polaroid); border-color: var(--polaroid); color: #1E1C19; border-radius: 5px; }
 
 /* Press: sinks fast, springs back when let go. */
-.btn, .btn-text, .keep-btn, .shutter, .tick-row, .viewer-icon {
+.btn, .btn-text, .keep-btn, .shutter, .tick-row, .viewer-icon, .counted {
   transition: transform var(--t-quick) var(--ease-spring);
 }
-.btn:active:not(:disabled), .btn-text:active, .keep-btn:active, .shutter:active, .tick-row:active, .viewer-icon:active {
+.btn:active:not(:disabled), .btn-text:active, .keep-btn:active, .shutter:active, .tick-row:active, .viewer-icon:active, .counted:active {
   transform: scale(.95);
   transition-duration: var(--t-press);
   transition-timing-function: var(--ease-out);
@@ -1275,7 +1275,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   animation: fade var(--t-quick) var(--ease-out) both;
 }
 .viewer-body {
-  --pw: min(300px, calc(100vw - 64px));   /* polaroid width */
+  --pw: min(300px, calc(100vw - 64px), calc(100dvh - 356px));   /* polaroid width; on short phones it gives way so the stack stays clear of the top bar */
   position: absolute;
   inset: 0;
   display: grid;
@@ -1353,6 +1353,10 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .polaroid-meta { margin: 6px 0 0; font-family: var(--f-mono); font-size: 10px; color: #6B645B; }
 /* With a note taped over the strip's lower part, the date sits midway between the photo and the tape. */
 .polaroid-meta:only-child { margin: 0 0 7px; }
+/* Counted for the challenge: the same round tick as when it was kept, small enough for the polaroid's edge. */
+.counted { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 var(--s-3); border: 0; background: none; color: #6B645B; font-family: var(--f-mono); font-size: 10px; }
+.counted-tick { display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #1E1C19; }
+.counted-tick::after { content: ""; width: 3px; height: 6px; margin-top: -1px; border: solid var(--polaroid); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
 /* Close, where-am-I and more, across the top like a photo viewer; paper-coloured on the dim. */
 .viewer-top {
   position: absolute;

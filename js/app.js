@@ -685,7 +685,7 @@ function renderShelf() {
   $('#setPlace')?.addEventListener('click', askLocation);
   drawSky(now, place, weather);
   paintWeather(place);
-  $('#heroJar').addEventListener('click', () => { state.viaPrompt = !doneToday; openCapture(); });
+  $('#heroJar').addEventListener('click', () => { state.viaPrompt = false; openCapture(); });
   $('#takeChallenge')?.addEventListener('click', () => { state.viaPrompt = true; openCapture(); });
   $('.today-count')?.addEventListener('click', (e) => { e.preventDefault(); $('#thisWeek').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth' }); });
   state.redraw = null;
@@ -1451,6 +1451,8 @@ async function review(blob, { takenAt, source, live = null }) {
 
   $('#noteInput').addEventListener('input', (e) => { e.target.className = `field note ${handClass(e.target.value)}`; });
   $('#retake').addEventListener('click', () => {
+    // The next try keeps what was chosen here, ticked or not.
+    state.viaPrompt = $('#forPrompt')?.checked ?? state.viaPrompt;
     if (source === 'library') { $('#fileLibrary').click(); return; }
     URL.revokeObjectURL(draft.url);
     draft = null;
@@ -1779,10 +1781,18 @@ const viewer = { stage: null, pol: null, busy: false, editing: false };
 /** Long notes write a little smaller so the slip stays two or three lines. */
 const noteClass = (note) => `${handClass(note)}${note.length > 40 ? ' is-long' : ''}`;
 
-/** The polaroid's own edge: when and where. A sky with no note offers to write one. */
+/** Which day of its round a counted sky filled. */
+function countedDay(sky) {
+  const days = [...new Set(state.skies.filter((s) => s.prompt && !s.sample).map((s) => s.prompt))].sort();
+  return (days.indexOf(sky.prompt) % CHALLENGE_SIZE) + 1;
+}
+
+/** The polaroid's own edge: when and where, and whether it counts for the challenge. A sky with no note offers to write one. */
 function stripHtml(sky, { editing = false } = {}) {
+  const day = sky.prompt && !sky.sample && !editing ? countedDay(sky) : 0;
   return `${sky.note || editing ? '' : `<button type="button" class="polaroid-note" id="editNote" aria-label="${t.editNote}"><span class="polaroid-empty">${t.writeOn}</span>${PEN}</button>`}
-    <p class="polaroid-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.stamp(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>`;
+    <p class="polaroid-meta"><time datetime="${new Date(sky.takenAt).toISOString()}">${fmt.stamp(sky.takenAt)}</time>${sky.place ? ` · ${esc(sky.place)}` : ''}</p>
+    ${day ? `<button type="button" class="counted" id="stopCount" aria-label="${t.countedLabel(day)}"><span class="counted-tick"></span>${t.counted(day)}</button>` : ''}`;
 }
 
 /** The note comes out of the jar as its own slip, in the same paper it went in on. Tap it to edit. */
@@ -1805,7 +1815,28 @@ function bindSkyDelete(sky) {
 function bindPolaroid(sky) {
   $('#editNote')?.addEventListener('click', () => startEdit(sky));
   $('#viewNote')?.addEventListener('click', () => startEdit(sky));
+  $('#stopCount')?.addEventListener('click', () => stopCounting(sky));
   $('#shareOne').addEventListener('click', () => openStory('single', { sky }));
+}
+
+/** Takes a kept sky out of the challenge; the photo stays. Past days can't be counted again, so it asks first. */
+async function stopCounting(sky) {
+  if (viewer.busy || viewer.editing) return;
+  const shared = state.skies.some((s) => s.id !== sky.id && !s.sample && s.prompt === sky.prompt);
+  const yes = await confirmDialog({ title: t.stopCountTitle, body: shared ? t.stopCountShared : t.stopCountBody, no: t.keepIt, yes: t.stopCountYes });
+  if (!yes) return;
+  const next = { ...sky, prompt: '', promptText: '', updatedAt: Date.now() };
+  try {
+    await store.put(next);
+  } catch {
+    toast(t.saveFailed);
+    return;
+  }
+  Object.assign(sky, next);
+  endEdit(sky);
+  render();
+  bgSync();   // push the change to the cloud
+  toast(t.stopCountDone);
 }
 
 /** @param from  1 or -1 when arriving by swipe: the polaroid slides in from that side, no jar to open */
