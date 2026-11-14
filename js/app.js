@@ -1025,9 +1025,17 @@ function showStep(name) {
 /** Dim the viewfinder (or a library photo) outside a jar-shaped window, so what you frame is what gets kept. */
 function layoutCameraFrame(svg = $('#camFrame'), maskId = 'camMask') {
   const W = innerWidth, H = innerHeight;
-  const jh = Math.min(H * 0.58, Math.min(W * 0.78, 340) * JAR_RATIO);
+  // The jar fits between the close button (with the hint above the lid) and whatever sits over the shutter,
+  // so it never covers the zoom buttons, the tip or the buttons under it.
+  const step = svg.closest('.cap-step');
+  const boxes = (sel) => [...step.querySelectorAll(sel)].filter((el) => el.offsetParent).map((el) => el.getBoundingClientRect());
+  const bar = boxes('.cam-top')[0];
+  const top = (bar ? bar.bottom : 60) + 52;
+  const lows = boxes('.cam-bottom, .frame-bottom, .cam-zooms, .cam-tip').map((r) => r.top);
+  const bottom = (lows.length ? Math.min(...lows) : H) - 16;
+  const jh = Math.max(160, Math.min(bottom - top, Math.min(W * 0.78, 340) * JAR_RATIO));
   const jw = jh / JAR_RATIO;
-  const x = (W - jw) / 2, y = (H - jh) / 2 - H * 0.02;
+  const x = (W - jw) / 2, y = top + Math.max(0, (bottom - top - jh) / 2);
   // Place the photo's coordinate space so its jar box lands at x,y, jw wide.
   const place = `translate(${x} ${y}) scale(${jw / BOX.w}) translate(${-BOX.x} ${-BOX.y})`;
   const k = jw / BOX.w;
@@ -1039,7 +1047,7 @@ function layoutCameraFrame(svg = $('#camFrame'), maskId = 'camMask') {
     <g transform="${place}">${jarSvg({ lidded: true }).replace(/^<svg[^>]*>|<\/svg>\s*$/g, '')}</g>`;
   // The hint sits just above the lid, clear of the close button.
   const hint = svg.parentElement.querySelector('.cam-hint');
-  if (hint) hint.style.top = `${Math.max(y - 44, 60)}px`;
+  if (hint) hint.style.top = `${Math.max(y - 44, bar ? bar.bottom + 8 : 60)}px`;
 }
 
 async function openCapture() {
@@ -1093,7 +1101,7 @@ async function startCamera() {
 
 // The camera's own zoom where the browser offers it (a phone may switch to its other lenses);
 // otherwise the preview is scaled up and the shot is cut from the middle of the frame, up to 4x.
-const zoom = { k: 1, min: 1, max: 4, hw: false, busy: false, want: null };
+const zoom = { k: 1, min: 1, max: 4, hw: false, busy: false, want: null, stops: [1] };
 
 function setupZoom() {
   const track = stream?.getVideoTracks()[0];
@@ -1104,13 +1112,29 @@ function setupZoom() {
   zoom.max = zoom.hw ? Math.min(caps.max, 10) : 4;
   zoom.busy = false;
   zoom.want = null;
+  // Stops like a phone camera's: the ones this camera can reach, 1× always among them.
+  const stops = zoom.hw ? [0.5, 1, 2, 3, 5, 10] : [1, 2, 3, 4];
+  zoom.stops = stops.filter((n) => n >= zoom.min - 0.01 && n <= zoom.max + 0.01);
+  $('#camZooms').innerHTML = zoom.stops.map((n) => `<button type="button" data-zoom="${n}" aria-label="${n}×">${n}</button>`).join('');
   $('#camVideo').style.setProperty('--zoom', 1);
   setZoom(1);
+  layoutCameraFrame();
+}
+
+/** The stop you're at or past lights up and reads the exact zoom, e.g. 2.4×; the others show their number. */
+function showZoom() {
+  const at = [...zoom.stops].reverse().find((n) => zoom.k >= n - 0.05) ?? zoom.stops[0];
+  $('#camZooms').querySelectorAll('[data-zoom]').forEach((b) => {
+    const n = Number(b.dataset.zoom), on = n === at;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', String(on));
+    b.textContent = on ? `${Number(zoom.k.toFixed(zoom.k < 10 ? 1 : 0))}×` : String(n);
+  });
 }
 
 function setZoom(k) {
   zoom.k = Math.min(zoom.max, Math.max(zoom.min, k));
-  $('#camZoom').textContent = `${Number(zoom.k.toFixed(zoom.k < 10 ? 1 : 0))}×`;
+  showZoom();
   if (!zoom.hw) { $('#camVideo').style.setProperty('--zoom', zoom.k); return; }
   // One change at a time; a pinch moves faster than the camera, so only the latest value waits.
   zoom.want = zoom.k;
@@ -1126,7 +1150,7 @@ function setZoom(k) {
   });
 }
 
-/** Two fingers anywhere on the camera pinch; a mouse wheel zooms; the button jumps between 1× and 2×. */
+/** Two fingers anywhere on the camera pinch; a mouse wheel zooms; the stops above the shutter jump straight there. */
 function bindCameraZoom() {
   const camStep = cap.querySelector('.cam');
   const touches = new Map();
@@ -1152,7 +1176,10 @@ function bindCameraZoom() {
     e.preventDefault();
     setZoom(zoom.k * Math.exp(-e.deltaY * 0.0015));
   }, { passive: false });
-  $('#camZoom').addEventListener('click', () => setZoom(Math.abs(zoom.k - 1) < 0.05 ? 2 : 1));
+  $('#camZooms').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-zoom]');
+    if (b) setZoom(Number(b.dataset.zoom));
+  });
 }
 
 async function flipCamera() {

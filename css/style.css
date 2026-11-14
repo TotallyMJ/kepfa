@@ -962,25 +962,35 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .cam-icon { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: rgba(20, 18, 16, .38); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: var(--camera-ink); cursor: pointer; }
 .cam-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .cam.is-front video { transform: scaleX(-1) scale(var(--zoom, 1)); }
-/* Zoom, just above the shutter like a phone camera's 1× button. */
-.cam-zoom {
+/* Zoom stops just above the shutter, like a phone camera's .5 1 2 3. */
+.cam-zooms {
   position: absolute;
   left: 50%;
   bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-6) + 72px + var(--s-4));
   z-index: 2;
-  min-width: 44px; height: 44px;
-  padding: 0 10px;
-  border: 0;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
   border-radius: 999px;
-  background: rgba(20, 18, 16, .45);
+  background: rgba(20, 18, 16, .38);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
-  color: var(--camera-ink);
-  font: 500 var(--t-sm) var(--f-mono);
   transform: translateX(-50%);
+}
+.cam-zooms:empty { display: none; }
+.cam-zooms button {
+  min-width: 36px; height: 36px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--camera-ink);
+  font: 500 12px var(--f-mono);
+  opacity: .8;
   cursor: pointer;
 }
-.cam.no-camera .cam-zoom { display: none; }
+.cam-zooms button.is-on { min-width: 44px; background: rgba(20, 18, 16, .6); color: #F4D58D; opacity: 1; }
+.cam.no-camera .cam-zooms { display: none; }
 /* A white disc in a white ring, so it reads as the shutter on any sky. */
 .shutter {
   position: relative;
