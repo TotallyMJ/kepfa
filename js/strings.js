@@ -207,17 +207,18 @@ export const THEMES = {
   },
   10: {
     name: 'Me & the sky',
+    // Every one is a quick selfie from a flattering angle: front camera held a little low, you in the frame, mostly sky.
     prompts: [
-      'The sky through your fingers.', 'Your hand reaching for the sky.', 'Your shadow and a bit of sky.',
-      'The sky above your shoes.', 'The sky resting in your palm.', 'The sky over your shoulder.',
-      'Your silhouette against a bright sky.', 'The sky in your sunglasses or a window.', 'The sky behind your drink.',
-      'The sky over your lunch.', 'Your thumbs-up against the sky.', 'The sky framed by your two hands.',
-      'The sky from flat on your back.', 'The sky above your front door.', 'Your finger pointing at the sky.',
-      'The sky with your sleeve in it.', 'The sky behind your keys.', 'The sky from your usual seat.',
-      'The sky as you step outside.', 'The sky on your way home.', 'The sky with your bag in the shot.',
-      'The sky as you look back over your shoulder.', 'The sky through a circle of your fingers.', 'The sky with your favorite color in the shot.',
-      'The sky you’d send to a friend right now.', 'Your reflection, with the sky in the window.', 'The sky straight above your head.',
-      'Your hand on a wall, with the sky above.', 'The first sky you see today, with you in it.', 'The sky from your bed or sofa, through a window.',
+      'Your hand reaching for the sky.', 'The sky through your fingers.', 'You, looking up at the sky.',
+      'A low-angle selfie, all sky behind.', 'The sky over your shoulder.', 'Your profile against the sky.',
+      'Your smile, with blue behind it.', 'The sky in your sunglasses.', 'Your hair against the sky.',
+      'A peace sign against the sky.', 'Eyes closed, sky behind.', 'You, with the light behind you.',
+      'Your favorite color against the sky.', 'You and the sky on your way out.', 'Your finger pointing at the sky.',
+      'Half you, half sky.', 'A finger heart against the sky.', 'You and whatever the sky is doing.',
+      'A selfie with the sky on your way home.', 'Your drink raised to the sky.', 'You and the afternoon sky.',
+      'Glancing back, sky behind.', 'The sky through a circle of your fingers.', 'Your face turned to the light.',
+      'A selfie for a friend, with today’s sky.', 'You, mid-laugh, under the sky.', 'You and the sky at dusk.',
+      'Chin up, sky behind.', 'The first sky of your day, with you.', 'The last sky of November, with you.',
     ],
   },
   11: {
