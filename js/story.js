@@ -1155,7 +1155,7 @@ async function storyStamp(p) {
 
 // ---------- sticker ----------
 
-const STICKER_W = 800, EDGE = 14;
+const STICKER_W = 800, EDGE = 28;
 
 /** One sky in its jar and nothing else: a see-through PNG with a thin white die-cut edge,
    so it can be pasted into an Instagram story as a sticker and still read on any photo. */
@@ -1189,9 +1189,12 @@ async function storySticker(sky) {
   const c = document.createElement('canvas');
   c.width = w + pad * 2; c.height = h + pad * 2;
   const ctx = c.getContext('2d');
-  for (let i = 0; i < 32; i++) {
-    const a = (i / 32) * Math.PI * 2;
-    ctx.drawImage(cut, pad + Math.cos(a) * EDGE, pad + Math.sin(a) * EDGE);
+  // In rings, so a thick edge stays smooth instead of scalloped.
+  for (const r of [EDGE / 3, (EDGE * 2) / 3, EDGE]) {
+    for (let i = 0; i < 48; i++) {
+      const a = (i / 48) * Math.PI * 2;
+      ctx.drawImage(cut, pad + Math.cos(a) * r, pad + Math.sin(a) * r);
+    }
   }
   ctx.drawImage(cut, pad, pad);
   ctx.drawImage(jar, pad, pad);
