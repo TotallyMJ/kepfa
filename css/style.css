@@ -921,7 +921,8 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .done-actions .btn { width: 100%; min-height: 52px; font-size: var(--t-body); font-weight: 500; }
 .done-actions .btn-text { padding: 0 var(--s-3); border-radius: 4px; background: rgba(253, 252, 248, .75); }
 .cap-step { position: absolute; inset: 0; }
-.cam video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cam { touch-action: none; }
+.cam video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(var(--zoom, 1)); }
 .cam-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; stroke: none; }
 .cam.no-camera .cam-frame, .cam.no-camera .cam-bottom { display: none; }
 .cam-scrim { fill: var(--camera); fill-opacity: .74; }
@@ -960,7 +961,26 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 /* Close, photos and front/back flip: the same round icon button, like every camera app. */
 .cam-icon { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: rgba(20, 18, 16, .38); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: var(--camera-ink); cursor: pointer; }
 .cam-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.cam.is-front video { transform: scaleX(-1); }
+.cam.is-front video { transform: scaleX(-1) scale(var(--zoom, 1)); }
+/* Zoom, just above the shutter like a phone camera's 1× button. */
+.cam-zoom {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-6) + 72px + var(--s-4));
+  z-index: 2;
+  min-width: 44px; height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(20, 18, 16, .45);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--camera-ink);
+  font: 500 var(--t-sm) var(--f-mono);
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+.cam.no-camera .cam-zoom { display: none; }
 /* A white disc in a white ring, so it reads as the shutter on any sky. */
 .shutter {
   position: relative;
@@ -985,7 +1005,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .shutter.is-recording .shutter-progress { animation: live-fill 3s linear forwards; }
 @keyframes live-fill { to { stroke-dashoffset: 0; } }
 .rec-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--stamp); vertical-align: 1px; }
-.cam-tip { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-6) + 72px + var(--s-4)); z-index: 2; margin: 0; text-align: center; font-size: var(--t-cap); color: var(--camera-ink); opacity: .85; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+.cam-tip { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-6) + 72px + var(--s-4) + 44px + var(--s-2)); z-index: 2; margin: 0; text-align: center; font-size: var(--t-cap); color: var(--camera-ink); opacity: .85; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
 .cam-fallback {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;

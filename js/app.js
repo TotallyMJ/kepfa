@@ -1086,6 +1086,73 @@ async function startCamera() {
   const v = $('#camVideo');
   v.srcObject = stream;
   await v.play();
+  setupZoom();
+}
+
+// ---------- zoom: pinch on the camera, or tap 1× / 2× ----------
+
+// The camera's own zoom where the browser offers it (a phone may switch to its other lenses);
+// otherwise the preview is scaled up and the shot is cut from the middle of the frame, up to 4x.
+const zoom = { k: 1, min: 1, max: 4, hw: false, busy: false, want: null };
+
+function setupZoom() {
+  const track = stream?.getVideoTracks()[0];
+  let caps = null;
+  try { caps = track?.getCapabilities?.().zoom || null; } catch { /* no camera zoom */ }
+  zoom.hw = !!(caps && caps.max > caps.min);
+  zoom.min = zoom.hw ? Math.max(caps.min, 0.5) : 1;
+  zoom.max = zoom.hw ? Math.min(caps.max, 10) : 4;
+  zoom.busy = false;
+  zoom.want = null;
+  $('#camVideo').style.setProperty('--zoom', 1);
+  setZoom(1);
+}
+
+function setZoom(k) {
+  zoom.k = Math.min(zoom.max, Math.max(zoom.min, k));
+  $('#camZoom').textContent = `${Number(zoom.k.toFixed(zoom.k < 10 ? 1 : 0))}×`;
+  if (!zoom.hw) { $('#camVideo').style.setProperty('--zoom', zoom.k); return; }
+  // One change at a time; a pinch moves faster than the camera, so only the latest value waits.
+  zoom.want = zoom.k;
+  if (zoom.busy) return;
+  const track = stream?.getVideoTracks()[0];
+  if (!track) return;
+  zoom.busy = true;
+  const next = zoom.want;
+  zoom.want = null;
+  track.applyConstraints({ advanced: [{ zoom: next }] }).catch(() => {}).finally(() => {
+    zoom.busy = false;
+    if (zoom.want != null && stream?.getVideoTracks()[0] === track) setZoom(zoom.want);
+  });
+}
+
+/** Two fingers anywhere on the camera pinch; a mouse wheel zooms; the button jumps between 1× and 2×. */
+function bindCameraZoom() {
+  const camStep = cap.querySelector('.cam');
+  const touches = new Map();
+  let pinch = null;
+  const spread = () => { const [a, b] = [...touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  camStep.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' || e.target.closest('button, label, a')) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) pinch = { d: spread(), k: zoom.k };
+  });
+  camStep.addEventListener('pointermove', (e) => {
+    if (!touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && touches.size === 2 && pinch.d > 0) setZoom(pinch.k * (spread() / pinch.d));
+  });
+  const lift = (e) => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; };
+  camStep.addEventListener('pointerup', lift);
+  camStep.addEventListener('pointercancel', lift);
+  // iPhone's own page pinch would otherwise zoom the whole app.
+  camStep.addEventListener('gesturestart', (e) => e.preventDefault());
+  camStep.addEventListener('wheel', (e) => {
+    if (!stream) return;
+    e.preventDefault();
+    setZoom(zoom.k * Math.exp(-e.deltaY * 0.0015));
+  }, { passive: false });
+  $('#camZoom').addEventListener('click', () => setZoom(Math.abs(zoom.k - 1) < 0.05 ? 2 : 1));
 }
 
 async function flipCamera() {
@@ -1134,9 +1201,12 @@ function camCrop(v) {
   const s = Math.max(innerWidth / vw, innerHeight / vh);
   const ox = (innerWidth - vw * s) / 2, oy = (innerHeight - vh * s) / 2;
   // A mirrored preview shows the jar window's left edge from the frame's right side; the saved photo reads the right way round.
-  const wx = v.closest('.is-front') ? innerWidth - camWindow.x - camWindow.w : camWindow.x;
-  const sx = Math.max(0, (wx - ox) / s), sy = Math.max(0, (camWindow.y - oy) / s);
-  return { sx, sy, sw: Math.min(vw - sx, camWindow.w / s), sh: Math.min(vh - sy, camWindow.h / s) };
+  const mx = v.closest('.is-front') ? innerWidth - camWindow.x - camWindow.w : camWindow.x;
+  // A preview scaled up from its middle (zoom without the camera's own) shows less of the frame: undo that scale.
+  const z = zoom.hw ? 1 : zoom.k, cx = innerWidth / 2, cy = innerHeight / 2;
+  const wx = cx + (mx - cx) / z, wy = cy + (camWindow.y - cy) / z;
+  const sx = Math.max(0, (wx - ox) / s), sy = Math.max(0, (wy - oy) / s);
+  return { sx, sy, sw: Math.min(vw - sx, camWindow.w / z / s), sh: Math.min(vh - sy, camWindow.h / z / s) };
 }
 
 /** What's in the jar right now, as a full-size JPEG. */
@@ -2353,6 +2423,7 @@ function markSeeded() {
 function bindGlobal() {
   $('#openCapture').addEventListener('click', () => { state.viaPrompt = false; openCapture(); });
   bindShutter();
+  bindCameraZoom();
   $('#camFlip').addEventListener('click', flipCamera);
   $('#fileLibrary').addEventListener('change', picked);
   $('#fileCamera').addEventListener('change', picked);
