@@ -385,6 +385,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .seg + .masthead { margin-top: var(--s-3); }
 /* Two ways to share one sky, at the top of the share sheet: the same pill switch, buttons instead of links. */
 .seg-2 { grid-template-columns: repeat(2, 1fr); width: 220px; margin: 0 auto var(--s-3); }
+.seg-3 { grid-template-columns: repeat(3, 1fr); width: 288px; margin: 0 auto var(--s-3); }
 .seg button { min-height: 32px; border: 0; border-radius: 999px; background: none; font: inherit; font-size: var(--t-sm); color: var(--ink-soft); }
 .seg button[aria-checked="true"] { background: var(--paper); color: var(--ink); font-weight: 500; box-shadow: 0 1px 3px rgba(30, 28, 25, .18); }
 .month-nav { display: flex; justify-content: space-between; align-items: center; margin-top: var(--s-2); }
@@ -1482,6 +1483,11 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   place-items: center;
 }
 .story-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* A sticker shows on a checkerboard, so its see-through edge reads as see-through. */
+.story-preview.is-sticker {
+  background: repeating-conic-gradient(rgba(127, 120, 110, .16) 0 25%, transparent 0 50%) 0 0 / 16px 16px, var(--paper);
+}
+.story-preview.is-sticker img { object-fit: contain; padding: 12%; box-sizing: border-box; }
 .switch {
   display: flex;
   align-items: center;

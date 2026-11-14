@@ -1,7 +1,7 @@
 // 1080×1920 images sized for an Instagram story, printed on paper under a Kepfa quote:
 // one jarred sky with its handwritten note, one month's jar, or the whole year's shelf.
 
-import { drawJar, jarPoint, JAR_RATIO, INSIDE } from './jar.js';
+import { drawJar, jarPoint, JAR_RATIO, INSIDE, INTERIOR, BOX } from './jar.js';
 import { loadThumbs, ROLLS, paperIndex, pileFor, drawPile } from './pile.js';
 import { loadImage } from './sky.js';
 import { t, fmt, MONTHS, MONTHS_SHORT, CHALLENGE_TAG, CHALLENGE_SIZE, HASHTAG } from './strings.js';
@@ -1153,9 +1153,58 @@ async function storyStamp(p) {
   return toBlob(c);
 }
 
+// ---------- sticker ----------
+
+const STICKER_W = 800, EDGE = 28;
+
+/** One sky in its jar and nothing else: a see-through PNG with a thin white die-cut edge,
+   so it can be pasted into an Instagram story as a sticker and still read on any photo. */
+async function storySticker(sky) {
+  const w = STICKER_W, h = Math.round(w * JAR_RATIO);
+  const jar = document.createElement('canvas');
+  jar.width = w; jar.height = h;
+  const { img, release } = await loadImage(sky.photo);
+  drawJar(jar.getContext('2d'), { x: 0, y: 0, w, image: img });
+  release();
+
+  // The jar's shape as solid white: anything the glass inks at all, plus the whole inside.
+  const cut = document.createElement('canvas');
+  cut.width = w; cut.height = h;
+  const cx = cut.getContext('2d');
+  cx.drawImage(jar, 0, 0);
+  const px = cx.getImageData(0, 0, w, h);
+  for (let i = 0; i < px.data.length; i += 4) {
+    const on = px.data[i + 3] > 6;
+    px.data[i] = px.data[i + 1] = px.data[i + 2] = 255;
+    px.data[i + 3] = on ? 255 : 0;
+  }
+  cx.putImageData(px, 0, 0);
+  const s = w / BOX.w;
+  cx.setTransform(s, 0, 0, s, -BOX.x * s, -BOX.y * s);
+  cx.fillStyle = '#fff';
+  cx.fill(new Path2D(INTERIOR));
+
+  // Grown outward by EDGE all round, which also closes the pale gaps in the glass walls.
+  const pad = EDGE * 2;
+  const c = document.createElement('canvas');
+  c.width = w + pad * 2; c.height = h + pad * 2;
+  const ctx = c.getContext('2d');
+  // In rings, so a thick edge stays smooth instead of scalloped.
+  for (const r of [EDGE / 3, (EDGE * 2) / 3, EDGE]) {
+    for (let i = 0; i < 48; i++) {
+      const a = (i / 48) * Math.PI * 2;
+      ctx.drawImage(cut, pad + Math.cos(a) * r, pad + Math.sin(a) * r);
+    }
+  }
+  ctx.drawImage(cut, pad, pad);
+  ctx.drawImage(jar, pad, pad);
+  return new Promise((resolve) => c.toBlob(resolve, 'image/png'));
+}
+
 export async function makeStory(kind, payload) {
   await fontsReady();
   if (kind === 'single') {
+    if (payload.style === 'sticker') return storySticker(payload.sky);
     return payload.style === 'jar'
       ? storySingleJar(payload.sky, payload.showPlace, payload.quote)
       : storySingle(payload.sky, payload.showPlace, payload.quote, payload.monthSkies);

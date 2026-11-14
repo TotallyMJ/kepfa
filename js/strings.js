@@ -546,7 +546,12 @@ export const t = {
 
   shareTitle: { single: 'Share this sky', jar: (m) => `Share ${m}’s jar`, year: () => 'Share my year in skies', done: `Share my ${CHALLENGE_SIZE} days`, stamp: 'Share this postcard' },
   shareStyle: 'Share as',
-  shareStyles: { polaroid: 'Polaroid', jar: 'Jar' },
+  shareStyles: { polaroid: 'Polaroid', jar: 'Jar', sticker: 'Sticker' },
+  copySticker: 'Copy sticker',
+  savePng: 'Save PNG',
+  stickerHint: 'Copy it, open an Instagram story and paste. On some phones: save it, then add it with the photo sticker.',
+  stickerCopied: 'Sticker copied. Open your story and paste.',
+  stickerCopyFailed: 'Couldn’t copy here, so it’s ready to share or save instead.',
   showPlace: 'Show place',
   showPlaceHint: 'Stays the way you last set it. No GPS ever leaves with the image.',
   close: 'Close',

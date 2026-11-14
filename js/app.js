@@ -21,6 +21,7 @@ const ICON = {
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M6 11v7.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>',
   save: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg>',
   live: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="1.6" fill="currentColor"/><circle cx="6" cy="6" r="3.6"/><circle cx="6" cy="6" r="5.4" stroke-dasharray="1.2 1.4"/></svg>',
   pen: '<svg class="pen" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
   camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.3-2h6l1.3 2h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>',
@@ -2181,28 +2182,43 @@ async function openStory(kind, payload) {
   try { placeOn = localStorage.getItem('kepfa.showPlace') === '1'; } catch { /* stays off */ }
   // One sky shares as a polaroid with a small jar, or as the jar itself full of the sky; the last choice sticks.
   let style = 'polaroid';
-  try { if (localStorage.getItem('kepfa.shareStyle') === 'jar') style = 'jar'; } catch { /* polaroid */ }
+  try {
+    const last = localStorage.getItem('kepfa.shareStyle');
+    if (last === 'jar' || last === 'sticker') style = last;
+  } catch { /* polaroid */ }
   const challenge = kind === 'single' ? challengeFor(payload.sky) : null;
   // A single sky's jar holds that month's pile.
   const monthSkies = kind === 'single' ? skiesIn(new Date(payload.sky.takenAt).getFullYear(), new Date(payload.sky.takenAt).getMonth()) : null;
   art.innerHTML = `
     <div class="grabber"></div>
     <div class="sheet-head"><span></span><h2>${title}</h2><button type="button" class="viewer-icon" data-close-story aria-label="${t.close}">${ICON.close}</button></div>
-    ${kind === 'single' ? `<div class="seg seg-2" role="radiogroup" aria-label="${t.shareStyle}">
-      ${['polaroid', 'jar'].map((k) => `<button type="button" role="radio" data-style="${k}" aria-checked="${k === style}">${t.shareStyles[k]}</button>`).join('')}
+    ${kind === 'single' ? `<div class="seg seg-3" role="radiogroup" aria-label="${t.shareStyle}">
+      ${['polaroid', 'jar', 'sticker'].map((k) => `<button type="button" role="radio" data-style="${k}" aria-checked="${k === style}">${t.shareStyles[k]}</button>`).join('')}
     </div>` : ''}
     <div class="story-preview" id="storyPreview"><div class="spinner"></div></div>
-    ${canShowPlace ? `<label class="switch"><span>${t.showPlace}</span><input type="checkbox" id="showPlace" ${placeOn ? 'checked' : ''}></label>
-      <p class="hint place-note">${t.showPlaceHint}</p>` : ''}
+    ${canShowPlace ? `<label class="switch" id="placeRow"><span>${t.showPlace}</span><input type="checkbox" id="showPlace" ${placeOn ? 'checked' : ''}></label>
+      <p class="hint place-note" id="placeNote">${t.showPlaceHint}</p>` : ''}
     <div class="sheet-actions">
-      <button type="button" class="btn" id="saveStory" disabled>${ICON.save}${t.saveImage}</button>
-      <button type="button" class="btn primary" id="shareStory" disabled>${ICON.share}${t.share}</button>
+      <button type="button" class="btn" id="saveStory" disabled></button>
+      <button type="button" class="btn primary" id="shareStory" disabled></button>
     </div>
-    <p class="hint">${t.captionHint}</p>`;
+    <p class="hint" id="storyHint"></p>`;
   wrap.hidden = false;
   document.body.style.overflow = 'hidden';
 
-  const filename = `kepfa-${kind}-${new Date().toISOString().slice(0, 10)}.jpg`;
+  const day = new Date().toISOString().slice(0, 10);
+  const sticker = () => kind === 'single' && style === 'sticker';
+  const filename = () => (sticker() ? `kepfa-sticker-${day}.png` : `kepfa-${kind}-${day}.jpg`);
+  // A sticker is only the jar: no place tag, PNG buttons, and no caption copy, which would take the clipboard.
+  const dress = () => {
+    const on = sticker();
+    $('#storyPreview').classList.toggle('is-sticker', on);
+    for (const id of ['#placeRow', '#placeNote']) { const el = $(id); if (el) el.hidden = on; }
+    $('#saveStory').innerHTML = `${ICON.save}${on ? t.savePng : t.saveImage}`;
+    $('#shareStory').innerHTML = `${on ? ICON.copy : ICON.share}${on ? t.copySticker : t.share}`;
+    $('#storyHint').textContent = on ? t.stickerHint : t.captionHint;
+  };
+  dress();
   const quote = nextQuote();
   let blob = null;
   let build = 0;
@@ -2236,13 +2252,25 @@ async function openStory(kind, payload) {
     ? navigator.clipboard.writeText(caption).then(() => true, () => false)
     : Promise.resolve(false));
   $('#saveStory').addEventListener('click', async () => {
+    if (sticker()) { saveImage(blob, filename()); toast(t.saved); return; }
     const copying = copyCaption();
-    saveImage(blob, filename);
+    saveImage(blob, filename());
     toast((await copying) ? t.captionCopied : t.saved);
   });
   $('#shareStory').addEventListener('click', async () => {
+    if (sticker()) {
+      // Written in the same tap: iOS only lets the page put an image on the clipboard during the gesture.
+      const copied = navigator.clipboard?.write && window.ClipboardItem
+        ? navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(() => true, () => false)
+        : Promise.resolve(false);
+      if (await copied) { toast(t.stickerCopied); return; }
+      toast(t.stickerCopyFailed);
+      const how = await shareImage(blob, filename());
+      if (how === 'saved') toast(t.sharedFallback);
+      return;
+    }
     const copying = copyCaption();
-    const how = await shareImage(blob, filename);
+    const how = await shareImage(blob, filename());
     if (how === 'saved') toast(t.sharedFallback);
     else if (await copying) toast(t.captionCopied);
   });
@@ -2252,6 +2280,7 @@ async function openStory(kind, payload) {
     style = b.dataset.style;
     try { localStorage.setItem('kepfa.shareStyle', style); } catch { /* this time only */ }
     art.querySelectorAll('[data-style]').forEach((o) => o.setAttribute('aria-checked', String(o === b)));
+    dress();
     make(showPlace);
   }));
   $('#showPlace')?.addEventListener('change', (e) => {
